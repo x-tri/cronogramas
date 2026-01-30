@@ -16,7 +16,8 @@ export type ScheduleRepository = {
 }
 
 export type CronogramaRepository = {
-  getCronograma: (alunoId: string) => Promise<Cronograma | null>
+  getCronograma: (alunoId: string, weekStart?: Date) => Promise<Cronograma | null>
+  getAllCronogramas: (alunoId: string) => Promise<Cronograma[]>
   saveCronograma: (
     cronograma: Omit<Cronograma, 'id' | 'createdAt' | 'updatedAt'>
   ) => Promise<Cronograma>

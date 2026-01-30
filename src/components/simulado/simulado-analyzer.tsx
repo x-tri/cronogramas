@@ -6,6 +6,7 @@ import type { BlocoCronograma, DiaSemana, Turno } from '../../types/domain'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, TURNOS } from '../../types/domain'
 import { TURNOS_CONFIG } from '../../constants/time-slots'
+import { getColorFromQuestionNumber } from '../../constants/colors'
 
 type SimuladoAnalyzerProps = {
   matricula: string
@@ -19,6 +20,9 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
   const blocks = useCronogramaStore((state) => state.blocks)
   const officialSchedule = useCronogramaStore((state) => state.officialSchedule)
   const addBlock = useCronogramaStore((state) => state.addBlock)
+  const cronograma = useCronogramaStore((state) => state.cronograma)
+  const currentStudent = useCronogramaStore((state) => state.currentStudent)
+  const createCronograma = useCronogramaStore((state) => state.createCronograma)
 
   const handleAnalyze = async () => {
     setIsLoading(true)
@@ -93,40 +97,64 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
     return available
   }
 
-  const handleDistribute = () => {
-    if (!result) return
+  const handleDistribute = async () => {
+    if (!result || !currentStudent) return
 
-    const availableSlots = getAvailableSlots()
-    const topicsToDistribute = result.topicsSummary.slice(
-      0,
-      availableSlots.length
-    )
+    try {
+      // Ensure cronograma exists
+      let activeCronograma = cronograma
+      if (!activeCronograma) {
+        const today = new Date()
+        const weekStart = new Date(today)
+        weekStart.setDate(today.getDate() - today.getDay() + 1)
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekStart.getDate() + 6)
 
-    topicsToDistribute.forEach((topic, index) => {
-      const slot = availableSlots[index]
-      if (!slot) return
-
-      const block: BlocoCronograma = {
-        id: `simulado-${Date.now()}-${index}`,
-        cronogramaId: 'temp',
-        diaSemana: slot.dia,
-        turno: slot.turno,
-        horarioInicio: slot.inicio,
-        horarioFim: slot.fim,
-        tipo: 'revisao',
-        titulo: topic.topic,
-        descricao: `${topic.count} erro${topic.count > 1 ? 's' : ''} neste tópico`,
-        disciplinaCodigo: null,
-        cor: '#F59E0B', // Amarelo para revisão
-        prioridade: topic.count >= 3 ? 2 : topic.count >= 2 ? 1 : 0,
-        concluido: false,
-        createdAt: new Date(),
+        activeCronograma = await createCronograma(
+          currentStudent.id,
+          weekStart,
+          weekEnd
+        )
       }
 
-      addBlock(block)
-    })
+      const availableSlots = getAvailableSlots()
+      const topicsToDistribute = result.topicsSummary.slice(
+        0,
+        availableSlots.length
+      )
 
-    setResult(null) // Close after distributing
+      for (let index = 0; index < topicsToDistribute.length; index++) {
+        const topic = topicsToDistribute[index]
+        const slot = availableSlots[index]
+        if (!slot) continue
+
+        // Get color based on question number (Q1-45: LC, Q46-90: CH, Q91-135: CN, Q136-180: MT)
+        const firstQuestion = topic.questions[0] ?? 1
+        const areaColor = getColorFromQuestionNumber(firstQuestion)
+
+        const blockData: Omit<BlocoCronograma, 'id' | 'createdAt'> = {
+          cronogramaId: activeCronograma.id,
+          diaSemana: slot.dia,
+          turno: slot.turno,
+          horarioInicio: slot.inicio,
+          horarioFim: slot.fim,
+          tipo: 'revisao',
+          titulo: topic.topic,
+          descricao: `${topic.count} erro${topic.count > 1 ? 's' : ''} neste tópico (Q${topic.questions.join(', Q')})`,
+          disciplinaCodigo: null,
+          cor: areaColor,
+          prioridade: topic.count >= 3 ? 2 : topic.count >= 2 ? 1 : 0,
+          concluido: false,
+        }
+
+        await addBlock(blockData)
+      }
+
+      setResult(null)
+    } catch (err) {
+      console.error('Failed to distribute blocks:', err)
+      setError('Erro ao distribuir blocos')
+    }
   }
 
   if (!result) {

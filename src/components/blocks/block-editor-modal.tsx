@@ -36,6 +36,9 @@ export function BlockEditorModal({
   const addBlock = useCronogramaStore((state) => state.addBlock)
   const updateBlock = useCronogramaStore((state) => state.updateBlock)
   const cronograma = useCronogramaStore((state) => state.cronograma)
+  const currentStudent = useCronogramaStore((state) => state.currentStudent)
+  const createCronograma = useCronogramaStore((state) => state.createCronograma)
+  const isSaving = useCronogramaStore((state) => state.isSaving)
 
   const [tipo, setTipo] = useState<TipoBloco>(editingBlock?.tipo ?? 'estudo')
   const [descricao, setDescricao] = useState(editingBlock?.descricao ?? '')
@@ -45,6 +48,7 @@ export function BlockEditorModal({
   const [prioridade, setPrioridade] = useState<Prioridade>(
     editingBlock?.prioridade ?? 0
   )
+  const [error, setError] = useState<string | null>(null)
 
   // Generate title automatically
   const generateTitle = () => {
@@ -55,36 +59,60 @@ export function BlockEditorModal({
     return TIPO_BLOCO_LABELS[tipo]
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!slot) return
-
-    const blockData: Omit<BlocoCronograma, 'id' | 'createdAt'> = {
-      cronogramaId: cronograma?.id ?? 'temp',
-      diaSemana: dia,
-      turno,
-      horarioInicio: slot.inicio,
-      horarioFim: slot.fim,
-      tipo,
-      titulo: generateTitle(),
-      descricao: descricao.trim() || null,
-      disciplinaCodigo,
-      cor: null,
-      prioridade,
-      concluido: editingBlock?.concluido ?? false,
+    if (!currentStudent) {
+      setError('Selecione um aluno primeiro')
+      return
     }
 
-    if (editingBlock) {
-      updateBlock(editingBlock.id, blockData)
-    } else {
-      addBlock({
-        ...blockData,
-        id: `block-${Date.now()}`,
-        createdAt: new Date(),
-      })
-    }
+    setError(null)
 
-    onClose()
+    try {
+      // Create cronograma if it doesn't exist
+      let cronogramaId = cronograma?.id
+      if (!cronogramaId) {
+        const today = new Date()
+        const weekStart = new Date(today)
+        weekStart.setDate(today.getDate() - today.getDay() + 1) // Monday
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekStart.getDate() + 6) // Sunday
+
+        const newCronograma = await createCronograma(
+          currentStudent.id,
+          weekStart,
+          weekEnd
+        )
+        cronogramaId = newCronograma.id
+      }
+
+      const blockData: Omit<BlocoCronograma, 'id' | 'createdAt'> = {
+        cronogramaId,
+        diaSemana: dia,
+        turno,
+        horarioInicio: slot.inicio,
+        horarioFim: slot.fim,
+        tipo,
+        titulo: generateTitle(),
+        descricao: descricao.trim() || null,
+        disciplinaCodigo,
+        cor: null,
+        prioridade,
+        concluido: editingBlock?.concluido ?? false,
+      }
+
+      if (editingBlock) {
+        await updateBlock(editingBlock.id, blockData)
+      } else {
+        await addBlock(blockData)
+      }
+
+      onClose()
+    } catch (err) {
+      console.error('Failed to save block:', err)
+      setError(err instanceof Error ? err.message : 'Erro ao salvar bloco')
+    }
   }
 
   if (!slot) return null
@@ -95,13 +123,18 @@ export function BlockEditorModal({
       onClose={onClose}
       title={editingBlock ? 'Editar Bloco' : 'Novo Bloco'}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSubmit}>
-            {editingBlock ? 'Salvar' : 'Adicionar'}
-          </Button>
+        <div className="flex flex-col gap-2">
+          {error && (
+            <div className="text-sm text-red-600 text-right">{error}</div>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={onClose} disabled={isSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmit} isLoading={isSaving}>
+              {editingBlock ? 'Salvar' : 'Adicionar'}
+            </Button>
+          </div>
         </div>
       }
     >

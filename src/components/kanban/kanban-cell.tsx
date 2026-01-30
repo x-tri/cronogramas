@@ -12,6 +12,7 @@ type KanbanCellProps = {
   onBlockEdit?: (block: BlocoCronograma) => void
   onBlockDelete?: (blockId: string) => void
   onBlockChangePriority?: (blockId: string, newPriority: 0 | 1 | 2) => void
+  onBlockToggleComplete?: (blockId: string) => void
 }
 
 export function KanbanCell({
@@ -22,6 +23,7 @@ export function KanbanCell({
   onBlockEdit,
   onBlockDelete,
   onBlockChangePriority,
+  onBlockToggleComplete,
 }: KanbanCellProps) {
   const turnoConfig = TURNOS_CONFIG[turno]
   const blocks = useCronogramaStore((state) => state.blocks)
@@ -55,12 +57,16 @@ export function KanbanCell({
             <TimeSlot
               key={slot.inicio}
               slot={slot}
+              slotIndex={index}
+              dia={dia}
+              turno={turno}
               officialClass={officialClass}
               customBlock={customBlock}
               onClick={() => onSlotClick?.(index)}
               onBlockEdit={onBlockEdit}
               onBlockDelete={onBlockDelete}
               onBlockChangePriority={onBlockChangePriority}
+              onBlockToggleComplete={onBlockToggleComplete}
             />
           )
         })}

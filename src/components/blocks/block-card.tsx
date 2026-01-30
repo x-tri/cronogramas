@@ -1,6 +1,6 @@
 import type { BlocoCronograma } from '../../types/domain'
 import { TIPO_BLOCO_LABELS, PRIORIDADE_LABELS } from '../../types/domain'
-import { CORES_TIPOS, CORES_PRIORIDADE } from '../../constants/colors'
+import { CORES_PRIORIDADE, getBlockColorWithAutoDetect } from '../../constants/colors'
 
 const PRIORIDADE_CONFIG = {
   0: { bg: 'bg-gray-200', text: 'text-gray-700', label: 'Normal' },
@@ -13,11 +13,13 @@ type BlockCardProps = {
   onEdit?: () => void
   onDelete?: () => void
   onChangePriority?: (newPriority: 0 | 1 | 2) => void
+  onToggleComplete?: () => void
   isDragging?: boolean
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>
 }
 
-export function BlockCard({ block, onEdit, onDelete, onChangePriority, isDragging }: BlockCardProps) {
-  const backgroundColor = block.cor ?? CORES_TIPOS[block.tipo]
+export function BlockCard({ block, onEdit, onDelete, onChangePriority, onToggleComplete, isDragging, dragHandleProps }: BlockCardProps) {
+  const backgroundColor = getBlockColorWithAutoDetect(block.tipo, block.titulo, null, block.cor)
 
   const cyclePriority = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -42,10 +44,27 @@ export function BlockCard({ block, onEdit, onDelete, onChangePriority, isDraggin
         relative p-2 rounded-lg text-white text-xs shadow-sm
         transition-all duration-150
         ${isDragging ? 'opacity-50 scale-105 shadow-lg' : 'opacity-100'}
-        ${onEdit ? 'cursor-grab active:cursor-grabbing' : ''}
       `}
       style={{ backgroundColor }}
     >
+      {/* Drag handle - apenas esta área é arrastável */}
+      {dragHandleProps && (
+        <div
+          {...dragHandleProps}
+          className="absolute top-1 left-1 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-white/20 z-10"
+          title="Arrastar bloco"
+        >
+          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5" cy="5" r="2"/>
+            <circle cx="12" cy="5" r="2"/>
+            <circle cx="5" cy="12" r="2"/>
+            <circle cx="12" cy="12" r="2"/>
+            <circle cx="5" cy="19" r="2"/>
+            <circle cx="12" cy="19" r="2"/>
+          </svg>
+        </div>
+      )}
+
       {/* Priority indicator */}
       {block.prioridade > 0 && (
         <div
@@ -56,7 +75,7 @@ export function BlockCard({ block, onEdit, onDelete, onChangePriority, isDraggin
       )}
 
       {/* Title */}
-      <div className="font-medium truncate pr-1">{block.titulo}</div>
+      <div className={`font-medium truncate pr-1 ${dragHandleProps ? 'pl-5' : ''}`}>{block.titulo}</div>
 
       {/* Type label */}
       <div className="text-[10px] opacity-80 mt-0.5">
@@ -69,8 +88,24 @@ export function BlockCard({ block, onEdit, onDelete, onChangePriority, isDraggin
       </div>
 
       {/* Action buttons - always visible */}
-      {(onEdit || onDelete || onChangePriority) && (
+      {(onEdit || onDelete || onChangePriority || onToggleComplete) && (
         <div className="flex gap-1 mt-2 pt-1.5 border-t border-white/30">
+          {onToggleComplete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleComplete()
+              }}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                block.concluido
+                  ? 'bg-green-500 hover:bg-green-600'
+                  : 'bg-white/20 hover:bg-white/30'
+              }`}
+              title={block.concluido ? 'Marcar como pendente' : 'Marcar como concluído'}
+            >
+              {block.concluido ? '✓' : '○'}
+            </button>
+          )}
           {onEdit && (
             <button
               onClick={(e) => {

@@ -7,6 +7,7 @@ import type { DataRepository } from './repository'
 import { ALL_STUDENTS } from './mock-data/students'
 import { DISCIPLINAS, DISCIPLINAS_BY_CODE } from './mock-data/subjects'
 import { getHorariosPorTurma } from './mock-data/schedules'
+import { createSupabaseRepository } from './supabase-repository'
 
 const delay = <T>(value: T, ms = 100): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), ms))
@@ -62,6 +63,13 @@ export function createMockRepository(): DataRepository {
     cronogramas: {
       getCronograma: async (alunoId) => {
         return delay(cronogramasStore.get(alunoId) ?? null)
+      },
+
+      getAllCronogramas: async (alunoId) => {
+        const all = Array.from(cronogramasStore.values()).filter(
+          (c) => c.alunoId === alunoId
+        )
+        return delay(all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()))
       },
 
       saveCronograma: async (data) => {
@@ -151,7 +159,18 @@ let repositoryInstance: DataRepository | null = null
 
 export function getRepository(): DataRepository {
   if (!repositoryInstance) {
-    repositoryInstance = createMockRepository()
+    // Try Supabase first, fallback to mock if unavailable
+    try {
+      repositoryInstance = createSupabaseRepository()
+    } catch (error) {
+      console.warn('Supabase unavailable, using mock repository:', error)
+      repositoryInstance = createMockRepository()
+    }
   }
   return repositoryInstance
+}
+
+// Force mock repository (useful for testing)
+export function useMockRepository(): void {
+  repositoryInstance = createMockRepository()
 }

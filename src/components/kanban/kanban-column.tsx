@@ -10,6 +10,7 @@ type KanbanColumnProps = {
   onBlockEdit?: (block: BlocoCronograma) => void
   onBlockDelete?: (blockId: string) => void
   onBlockChangePriority?: (blockId: string, newPriority: 0 | 1 | 2) => void
+  onBlockToggleComplete?: (blockId: string) => void
 }
 
 export function KanbanColumn({
@@ -19,6 +20,7 @@ export function KanbanColumn({
   onBlockEdit,
   onBlockDelete,
   onBlockChangePriority,
+  onBlockToggleComplete,
 }: KanbanColumnProps) {
   const diaConfig = DIAS_CONFIG[dia]
   const isWeekend = diaConfig.livre
@@ -55,6 +57,7 @@ export function KanbanColumn({
             onBlockEdit={onBlockEdit}
             onBlockDelete={onBlockDelete}
             onBlockChangePriority={onBlockChangePriority}
+            onBlockToggleComplete={onBlockToggleComplete}
           />
         ))}
       </div>

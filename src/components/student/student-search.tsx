@@ -15,6 +15,7 @@ export function StudentSearch() {
     setStudent,
     setOfficialSchedule,
     setLoadingSchedule,
+    loadCronograma,
   } = useCronogramaStore()
 
   const handleSearch = async () => {
@@ -43,6 +44,7 @@ export function StudentSearch() {
             turma: supabaseStudent.turma ?? 'A',
             email: null,
             fotoFilename: null,
+            createdAt: new Date(),
           }
         }
       }
@@ -59,6 +61,9 @@ export function StudentSearch() {
       setLoadingSchedule(true)
       const schedule = await repo.schedules.getOfficialSchedule(student.turma)
       setOfficialSchedule(schedule)
+
+      // Load existing cronograma and blocks for this student
+      await loadCronograma(student.id)
     } catch (err) {
       setError('Erro ao buscar aluno')
       console.error(err)

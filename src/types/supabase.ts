@@ -1,3 +1,109 @@
+import type {
+  Cronograma,
+  BlocoCronograma,
+  DiaSemana,
+  Turno,
+  TipoBloco,
+  Prioridade,
+} from './domain'
+
+// ============ ROW TYPES (snake_case - como vem do banco) ============
+
+export type CronogramaRow = {
+  id: string
+  aluno_id: string
+  semana_inicio: string
+  semana_fim: string
+  observacoes: string | null
+  status: 'ativo' | 'arquivado'
+  created_at: string
+  updated_at: string
+}
+
+export type BlocoCronogramaRow = {
+  id: string
+  cronograma_id: string
+  dia_semana: string
+  horario_inicio: string
+  horario_fim: string
+  turno: string
+  tipo: string
+  titulo: string
+  descricao: string | null
+  disciplina_codigo: string | null
+  cor: string | null
+  prioridade: number
+  concluido: boolean
+  created_at: string
+}
+
+// ============ CONVERSION FUNCTIONS ============
+
+export function cronogramaFromRow(row: CronogramaRow): Cronograma {
+  return {
+    id: row.id,
+    alunoId: row.aluno_id,
+    semanaInicio: new Date(row.semana_inicio),
+    semanaFim: new Date(row.semana_fim),
+    observacoes: row.observacoes,
+    status: row.status,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  }
+}
+
+export function cronogramaToRow(
+  cronograma: Omit<Cronograma, 'id' | 'createdAt' | 'updatedAt'>
+): Omit<CronogramaRow, 'id' | 'created_at' | 'updated_at'> {
+  return {
+    aluno_id: cronograma.alunoId,
+    semana_inicio: cronograma.semanaInicio.toISOString().split('T')[0],
+    semana_fim: cronograma.semanaFim.toISOString().split('T')[0],
+    observacoes: cronograma.observacoes,
+    status: cronograma.status,
+  }
+}
+
+export function blocoFromRow(row: BlocoCronogramaRow): BlocoCronograma {
+  return {
+    id: row.id,
+    cronogramaId: row.cronograma_id,
+    diaSemana: row.dia_semana as DiaSemana,
+    horarioInicio: row.horario_inicio,
+    horarioFim: row.horario_fim,
+    turno: row.turno as Turno,
+    tipo: row.tipo as TipoBloco,
+    titulo: row.titulo,
+    descricao: row.descricao,
+    disciplinaCodigo: row.disciplina_codigo,
+    cor: row.cor,
+    prioridade: row.prioridade as Prioridade,
+    concluido: row.concluido,
+    createdAt: new Date(row.created_at),
+  }
+}
+
+export function blocoToRow(
+  bloco: Omit<BlocoCronograma, 'id' | 'createdAt'>
+): Omit<BlocoCronogramaRow, 'id' | 'created_at'> {
+  return {
+    cronograma_id: bloco.cronogramaId,
+    dia_semana: bloco.diaSemana,
+    horario_inicio: bloco.horarioInicio,
+    horario_fim: bloco.horarioFim,
+    turno: bloco.turno,
+    tipo: bloco.tipo,
+    titulo: bloco.titulo,
+    descricao: bloco.descricao,
+    disciplina_codigo: bloco.disciplinaCodigo,
+    cor: bloco.cor,
+    prioridade: bloco.prioridade,
+    concluido: bloco.concluido,
+  }
+}
+
+// ============ EXISTING TYPES ============
+
 export type SupabaseStudent = {
   id: string
   matricula: string
