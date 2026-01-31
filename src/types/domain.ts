@@ -92,12 +92,21 @@ export type DiaConfig = {
 
 // ============ DATABASE ENTITIES ============
 
+export const ESCOLAS = ['MARISTA', 'XTRI'] as const
+export type Escola = (typeof ESCOLAS)[number]
+
+export const ESCOLA_LABELS: Record<Escola, string> = {
+  MARISTA: 'Colégio Marista de Natal',
+  XTRI: 'Escola XTRI',
+}
+
 export type Aluno = {
   id: string
   matricula: string
   nome: string
   turma: string
   email: string | null
+  escola: Escola
   fotoFilename: string | null
   createdAt: Date
 }

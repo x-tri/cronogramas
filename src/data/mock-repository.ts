@@ -7,35 +7,149 @@ import type { DataRepository } from './repository'
 import { ALL_STUDENTS } from './mock-data/students'
 import { DISCIPLINAS, DISCIPLINAS_BY_CODE } from './mock-data/subjects'
 import { getHorariosPorTurma } from './mock-data/schedules'
-import { createSupabaseRepository } from './supabase-repository'
+import { 
+  loadFromStorage, 
+  saveToStorage, 
+  type PersistedData 
+} from '../lib/local-storage'
+import { logRepository } from '../config/repository-config'
 
 const delay = <T>(value: T, ms = 100): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), ms))
 
-// In-memory storage for cronogramas during session
-const cronogramasStore = new Map<string, Cronograma>()
-const blocosStore = new Map<string, BlocoCronograma[]>()
-
 let idCounter = 1
-const generateId = () => `mock-${idCounter++}`
+const generateId = () => `mock-${Date.now()}-${idCounter++}`
+
+// In-memory storage
+let cronogramasStore = new Map<string, Cronograma>()
+let blocosStore = new Map<string, BlocoCronograma[]>()
+let isInitialized = false
+
+/** Inicializa o store com dados do localStorage */
+function initializeStore(): void {
+  if (isInitialized) return
+  
+  const persisted = loadFromStorage()
+  if (persisted) {
+    // Restaura cronogramas
+    for (const c of persisted.cronogramas) {
+      const cronograma: Cronograma = {
+        id: c.id,
+        alunoId: c.alunoId,
+        semanaInicio: new Date(c.semanaInicio),
+        semanaFim: new Date(c.semanaFim),
+        observacoes: c.observacoes,
+        status: c.status,
+        createdAt: new Date(c.createdAt),
+        updatedAt: new Date(c.updatedAt),
+      }
+      cronogramasStore.set(c.id, cronograma)
+    }
+
+    // Restaura blocos
+    for (const b of persisted.blocos) {
+      const bloco: BlocoCronograma = {
+        id: b.id,
+        cronogramaId: b.cronogramaId,
+        diaSemana: b.diaSemana as BlocoCronograma['diaSemana'],
+        horarioInicio: b.horarioInicio,
+        horarioFim: b.horarioFim,
+        turno: b.turno as BlocoCronograma['turno'],
+        tipo: b.tipo as BlocoCronograma['tipo'],
+        titulo: b.titulo,
+        descricao: b.descricao,
+        disciplinaCodigo: b.disciplinaCodigo,
+        cor: b.cor,
+        prioridade: b.prioridade as BlocoCronograma['prioridade'],
+        concluido: b.concluido,
+        createdAt: new Date(b.createdAt),
+      }
+      
+      const existing = blocosStore.get(b.cronogramaId) ?? []
+      existing.push(bloco)
+      blocosStore.set(b.cronogramaId, existing)
+    }
+
+    logRepository('Mock repository inicializado com dados persistidos', {
+      cronogramas: cronogramasStore.size,
+      blocos: persisted.blocos.length,
+    })
+  }
+  
+  isInitialized = true
+}
+
+/** Persiste o estado atual no localStorage */
+function persistState(): void {
+  const data: PersistedData = {
+    cronogramas: Array.from(cronogramasStore.values()).map(c => ({
+      id: c.id,
+      alunoId: c.alunoId,
+      semanaInicio: c.semanaInicio.toISOString(),
+      semanaFim: c.semanaFim.toISOString(),
+      observacoes: c.observacoes,
+      status: c.status,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+    })),
+    blocos: Array.from(blocosStore.entries()).flatMap(([, blocos]) => 
+      blocos.map(b => ({
+        id: b.id,
+        cronogramaId: b.cronogramaId,
+        diaSemana: b.diaSemana,
+        horarioInicio: b.horarioInicio,
+        horarioFim: b.horarioFim,
+        turno: b.turno,
+        tipo: b.tipo,
+        titulo: b.titulo,
+        descricao: b.descricao,
+        disciplinaCodigo: b.disciplinaCodigo,
+        cor: b.cor,
+        prioridade: b.prioridade,
+        concluido: b.concluido,
+        createdAt: b.createdAt.toISOString(),
+      }))
+    ),
+    version: 1,
+  }
+  
+  saveToStorage(data)
+}
 
 export function createMockRepository(): DataRepository {
-  return {
+  // Garante que o store está inicializado
+  initializeStore()
+
+  const repo: DataRepository = {
     students: {
       findByMatricula: async (matricula) => {
+        // Busca nos alunos MARISTA
         const found = ALL_STUDENTS.find((s) => s.matricula === matricula)
-        if (!found) return delay(null)
-
-        const aluno: Aluno = {
-          id: found.matricula,
-          matricula: found.matricula,
-          nome: found.nome,
-          turma: found.turma,
-          email: null,
-          fotoFilename: `${found.matricula}.jpg`,
-          createdAt: new Date(),
+        if (found) {
+          const aluno: Aluno = {
+            id: found.matricula,
+            matricula: found.matricula,
+            nome: found.nome,
+            turma: found.turma,
+            email: null,
+            fotoFilename: `${found.matricula}.jpg`,
+            escola: 'MARISTA',
+            createdAt: new Date(),
+          }
+          return delay(aluno)
         }
-        return delay(aluno)
+        
+        // Busca nos alunos XTRI (do localStorage)
+        const alunosXTRI = JSON.parse(localStorage.getItem('xtri-alunos-xtris') || '[]')
+        const foundXTRI = alunosXTRI.find((s: Aluno) => s.matricula === matricula)
+        if (foundXTRI) {
+          return delay({
+            ...foundXTRI,
+            createdAt: new Date(foundXTRI.createdAt),
+          })
+        }
+        
+        return delay(null)
       },
 
       findByTurma: async (turma) => {
@@ -48,9 +162,36 @@ export function createMockRepository(): DataRepository {
             turma: s.turma,
             email: null,
             fotoFilename: `${s.matricula}.jpg`,
+            escola: 'MARISTA' as const,
             createdAt: new Date(),
           }))
         )
+      },
+
+      createAlunoXTRI: async (data) => {
+        const aluno: Aluno = {
+          id: generateId(),
+          matricula: data.matricula,
+          nome: data.nome,
+          turma: data.turma,
+          email: data.email,
+          fotoFilename: data.fotoFilename,
+          escola: 'XTRI',
+          createdAt: new Date(),
+        }
+        
+        // Mock mode: persiste no localStorage
+        // Em produção (Supabase), vai para a tabela alunos_xtris
+        const alunosXTRI = JSON.parse(localStorage.getItem('xtri-alunos-xtris') || '[]')
+        alunosXTRI.push({
+          ...aluno,
+          createdAt: aluno.createdAt.toISOString(),
+        })
+        localStorage.setItem('xtri-alunos-xtris', JSON.stringify(alunosXTRI))
+        
+        logRepository('Aluno XTRI criado (mock)', { matricula: aluno.matricula, nome: aluno.nome })
+        
+        return delay(aluno)
       },
     },
 
@@ -61,8 +202,22 @@ export function createMockRepository(): DataRepository {
     },
 
     cronogramas: {
-      getCronograma: async (alunoId) => {
-        return delay(cronogramasStore.get(alunoId) ?? null)
+      getCronograma: async (alunoId, weekStart) => {
+        // Procura cronograma do aluno para a semana específica
+        for (const c of cronogramasStore.values()) {
+          if (c.alunoId === alunoId) {
+            if (!weekStart) return delay(c)
+            
+            const weekStartTime = weekStart.getTime()
+            const cStartTime = c.semanaInicio.getTime()
+            const cEndTime = c.semanaFim.getTime()
+            
+            if (weekStartTime >= cStartTime && weekStartTime <= cEndTime) {
+              return delay(c)
+            }
+          }
+        }
+        return delay(null)
       },
 
       getAllCronogramas: async (alunoId) => {
@@ -79,15 +234,17 @@ export function createMockRepository(): DataRepository {
           createdAt: new Date(),
           updatedAt: new Date(),
         }
-        cronogramasStore.set(data.alunoId, cronograma)
+        cronogramasStore.set(cronograma.id, cronograma)
         blocosStore.set(cronograma.id, [])
+        
+        persistState()
+        logRepository('Cronograma criado', { id: cronograma.id })
+        
         return delay(cronograma)
       },
 
       updateCronograma: async (id, updates) => {
-        const existing = Array.from(cronogramasStore.values()).find(
-          (c) => c.id === id
-        )
+        const existing = cronogramasStore.get(id)
         if (!existing) throw new Error(`Cronograma ${id} not found`)
 
         const updated: Cronograma = {
@@ -95,7 +252,11 @@ export function createMockRepository(): DataRepository {
           ...updates,
           updatedAt: new Date(),
         }
-        cronogramasStore.set(existing.alunoId, updated)
+        cronogramasStore.set(id, updated)
+        
+        persistState()
+        logRepository('Cronograma atualizado', { id })
+        
         return delay(updated)
       },
     },
@@ -113,6 +274,10 @@ export function createMockRepository(): DataRepository {
         }
         const existing = blocosStore.get(data.cronogramaId) ?? []
         blocosStore.set(data.cronogramaId, [...existing, bloco])
+        
+        persistState()
+        logRepository('Bloco criado', { id: bloco.id, cronogramaId: data.cronogramaId })
+        
         return delay(bloco)
       },
 
@@ -123,6 +288,10 @@ export function createMockRepository(): DataRepository {
             const updated = { ...blocos[index], ...updates }
             blocos[index] = updated
             blocosStore.set(cronogramaId, [...blocos])
+            
+            persistState()
+            logRepository('Bloco atualizado', { id })
+            
             return delay(updated)
           }
         }
@@ -135,6 +304,10 @@ export function createMockRepository(): DataRepository {
           if (index !== -1) {
             blocos.splice(index, 1)
             blocosStore.set(cronogramaId, [...blocos])
+            
+            persistState()
+            logRepository('Bloco deletado', { id })
+            
             return delay(undefined)
           }
         }
@@ -152,25 +325,26 @@ export function createMockRepository(): DataRepository {
       },
     },
   }
+
+  return repo
 }
 
-// Singleton instance
-let repositoryInstance: DataRepository | null = null
+/** Limpa todos os dados do mock (útil para testes) */
+export function resetMockRepository(): void {
+  cronogramasStore.clear()
+  blocosStore.clear()
+  isInitialized = false
+  logRepository('Mock repository resetado')
+}
 
-export function getRepository(): DataRepository {
-  if (!repositoryInstance) {
-    // Try Supabase first, fallback to mock if unavailable
-    try {
-      repositoryInstance = createSupabaseRepository()
-    } catch (error) {
-      console.warn('Supabase unavailable, using mock repository:', error)
-      repositoryInstance = createMockRepository()
-    }
+/** Retorna estatísticas do mock (útil para debug) */
+export function getMockStats(): { cronogramas: number; blocos: number } {
+  const blocosCount = Array.from(blocosStore.values()).reduce(
+    (acc, arr) => acc + arr.length, 
+    0
+  )
+  return {
+    cronogramas: cronogramasStore.size,
+    blocos: blocosCount,
   }
-  return repositoryInstance
-}
-
-// Force mock repository (useful for testing)
-export function useMockRepository(): void {
-  repositoryInstance = createMockRepository()
 }

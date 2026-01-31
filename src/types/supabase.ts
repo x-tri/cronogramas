@@ -1,6 +1,7 @@
 import type {
   Cronograma,
   BlocoCronograma,
+  Aluno,
   DiaSemana,
   Turno,
   TipoBloco,
@@ -34,6 +35,16 @@ export type BlocoCronogramaRow = {
   cor: string | null
   prioridade: number
   concluido: boolean
+  created_at: string
+}
+
+export type AlunoXTRIRow = {
+  id: string
+  matricula: string
+  nome: string
+  turma: string
+  email: string | null
+  foto_filename: string | null
   created_at: string
 }
 
@@ -99,6 +110,31 @@ export function blocoToRow(
     cor: bloco.cor,
     prioridade: bloco.prioridade,
     concluido: bloco.concluido,
+  }
+}
+
+export function alunoXTRIFromRow(row: AlunoXTRIRow): Aluno {
+  return {
+    id: row.id,
+    matricula: row.matricula,
+    nome: row.nome,
+    turma: row.turma,
+    email: row.email,
+    fotoFilename: row.foto_filename,
+    escola: 'XTRI',
+    createdAt: new Date(row.created_at),
+  }
+}
+
+export function alunoXTRIToRow(
+  aluno: Omit<Aluno, 'id' | 'createdAt' | 'escola'>
+): Omit<AlunoXTRIRow, 'id' | 'created_at'> {
+  return {
+    matricula: aluno.matricula,
+    nome: aluno.nome,
+    turma: aluno.turma,
+    email: aluno.email,
+    foto_filename: aluno.fotoFilename,
   }
 }
 

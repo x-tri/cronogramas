@@ -20,7 +20,7 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
+    // "erasableSyntaxOnly": true, // Desabilitado para permitir public/private constructor params
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },

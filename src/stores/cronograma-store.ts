@@ -9,7 +9,7 @@ import type {
   Turno,
 } from '../types/domain'
 import { getSlotByIndex } from '../constants/time-slots'
-import { getRepository } from '../data/mock-repository'
+import { getRepository } from '../data/factory'
 
 type CronogramaState = {
   // Data

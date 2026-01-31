@@ -1,10 +1,9 @@
 import type { BlocoCronograma, DiaSemana, HorarioOficial, Turno } from '../../types/domain'
 import { TURNOS_CONFIG } from '../../constants/time-slots'
-import { TURNO_LABELS } from '../../types/domain'
 import { TimeSlot } from './time-slot'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 
-type KanbanCellProps = {
+interface KanbanCellProps {
   dia: DiaSemana
   turno: Turno
   officialSchedule: HorarioOficial[]
@@ -41,36 +40,28 @@ export function KanbanCell({
   }
 
   return (
-    <div className="bg-gray-50 rounded-lg p-2 min-h-[120px]">
-      {/* Turno label */}
-      <div className="text-[10px] font-medium text-gray-500 mb-2 uppercase tracking-wide">
-        {TURNO_LABELS[turno]}
-      </div>
+    <div className="bg-white rounded-md border border-gray-100 p-1.5 space-y-1">
+      {turnoConfig.slots.map((slot, index) => {
+        const officialClass = getOfficialForSlot(slot.inicio)
+        const customBlock = getBlockForSlot(slot.inicio)
 
-      {/* Time slots */}
-      <div className="space-y-1">
-        {turnoConfig.slots.map((slot, index) => {
-          const officialClass = getOfficialForSlot(slot.inicio)
-          const customBlock = getBlockForSlot(slot.inicio)
-
-          return (
-            <TimeSlot
-              key={slot.inicio}
-              slot={slot}
-              slotIndex={index}
-              dia={dia}
-              turno={turno}
-              officialClass={officialClass}
-              customBlock={customBlock}
-              onClick={() => onSlotClick?.(index)}
-              onBlockEdit={onBlockEdit}
-              onBlockDelete={onBlockDelete}
-              onBlockChangePriority={onBlockChangePriority}
-              onBlockToggleComplete={onBlockToggleComplete}
-            />
-          )
-        })}
-      </div>
+        return (
+          <TimeSlot
+            key={slot.inicio}
+            slot={slot}
+            slotIndex={index}
+            dia={dia}
+            turno={turno}
+            officialClass={officialClass}
+            customBlock={customBlock}
+            onClick={() => onSlotClick?.(index)}
+            onBlockEdit={onBlockEdit}
+            onBlockDelete={onBlockDelete}
+            onBlockChangePriority={onBlockChangePriority}
+            onBlockToggleComplete={onBlockToggleComplete}
+          />
+        )
+      })}
     </div>
   )
 }

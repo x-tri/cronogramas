@@ -9,6 +9,7 @@ import type {
 export type StudentRepository = {
   findByMatricula: (matricula: string) => Promise<Aluno | null>
   findByTurma: (turma: string) => Promise<Aluno[]>
+  createAlunoXTRI: (aluno: Omit<Aluno, 'id' | 'createdAt' | 'escola'>) => Promise<Aluno>
 }
 
 export type ScheduleRepository = {

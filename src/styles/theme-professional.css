@@ -1,0 +1,318 @@
+/**
+ * Tema Profissional/Escolar
+ * Design institucional focado em legibilidade e organização
+ */
+
+:root {
+  /* Cores Primárias - Paleta Institucional */
+  --primary-900: #1e3a5f;
+  --primary-800: #234876;
+  --primary-700: #2d5a8e;
+  --primary-600: #3d7ab8;
+  --primary-500: #5b9bd5;
+  --primary-100: #e8f4fc;
+  --primary-50: #f5fafd;
+
+  /* Cores Neutras - Escala de Cinza Profissional */
+  --gray-900: #1a1a1a;
+  --gray-800: #2d2d2d;
+  --gray-700: #404040;
+  --gray-600: #525252;
+  --gray-500: #6b7280;
+  --gray-400: #9ca3af;
+  --gray-300: #d1d5db;
+  --gray-200: #e5e7eb;
+  --gray-100: #f3f4f6;
+  --gray-50: #f9fafb;
+
+  /* Cores Semânticas */
+  --success: #166534;
+  --success-light: #dcfce7;
+  --warning: #b45309;
+  --warning-light: #fef3c7;
+  --danger: #991b1b;
+  --danger-light: #fee2e2;
+  --info: #1e40af;
+  --info-light: #dbeafe;
+
+  /* Cores de Destaque para Áreas do ENEM */
+  --area-linguagens: #1e40af;
+  --area-humanas: #b45309;
+  --area-natureza: #15803d;
+  --area-matematica: #991b1b;
+  --area-outros: #6b7280;
+
+  /* Tipografia */
+  --font-family-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-heading: 'Inter', system-ui, sans-serif;
+
+  /* Tamanhos de Fonte */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* Pesos de Fonte */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Espaçamento */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Bordas */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Sombras - Mais sutis para look profissional */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+
+  /* Transições */
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 200ms ease-in-out;
+  --transition-slow: 300ms ease-in-out;
+}
+
+/* Reset e Base */
+.professional-theme {
+  font-family: var(--font-family-primary);
+  color: var(--gray-800);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headers Institucionais */
+.professional-theme h1,
+.professional-theme h2,
+.professional-theme h3 {
+  font-family: var(--font-family-heading);
+  font-weight: var(--font-semibold);
+  color: var(--gray-900);
+  letter-spacing: -0.01em;
+}
+
+/* Cards Profissionais */
+.pro-card {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-base);
+}
+
+.pro-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Botões Institucionais */
+.pro-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.pro-btn-primary {
+  background: var(--primary-700);
+  color: white;
+  border-color: var(--primary-700);
+}
+
+.pro-btn-primary:hover {
+  background: var(--primary-800);
+  border-color: var(--primary-800);
+}
+
+.pro-btn-secondary {
+  background: white;
+  color: var(--gray-700);
+  border-color: var(--gray-300);
+}
+
+.pro-btn-secondary:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+}
+
+.pro-btn-ghost {
+  background: transparent;
+  color: var(--gray-600);
+  border-color: transparent;
+}
+
+.pro-btn-ghost:hover {
+  background: var(--gray-100);
+  color: var(--gray-800);
+}
+
+/* Inputs Profissionais */
+.pro-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--gray-800);
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.pro-input:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.pro-input::placeholder {
+  color: var(--gray-400);
+}
+
+/* Badges e Labels */
+.pro-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  border-radius: var(--radius-sm);
+}
+
+.pro-badge-primary {
+  background: var(--primary-100);
+  color: var(--primary-800);
+}
+
+.pro-badge-success {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.pro-badge-warning {
+  background: var(--warning-light);
+  color: var(--warning);
+}
+
+/* Tabela/Kanban Profissional */
+.pro-kanban {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-xl);
+}
+
+.pro-kanban-header {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  padding: var(--space-4) var(--space-6);
+}
+
+.pro-kanban-column {
+  background: white;
+  border-right: 1px solid var(--gray-200);
+}
+
+.pro-kanban-column:last-child {
+  border-right: none;
+}
+
+/* Cards de Horário */
+.pro-slot {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  transition: all var(--transition-fast);
+}
+
+.pro-slot:hover {
+  border-color: var(--primary-300);
+  box-shadow: var(--shadow-sm);
+}
+
+.pro-slot-official {
+  background: var(--gray-100);
+  border-color: var(--gray-200);
+}
+
+/* Blocos de Estudo */
+.pro-block {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.pro-block:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Barra de Navegação */
+.pro-nav {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Status Indicators */
+.pro-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.pro-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.pro-status-active::before {
+  background: var(--success);
+}
+
+.pro-status-pending::before {
+  background: var(--warning);
+}
+
+/* Dividers */
+.pro-divider {
+  height: 1px;
+  background: var(--gray-200);
+  margin: var(--space-4) 0;
+}
+
+/* Focus Visible para Acessibilidade */
+.professional-theme *:focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: 2px;
+}

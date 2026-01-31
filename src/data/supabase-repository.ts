@@ -1,41 +1,79 @@
-import { supabase } from '../lib/supabase'
 import type { DataRepository } from './repository'
 import type {
   CronogramaRow,
   BlocoCronogramaRow,
 } from '../types/supabase'
+import type { Aluno } from '../types/domain'
 import {
   cronogramaFromRow,
   cronogramaToRow,
   blocoFromRow,
   blocoToRow,
+  alunoXTRIFromRow,
+  alunoXTRIToRow,
 } from '../types/supabase'
+import type { AlunoXTRIRow } from '../types/supabase'
 import { ALL_STUDENTS } from './mock-data/students'
 import { DISCIPLINAS, DISCIPLINAS_BY_CODE } from './mock-data/subjects'
 import { getHorariosPorTurma } from './mock-data/schedules'
-import type { Aluno } from '../types/domain'
+import { logRepository } from '../config/repository-config'
+import { supabase } from '../lib/supabase'
+
+// Supabase client é inicializado lazy no próprio módulo supabase.ts
 
 export function createSupabaseRepository(): DataRepository {
-  return {
-    // Students still use mock data (would need separate Supabase table)
+  logRepository('Inicializando Supabase repository')
+
+  // Verifica se está configurado no momento da criação
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const key = import.meta.env.VITE_SUPABASE_KEY
+  
+  if (!url || !key) {
+    throw new Error(
+      'Supabase repository cannot be created: VITE_SUPABASE_URL and VITE_SUPABASE_KEY must be set'
+    )
+  }
+
+  const repo: DataRepository = {
     students: {
       findByMatricula: async (matricula) => {
+        // Busca nos alunos MARISTA (mock)
         const found = ALL_STUDENTS.find((s) => s.matricula === matricula)
-        if (!found) return null
-
-        const aluno: Aluno = {
-          id: found.matricula,
-          matricula: found.matricula,
-          nome: found.nome,
-          turma: found.turma,
-          email: null,
-          fotoFilename: `${found.matricula}.jpg`,
-          createdAt: new Date(),
+        if (found) {
+          const aluno: Aluno = {
+            id: found.matricula,
+            matricula: found.matricula,
+            nome: found.nome,
+            turma: found.turma,
+            email: null,
+            fotoFilename: `${found.matricula}.jpg`,
+            escola: 'MARISTA',
+            createdAt: new Date(),
+          }
+          return aluno
         }
-        return aluno
+        
+        // Busca nos alunos XTRI (Supabase)
+        const { data, error } = await supabase
+          .from('alunos_xtris')
+          .select('*')
+          .eq('matricula', matricula)
+          .maybeSingle()
+        
+        if (error) {
+          console.error('Erro ao buscar aluno XTRI:', error)
+          return null
+        }
+        
+        if (data) {
+          return alunoXTRIFromRow(data as AlunoXTRIRow)
+        }
+        
+        return null
       },
 
       findByTurma: async (turma) => {
+        // TODO: Migrar para Supabase quando tabela existir
         const students = ALL_STUDENTS.filter((s) => s.turma === turma)
         return students.map((s) => ({
           id: s.matricula,
@@ -44,28 +82,51 @@ export function createSupabaseRepository(): DataRepository {
           turma: s.turma,
           email: null,
           fotoFilename: `${s.matricula}.jpg`,
+          escola: 'MARISTA' as const,
           createdAt: new Date(),
         }))
       },
+
+      createAlunoXTRI: async (data) => {
+        const row = alunoXTRIToRow(data)
+        
+        const { data: result, error } = await supabase
+          .from('alunos_xtris')
+          .insert(row)
+          .select()
+          .single()
+        
+        if (error) {
+          throw new Error(`Failed to create aluno XTRI: ${error.message}`)
+        }
+        
+        logRepository('Aluno XTRI criado no Supabase', { 
+          id: result.id,
+          matricula: result.matricula, 
+          nome: result.nome 
+        })
+        
+        return alunoXTRIFromRow(result as AlunoXTRIRow)
+      },
     },
 
-    // Schedules still use mock data (would need separate Supabase table)
     schedules: {
       getOfficialSchedule: async (turma) => {
+        // TODO: Migrar para Supabase quando tabela existir
         return getHorariosPorTurma(turma)
       },
     },
 
-    // Cronogramas use Supabase
     cronogramas: {
       getCronograma: async (alunoId, weekStart) => {
+        
+        
         let query = supabase
           .from('cronogramas')
           .select('*')
           .eq('aluno_id', alunoId)
           .eq('status', 'ativo')
 
-        // If weekStart provided, filter by week containing that date
         if (weekStart) {
           const weekStartStr = weekStart.toISOString().split('T')[0]
           query = query
@@ -82,14 +143,14 @@ export function createSupabaseRepository(): DataRepository {
           throw new Error(`Failed to get cronograma: ${error.message}`)
         }
 
-        if (!data) {
-          return null
-        }
+        if (!data) return null
 
         return cronogramaFromRow(data as CronogramaRow)
       },
 
       getAllCronogramas: async (alunoId) => {
+        
+        
         const { data, error } = await supabase
           .from('cronogramas')
           .select('*')
@@ -104,6 +165,8 @@ export function createSupabaseRepository(): DataRepository {
       },
 
       saveCronograma: async (cronogramaData) => {
+        
+        
         const row = cronogramaToRow(cronogramaData)
 
         const { data, error } = await supabase
@@ -116,10 +179,13 @@ export function createSupabaseRepository(): DataRepository {
           throw new Error(`Failed to save cronograma: ${error.message}`)
         }
 
+        logRepository('Cronograma criado no Supabase', { id: data.id })
         return cronogramaFromRow(data as CronogramaRow)
       },
 
       updateCronograma: async (id, updates) => {
+        
+        
         const updateData: Partial<CronogramaRow> = {}
 
         if (updates.observacoes !== undefined) {
@@ -152,9 +218,10 @@ export function createSupabaseRepository(): DataRepository {
       },
     },
 
-    // Blocos use Supabase
     blocos: {
       getBlocos: async (cronogramaId) => {
+        
+        
         const { data, error } = await supabase
           .from('blocos_cronograma')
           .select('*')
@@ -169,6 +236,8 @@ export function createSupabaseRepository(): DataRepository {
       },
 
       createBloco: async (blocoData) => {
+        
+        
         const row = blocoToRow(blocoData)
 
         const { data, error } = await supabase
@@ -181,10 +250,13 @@ export function createSupabaseRepository(): DataRepository {
           throw new Error(`Failed to create bloco: ${error.message}`)
         }
 
+        logRepository('Bloco criado no Supabase', { id: data.id })
         return blocoFromRow(data as BlocoCronogramaRow)
       },
 
       updateBloco: async (id, updates) => {
+        
+        
         const updateData: Partial<BlocoCronogramaRow> = {}
 
         if (updates.diaSemana !== undefined) {
@@ -236,6 +308,8 @@ export function createSupabaseRepository(): DataRepository {
       },
 
       deleteBloco: async (id) => {
+        
+        
         const { error } = await supabase
           .from('blocos_cronograma')
           .delete()
@@ -247,15 +321,18 @@ export function createSupabaseRepository(): DataRepository {
       },
     },
 
-    // Subjects still use mock data
     subjects: {
       getAllSubjects: async () => {
+        // TODO: Migrar para Supabase quando tabela existir
         return DISCIPLINAS
       },
 
       getSubjectByCode: async (codigo) => {
+        // TODO: Migrar para Supabase quando tabela existir
         return DISCIPLINAS_BY_CODE.get(codigo) ?? null
       },
     },
   }
+
+  return repo
 }
