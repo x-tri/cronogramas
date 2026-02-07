@@ -1,41 +1,67 @@
 import { type InputHTMLAttributes, forwardRef } from 'react'
 
-type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+type InputSize = 'sm' | 'md' | 'lg'
+
+interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string
   error?: string
+  inputSize?: InputSize
+  helperText?: string
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, className = '', id, ...props },
-  ref
-) {
-  const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
+const sizeStyles: Record<InputSize, string> = {
+  sm: 'px-2.5 py-1 text-xs',
+  md: 'px-3 py-1.5 text-sm',
+  lg: 'px-3 py-2 text-sm',
+}
 
-  return (
-    <div className="w-full">
-      {label && (
-        <label
-          htmlFor={inputId}
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          {label}
-        </label>
-      )}
-      <input
-        ref={ref}
-        id={inputId}
-        className={`
-          w-full px-3 py-2
-          border rounded-lg
-          text-gray-900 placeholder-gray-400
-          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-          disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
-          ${error ? 'border-red-500' : 'border-gray-300'}
-          ${className}
-        `}
-        {...props}
-      />
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-    </div>
-  )
-})
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  function Input(
+    {
+      label,
+      error,
+      inputSize = 'md',
+      helperText,
+      className = '',
+      disabled,
+      ...props
+    },
+    ref
+  ) {
+    return (
+      <div className="w-full">
+        {label && (
+          <label className="block text-sm font-medium text-[#37352f] mb-1.5">
+            {label}
+          </label>
+        )}
+        <input
+          ref={ref}
+          disabled={disabled}
+          className={`
+            w-full
+            bg-[#f7f6f3]
+            border border-[#e3e2e0]
+            rounded
+            text-[#37352f]
+            placeholder:text-[#9ca3af]
+            transition-colors duration-100
+            focus:outline-none focus:border-[#2383e2] focus:bg-white
+            hover:border-[#d1d1cd]
+            disabled:bg-[#f1f1ef] disabled:text-[#9ca3af] disabled:cursor-not-allowed
+            ${error ? 'border-[#fca5a5] focus:border-[#ef4444]' : ''}
+            ${sizeStyles[inputSize]}
+            ${className}
+          `}
+          {...props}
+        />
+        {error && (
+          <p className="mt-1.5 text-xs text-[#dc2626]">{error}</p>
+        )}
+        {helperText && !error && (
+          <p className="mt-1.5 text-xs text-[#6b6b67]">{helperText}</p>
+        )}
+      </div>
+    )
+  }
+)

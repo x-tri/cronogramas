@@ -40,7 +40,7 @@ export function KanbanCell({
   }
 
   return (
-    <div className="bg-white rounded-md border border-gray-100 p-1.5 space-y-1">
+    <div className="bg-white rounded border border-[#f1f1ef] p-1 space-y-0.5">
       {turnoConfig.slots.map((slot, index) => {
         const officialClass = getOfficialForSlot(slot.inicio)
         const customBlock = getBlockForSlot(slot.inicio)

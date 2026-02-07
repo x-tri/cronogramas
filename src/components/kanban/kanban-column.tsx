@@ -28,47 +28,47 @@ export function KanbanColumn({
   return (
     <div
       className={`
-        flex flex-col rounded-lg border overflow-hidden
+        flex flex-col rounded-lg
         ${isWeekend 
-          ? 'bg-emerald-50/50 border-emerald-200' 
-          : 'bg-white border-gray-200'
+          ? 'bg-[#f0fdf4]' 
+          : 'bg-white'
         }
       `}
     >
       {/* Header do Dia */}
       <div
         className={`
-          px-3 py-2.5 text-center border-b
+          px-2 py-2 text-center border-b-2
           ${isWeekend 
-            ? 'bg-emerald-100/70 border-emerald-200' 
-            : 'bg-gray-100 border-gray-200'
+            ? 'border-[#10b981]' 
+            : 'border-[#e3e2e0]'
           }
         `}
       >
         <h3 className={`
           text-sm font-semibold
-          ${isWeekend ? 'text-emerald-900' : 'text-gray-800'}
+          ${isWeekend ? 'text-[#047857]' : 'text-[#37352f]'}
         `}>
           {DIAS_SEMANA_LABELS[dia]}
         </h3>
         {isWeekend && (
-          <span className="text-[10px] font-medium text-emerald-700 uppercase tracking-wide">
+          <span className="text-[10px] font-medium text-[#10b981] uppercase tracking-wide">
             Livre
           </span>
         )}
       </div>
 
       {/* Turnos */}
-      <div className="flex-1 p-2 space-y-3">
+      <div className="flex-1 p-2 space-y-2">
         {TURNOS.map((turno) => (
-          <div key={turno} className="space-y-1.5">
+          <div key={turno} className="space-y-1">
             {/* Label do Turno */}
             <div className="flex items-center gap-1.5">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              <div className="h-px flex-1 bg-[#e3e2e0]" />
+              <span className="text-[10px] font-semibold text-[#9ca3af] uppercase tracking-wider">
                 {TURNO_LABELS[turno]}
               </span>
-              <div className="h-px flex-1 bg-gray-200" />
+              <div className="h-px flex-1 bg-[#e3e2e0]" />
             </div>
             
             <KanbanCell

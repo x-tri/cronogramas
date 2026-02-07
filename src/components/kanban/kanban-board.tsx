@@ -96,12 +96,12 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
 
   if (isLoadingSchedule) {
     return (
-      <div className="bg-gray-50 rounded-lg border border-gray-200 p-8">
+      <div className="bg-[#f7f6f3] rounded-lg p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 rounded w-1/4 mx-auto" />
+          <div className="h-4 bg-[#e3e2e0] rounded w-1/4 mx-auto" />
           <div className="grid grid-cols-7 gap-3">
             {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="h-64 bg-gray-100 rounded-lg" />
+              <div key={i} className="h-64 bg-[#e3e2e0] rounded" />
             ))}
           </div>
         </div>
@@ -115,54 +115,50 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-[#f7f6f3] rounded-lg p-5 w-full">
         {/* Header do Kanban */}
-        <div className="bg-white border-b border-gray-200 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 text-sm">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 bg-gray-400 rounded" />
-                <span className="text-gray-600">Aula Oficial</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 bg-blue-500 rounded" />
-                <span className="text-gray-600">Estudo</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 bg-green-500 rounded" />
-                <span className="text-gray-600">Revisão</span>
-              </span>
-            </div>
-            <div className="text-xs text-gray-500">
-              Arraste os blocos para reorganizar
-            </div>
+        <div className="flex items-center justify-between mb-4 px-1">
+          <div className="flex items-center gap-5 text-sm text-[#6b6b67]">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 bg-[#9ca3af] rounded-sm" />
+              <span>Aula Oficial</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 bg-[#37352f] rounded-sm" />
+              <span>Estudo</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 border-2 border-[#37352f] rounded-sm" />
+              <span>Revisão</span>
+            </span>
+          </div>
+          <div className="text-sm text-[#9ca3af]">
+            Arraste para reorganizar
           </div>
         </div>
 
-        {/* Grid do Kanban */}
-        <div className="p-4 overflow-x-auto">
-          <div className="grid grid-cols-7 gap-3 min-w-[1400px]">
-            {DIAS_SEMANA.map((dia) => (
-              <KanbanColumn
-                key={dia}
-                dia={dia}
-                officialSchedule={officialSchedule}
-                onSlotClick={(turno, slotIndex) =>
-                  onSlotClick?.(dia, turno, slotIndex)
-                }
-                onBlockEdit={onBlockEdit}
-                onBlockDelete={handleBlockDelete}
-                onBlockChangePriority={handleBlockChangePriority}
-                onBlockToggleComplete={handleBlockToggleComplete}
-              />
-            ))}
-          </div>
+        {/* Grid do Kanban - ocupa 100% da largura */}
+        <div className="grid grid-cols-7 gap-3 w-full">
+          {DIAS_SEMANA.map((dia) => (
+            <KanbanColumn
+              key={dia}
+              dia={dia}
+              officialSchedule={officialSchedule}
+              onSlotClick={(turno, slotIndex) =>
+                onSlotClick?.(dia, turno, slotIndex)
+              }
+              onBlockEdit={onBlockEdit}
+              onBlockDelete={handleBlockDelete}
+              onBlockChangePriority={handleBlockChangePriority}
+              onBlockToggleComplete={handleBlockToggleComplete}
+            />
+          ))}
         </div>
       </div>
 
       <DragOverlay>
         {activeBlock && (
-          <div className="w-48 opacity-90 rotate-2">
+          <div className="w-52 opacity-90 rotate-1">
             <BlockCard block={activeBlock} isDragging />
           </div>
         )}

@@ -38,26 +38,26 @@ export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) 
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
     >
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200"
+        className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 id="modal-title" className="text-lg font-semibold text-gray-900">
+        {/* Header - estilo Notion */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#e3e2e0]">
+          <h2 id="modal-title" className="text-base font-semibold text-[#37352f]">
             {title}
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-1 text-[#9ca3af] hover:text-[#37352f] rounded hover:bg-[#f1f1ef] transition-colors"
             aria-label="Fechar"
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -73,11 +73,11 @@ export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) 
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 overflow-y-auto flex-1">{children}</div>
+        <div className="px-4 py-4 overflow-y-auto flex-1">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+          <div className="px-4 py-3 border-t border-[#e3e2e0] bg-[#f7f6f3] rounded-b-lg">
             {footer}
           </div>
         )}

@@ -1,8 +1,8 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@import "./styles/theme-professional.css";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "./styles/theme-notion.css";
 
-/* Base styles - Tema Profissional */
+/* Base styles - Tema Notion */
 html {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -11,208 +11,79 @@ html {
 
 body {
   min-height: 100vh;
-  background-color: #f9fafb;
-  color: #1f2937;
-  line-height: 1.6;
+  background-color: #ffffff;
+  color: #37352f;
+  line-height: 1.5;
 }
 
-/* Scrollbar profissional */
+/* Scrollbar estilo Notion */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f3f4f6;
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
-  border: 2px solid #f3f4f6;
+  background: #d1d1cd;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: #b8b8b4;
 }
 
 /* Seleção de texto */
 ::selection {
-  background: #dbeafe;
-  color: #1e40af;
+  background: rgba(45, 170, 70, 0.2);
+  color: #37352f;
 }
 
-/* Focus visible para acessibilidade */
+/* Focus minimalista */
 *:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-/* Animações suaves */
-.transition-professional {
-  transition: all 200ms ease-in-out;
-}
-
-/* Card hover effect */
-.hover-lift {
-  transition: transform 200ms ease, box-shadow 200ms ease;
-}
-
-.hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.1);
-}
-
-/* Divider elegante */
-.divider {
-  height: 1px;
-  background: linear-gradient(to right, transparent, #e5e7eb, transparent);
-}
-
-/* Badge styles */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: 4px;
-}
-
-.badge-blue {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.badge-green {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.badge-yellow {
-  background: #fef3c7;
-  color: #b45309;
-}
-
-.badge-red {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.badge-gray {
-  background: #f3f4f6;
-  color: #4b5563;
-}
-
-/* Input styles */
-.input-professional {
-  width: 100%;
-  padding: 0.625rem 0.875rem;
-  font-size: 0.9375rem;
-  color: #1f2937;
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-
-.input-professional:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.35);
 }
 
-.input-professional::placeholder {
-  color: #9ca3af;
+/* Utilitários Notion */
+.notion-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
 }
 
-/* Button styles */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-radius: 6px;
-  transition: all 150ms ease;
-  border: 1px solid transparent;
-  cursor: pointer;
+/* Loading skeleton estilo Notion */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
 }
 
-.btn-primary {
-  background: #1e40af;
-  color: white;
+.notion-skeleton {
+  background: linear-gradient(90deg, #f1f1ef 25%, #e3e2e0 50%, #f1f1ef 75%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
 }
 
-.btn-primary:hover {
-  background: #1e3a8a;
+/* Drag and drop */
+.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
 }
 
-.btn-secondary {
-  background: white;
-  color: #374151;
-  border-color: #d1d5db;
+.drag-over {
+  background: rgba(35, 131, 226, 0.1);
 }
 
-.btn-secondary:hover {
-  background: #f9fafb;
-  border-color: #9ca3af;
+/* Utilitários de texto */
+.text-balance {
+  text-wrap: balance;
 }
 
-.btn-ghost {
-  background: transparent;
-  color: #6b7280;
-}
-
-.btn-ghost:hover {
-  background: #f3f4f6;
-  color: #1f2937;
-}
-
-/* Card styles */
-.card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: box-shadow 200ms ease;
-}
-
-.card:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
-}
-
-/* Header styles */
-.page-header {
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-}
-
-/* Status indicators */
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.status-dot-active {
-  background: #22c55e;
-}
-
-.status-dot-pending {
-  background: #f59e0b;
-}
-
-.status-dot-inactive {
-  background: #9ca3af;
-}
-
-/* Line clamp utilities */
+/* Line clamp */
 .line-clamp-1 {
   display: -webkit-box;
   -webkit-line-clamp: 1;

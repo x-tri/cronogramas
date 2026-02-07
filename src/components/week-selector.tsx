@@ -60,41 +60,41 @@ export function WeekSelector() {
   const hasCronograma = cronograma !== null
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <button
         onClick={goToPreviousWeek}
-        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+        className="p-1.5 rounded hover:bg-[#f1f1ef] text-[#6b6b67] transition-colors"
         title="Semana anterior"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
       </button>
 
-      <div className="flex items-center gap-2">
-        <div className="text-sm font-medium text-gray-700 min-w-[160px] text-center">
+      <div className="flex items-center gap-2 px-2">
+        <div className="text-sm font-medium text-[#37352f] min-w-[140px] text-center">
           {formatWeekRange(start, end)}
         </div>
 
         {isCurrent && (
-          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+          <span className="px-1.5 py-0.5 bg-[#eff6ff] text-[#1d4ed8] text-[10px] font-medium rounded border border-[#bfdbfe]">
             Atual
           </span>
         )}
 
         {!hasCronograma && (
-          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">
-            Sem cronograma
+          <span className="px-1.5 py-0.5 bg-[#fef3c7] text-[#92400e] text-[10px] font-medium rounded border border-[#fcd34d]">
+            Novo
           </span>
         )}
       </div>
 
       <button
         onClick={goToNextWeek}
-        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+        className="p-1.5 rounded hover:bg-[#f1f1ef] text-[#6b6b67] transition-colors"
         title="Próxima semana"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </button>
@@ -102,7 +102,7 @@ export function WeekSelector() {
       {!isCurrent && (
         <button
           onClick={goToCurrentWeek}
-          className="ml-2 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+          className="ml-1 px-2 py-1 text-xs font-medium text-[#37352f] hover:bg-[#f1f1ef] rounded transition-colors"
           title="Ir para semana atual"
         >
           Hoje
