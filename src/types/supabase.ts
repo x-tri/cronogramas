@@ -200,3 +200,64 @@ export type TopicSummary = {
   count: number
   questions: number[]
 }
+
+// ============ TABELA PROJETOS (Gabaritos) ============
+
+export type ProjetoRow = {
+  id: string
+  matricula: string
+  nome_aluno: string | null
+  turma: string | null
+  simulado_nome: string | null
+  questoes_erradas: number[] | null
+  topicos_erros: Record<string, number> | null // { "Matemática": 5, "Física": 3 }
+  total_acertos: number | null
+  total_erros: number | null
+  total_branco: number | null
+  nota_lc: number | null
+  nota_ch: number | null
+  nota_cn: number | null
+  nota_mt: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type Projeto = {
+  id: string
+  matricula: string
+  nomeAluno: string | null
+  turma: string | null
+  simuladoNome: string | null
+  questoesErradas: number[]
+  topicosErros: Record<string, number>
+  totalAcertos: number
+  totalErros: number
+  totalBranco: number
+  notaLC: number | null
+  notaCH: number | null
+  notaCN: number | null
+  notaMT: number | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export function projetoFromRow(row: ProjetoRow): Projeto {
+  return {
+    id: row.id,
+    matricula: row.matricula,
+    nomeAluno: row.nome_aluno,
+    turma: row.turma,
+    simuladoNome: row.simulado_nome,
+    questoesErradas: row.questoes_erradas ?? [],
+    topicosErros: row.topicos_erros ?? {},
+    totalAcertos: row.total_acertos ?? 0,
+    totalErros: row.total_erros ?? 0,
+    totalBranco: row.total_branco ?? 0,
+    notaLC: row.nota_lc,
+    notaCH: row.nota_ch,
+    notaCN: row.nota_cn,
+    notaMT: row.nota_mt,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  }
+}

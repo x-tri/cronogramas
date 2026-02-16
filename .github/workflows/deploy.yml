@@ -1,0 +1,67 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Permite deploy manual pelo GitHub
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.HOSTINGER_SSH_KEY }}
+        
+    - name: Add Hostinger to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H 212.85.19.50 >> ~/.ssh/known_hosts
+        
+    - name: Deploy to Hostinger
+      env:
+        HOSTINGER_IP: 212.85.19.50
+        HOSTINGER_USER: root
+      run: |
+        echo "🚀 Iniciando deploy para Hostinger..."
+        
+        # Criar diretório remoto se não existir
+        ssh $HOSTINGER_USER@$HOSTINGER_IP "mkdir -p /opt/xtri-cronogramas"
+        
+        # Enviar arquivos necessários
+        echo "📦 Enviando arquivos..."
+        scp -r dist docker-compose.yml Dockerfile nginx.conf deploy.sh $HOSTINGER_USER@$HOSTINGER_IP:/opt/xtri-cronogramas/
+        
+        # Executar deploy no servidor
+        echo "🔨 Executando deploy no servidor..."
+        ssh $HOSTINGER_USER@$HOSTINGER_IP << 'EOF'
+          cd /opt/xtri-cronogramas
+          chmod +x deploy.sh
+          ./deploy.sh
+        EOF
+        
+        echo "✅ Deploy concluído com sucesso!"
+        echo "🌐 Aplicação disponível em: https://horariodeestudos.com"
+        
+    - name: Verify deployment
+      run: |
+        sleep 10
+        curl -f http://212.85.19.50:3000 || exit 1
+        echo "✅ Health check passou!"

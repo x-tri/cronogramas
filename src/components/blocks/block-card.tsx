@@ -102,21 +102,21 @@ export function BlockCard({
       {dragHandleProps && (
         <div
           {...dragHandleProps}
-          className="absolute top-1 left-1 z-10 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-[#f1f1ef]"
+          className="absolute top-1 left-1 z-10 cursor-grab active:cursor-grabbing p-1.5 rounded hover:bg-[#f1f1ef] touch-none"
           title="Arrastar"
         >
-          <svg className="w-3 h-3 text-[#c1c0bb]" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="5" r="1.5"/>
-            <circle cx="9" cy="12" r="1.5"/>
-            <circle cx="9" cy="19" r="1.5"/>
-            <circle cx="15" cy="5" r="1.5"/>
-            <circle cx="15" cy="12" r="1.5"/>
-            <circle cx="15" cy="19" r="1.5"/>
+          <svg className="w-4 h-4 text-[#9ca3af]" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="9" cy="5" r="2"/>
+            <circle cx="9" cy="12" r="2"/>
+            <circle cx="9" cy="19" r="2"/>
+            <circle cx="15" cy="5" r="2"/>
+            <circle cx="15" cy="12" r="2"/>
+            <circle cx="15" cy="19" r="2"/>
           </svg>
         </div>
       )}
 
-      <div className={`p-2 pr-1 ${dragHandleProps ? 'pl-5' : ''}`}>
+      <div className={`p-2 pr-1 ${dragHandleProps ? 'pl-6' : ''}`}>
         {/* Badges: Área + Prioridade */}
         <div className="flex items-center gap-1.5 mb-1">
           {getAreaBadge()}

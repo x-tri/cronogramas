@@ -7,6 +7,9 @@ interface KanbanCellProps {
   dia: DiaSemana
   turno: Turno
   officialSchedule: HorarioOficial[]
+  isDropTarget?: boolean
+  dropSlotIndex?: number
+  dropMode?: 'swap' | 'move' | 'blocked'
   onSlotClick?: (slotIndex: number) => void
   onBlockEdit?: (block: BlocoCronograma) => void
   onBlockDelete?: (blockId: string) => void
@@ -18,6 +21,9 @@ export function KanbanCell({
   dia,
   turno,
   officialSchedule,
+  isDropTarget,
+  dropSlotIndex,
+  dropMode,
   onSlotClick,
   onBlockEdit,
   onBlockDelete,
@@ -45,6 +51,8 @@ export function KanbanCell({
         const officialClass = getOfficialForSlot(slot.inicio)
         const customBlock = getBlockForSlot(slot.inicio)
 
+        const isTargetSlot = isDropTarget && dropSlotIndex === index
+
         return (
           <TimeSlot
             key={slot.inicio}
@@ -54,6 +62,8 @@ export function KanbanCell({
             turno={turno}
             officialClass={officialClass}
             customBlock={customBlock}
+            isDropTarget={isTargetSlot}
+            dropMode={isTargetSlot ? dropMode : undefined}
             onClick={() => onSlotClick?.(index)}
             onBlockEdit={onBlockEdit}
             onBlockDelete={onBlockDelete}

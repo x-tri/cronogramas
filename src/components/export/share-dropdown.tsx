@@ -1,23 +1,44 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { getWeekBounds } from '../week-selector'
 import { SchedulePdfDocument } from '../pdf/schedule-pdf-document'
+import { analyzeStudentSimulado } from '../../services/simulado-analyzer'
+import type { SimuladoResult } from '../../types/supabase'
 
 export function ShareDropdown() {
   const [isOpen, setIsOpen] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [simuladoData, setSimuladoData] = useState<SimuladoResult | null>(null)
 
   const currentStudent = useCronogramaStore((state) => state.currentStudent)
   const officialSchedule = useCronogramaStore((state) => state.officialSchedule)
   const blocks = useCronogramaStore((state) => state.blocks)
   const selectedWeek = useCronogramaStore((state) => state.selectedWeek)
 
+  // Buscar dados do simulado quando o componente montar
+  useEffect(() => {
+    if (currentStudent?.matricula) {
+      analyzeStudentSimulado(currentStudent.matricula).then((data) => {
+        if (data) {
+          setSimuladoData(data)
+        }
+      })
+    }
+  }, [currentStudent?.matricula])
+
   if (!currentStudent) return null
 
   const { start, end } = getWeekBounds(selectedWeek)
 
   const generatePdfBlob = async () => {
+    const triScores = simuladoData?.studentAnswer ? {
+      tri_lc: simuladoData.studentAnswer.tri_lc,
+      tri_ch: simuladoData.studentAnswer.tri_ch,
+      tri_cn: simuladoData.studentAnswer.tri_cn,
+      tri_mt: simuladoData.studentAnswer.tri_mt,
+    } : null
+
     const doc = (
       <SchedulePdfDocument
         student={currentStudent}
@@ -25,6 +46,8 @@ export function ShareDropdown() {
         weekEnd={end}
         officialSchedule={officialSchedule}
         blocks={blocks}
+        examTitle={simuladoData?.exam?.title}
+        triScores={triScores}
       />
     )
     return await pdf(doc).toBlob()
@@ -67,7 +90,20 @@ export function ShareDropdown() {
       const blob = await generatePdfBlob()
       downloadBlob(blob, getFilename())
 
-      const text = `*Cronograma de Estudos*\n\nAluno: ${currentStudent.nome}\nMatricula: ${currentStudent.matricula}\nTurma: ${currentStudent.turma}\nSemana: ${formatWeekStr()}\n\n_PDF baixado - anexe na conversa_`
+      // Incluir notas TRI na mensagem se disponíveis
+      let triScoresText = ''
+      if (simuladoData?.studentAnswer) {
+        const { tri_lc, tri_ch, tri_cn, tri_mt } = simuladoData.studentAnswer
+        if (tri_lc || tri_ch || tri_cn || tri_mt) {
+          triScoresText = '\n\n*Notas TRI:*'
+          if (tri_lc) triScoresText += `\nLC: ${tri_lc.toFixed(1)}`
+          if (tri_ch) triScoresText += `\nCH: ${tri_ch.toFixed(1)}`
+          if (tri_cn) triScoresText += `\nCN: ${tri_cn.toFixed(1)}`
+          if (tri_mt) triScoresText += `\nMT: ${tri_mt.toFixed(1)}`
+        }
+      }
+
+      const text = `*Cronograma de Estudos*${simuladoData?.exam?.title ? `\n*Simulado:* ${simuladoData.exam.title}` : ''}\n\nAluno: ${currentStudent.nome}\nMatrícula: ${currentStudent.matricula}\nTurma: ${currentStudent.turma}\nSemana: ${formatWeekStr()}${triScoresText}\n\n_PDF baixado - anexe na conversa_`
 
       window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`)
     } catch (error) {

@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Questões Individuais</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e5e5e5;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111;
+        }
+        .exam-info {
+            font-size: 14px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .topics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .topics-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+        .topics-count {
+            font-size: 13px;
+            color: #666;
+        }
+        .topics-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .action-link {
+            font-size: 12px;
+            color: #3b82f6;
+            text-decoration: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+        }
+        .separator {
+            color: #ddd;
+        }
+        .topics-list {
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            padding: 8px;
+            background: #f9f9f9;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .area-group {
+            margin-bottom: 16px;
+        }
+        .area-group:last-child {
+            margin-bottom: 0;
+        }
+        .area-header {
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .area-linguagens { background: #dbeafe; color: #1e40af; }
+        .area-humanas { background: #ffedd5; color: #9a3412; }
+        .area-natureza { background: #d1fae5; color: #065f46; }
+        .area-matematica { background: #fee2e2; color: #991b1b; }
+        
+        .questions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 6px;
+            padding-left: 4px;
+        }
+        
+        .question-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+            border: 1px solid transparent;
+        }
+        .question-item:hover {
+            background: #f0f0f0;
+        }
+        .question-item.selected {
+            background: #eff6ff;
+            border-color: #3b82f6;
+        }
+        .question-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #3b82f6;
+        }
+        .question-text {
+            flex: 1;
+            font-size: 12px;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .question-number {
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            min-width: 32px;
+            text-align: center;
+        }
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e5e5e5;
+        }
+        .footer-text {
+            font-size: 14px;
+            color: #666;
+        }
+        .footer-text.error {
+            color: #dc2626;
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            margin-right: 8px;
+        }
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+        .btn-primary {
+            background: #111;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #333;
+        }
+        .btn-primary:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .info-box {
+            background: #dbeafe;
+            border: 1px solid #93c5fd;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .info-box h2 {
+            font-size: 16px;
+            color: #1e40af;
+            margin-bottom: 12px;
+        }
+        .info-box ul {
+            margin-left: 20px;
+            color: #1e40af;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .info-box li {
+            margin-bottom: 4px;
+        }
+        .important-box {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+        .important-box h3 {
+            font-size: 14px;
+            color: #92400e;
+            margin-bottom: 8px;
+        }
+        .important-box p {
+            font-size: 13px;
+            color: #92400e;
+            line-height: 1.6;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ Questões Individuais - Implementado!</h1>
+        <p class="subtitle">Agora cada questão errada aparece individualmente para seleção</p>
+        
+        <div class="info-box">
+            <h2>🎯 O que mudou:</h2>
+            <ul>
+                <li><strong>Antes:</strong> "Linguagens - 26 erros para revisar" (só o total)</li>
+                <li><strong>Agora:</strong> Lista Q1, Q5, Q12, Q17... cada uma com seu assunto específico</li>
+                <li>Você pode <strong>selecionar quais questões</strong> são mais importantes para a aluna</li>
+                <li>Cada questão vira um <strong>bloco individual</strong> no cronograma</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="header">
+                <div>
+                    <div class="title">Simulado Diagnóstico - Marista</div>
+                    <div class="exam-info">95 acertos • 45 erros • 40 em branco</div>
+                </div>
+            </div>
+
+            <div class="topics-section">
+                <div class="topics-header">
+                    <span class="topics-title">Selecione as questões erradas para revisar</span>
+                    <span class="topics-count" id="counter">15 de 45 selecionadas</span>
+                </div>
+                
+                <div class="topics-actions">
+                    <button class="action-link" onclick="selectAll()">Selecionar todas</button>
+                    <span class="separator">|</span>
+                    <button class="action-link" onclick="deselectAll()">Limpar seleção</button>
+                </div>
+
+                <div class="topics-list">
+                    <!-- LINGUAGENS - 26 questões -->
+                    <div class="area-group">
+                        <div class="area-header area-linguagens">
+                            <span>Linguagens</span>
+                            <span>26 questões erradas</span>
+                        </div>
+                        <div class="questions-grid" id="linguagens-list">
+                            <!-- Gerado por JS -->
+                        </div>
+                    </div>
+
+                    <!-- HUMANAS - 8 questões -->
+                    <div class="area-group">
+                        <div class="area-header area-humanas">
+                            <span>Humanas</span>
+                            <span>8 questões erradas</span>
+                        </div>
+                        <div class="questions-grid" id="humanas-list">
+                            <!-- Gerado por JS -->
+                        </div>
+                    </div>
+
+                    <!-- NATUREZA - 6 questões -->
+                    <div class="area-group">
+                        <div class="area-header area-natureza">
+                            <span>Natureza</span>
+                            <span>6 questões erradas</span>
+                        </div>
+                        <div class="questions-grid" id="natureza-list">
+                            <!-- Gerado por JS -->
+                        </div>
+                    </div>
+
+                    <!-- MATEMÁTICA - 5 questões -->
+                    <div class="area-group">
+                        <div class="area-header area-matematica">
+                            <span>Matemática</span>
+                            <span>5 questões erradas</span>
+                        </div>
+                        <div class="questions-grid" id="matematica-list">
+                            <!-- Gerado por JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <span class="footer-text" id="footerText">15 questões serão adicionadas ao cronograma</span>
+                <div>
+                    <button class="btn btn-secondary">Cancelar</button>
+                    <button class="btn btn-primary" id="distributeBtn">Distribuir (15)</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="important-box">
+            <h3>⚠️ Como funciona a distribuição dos erros:</h3>
+            <p>
+                Quando o banco só tem o total de erros por área (ex: 26 erros em Linguagens), 
+                o sistema <strong>distribui automaticamente</strong> esses erros em questões 
+                específicas (Q1, Q5, Q12...) para que você possa selecionar individualmente.
+            </p>
+            <p style="margin-top: 8px;">
+                <strong>Dica:</strong> Priorize questões dos assuntos que a aluna mais precisa revisar!
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Dados simulados - distribuição dos 45 erros
+        const questionsData = {
+            linguagens: [
+                { q: 1, topic: 'Interpretação de Texto' },
+                { q: 5, topic: 'Gramática (Morfologia)' },
+                { q: 8, topic: 'Gramática (Sintaxe)' },
+                { q: 12, topic: 'Semântica e Figuras' },
+                { q: 15, topic: 'Funções da Linguagem' },
+                { q: 18, topic: 'Literatura Brasileira' },
+                { q: 22, topic: 'Literatura Portuguesa' },
+                { q: 25, topic: 'Arte e Cultura' },
+                { q: 28, topic: 'Língua Estrangeira' },
+                { q: 31, topic: 'Interpretação de Texto' },
+                { q: 34, topic: 'Gramática (Morfologia)' },
+                { q: 37, topic: 'Gramática (Sintaxe)' },
+                { q: 40, topic: 'Semântica e Figuras' },
+                { q: 43, topic: 'Funções da Linguagem' },
+                { q: 45, topic: 'Literatura Brasileira' },
+                { q: 2, topic: 'Interpretação de Texto' },
+                { q: 6, topic: 'Gramática (Morfologia)' },
+                { q: 9, topic: 'Gramática (Sintaxe)' },
+                { q: 13, topic: 'Semântica e Figuras' },
+                { q: 16, topic: 'Funções da Linguagem' },
+                { q: 19, topic: 'Literatura Brasileira' },
+                { q: 23, topic: 'Literatura Portuguesa' },
+                { q: 26, topic: 'Arte e Cultura' },
+                { q: 29, topic: 'Língua Estrangeira' },
+                { q: 32, topic: 'Interpretação de Texto' },
+                { q: 35, topic: 'Gramática (Morfologia)' },
+            ],
+            humanas: [
+                { q: 48, topic: 'História do Brasil (Colônia)' },
+                { q: 52, topic: 'História do Brasil (Império)' },
+                { q: 56, topic: 'História Geral' },
+                { q: 61, topic: 'História Contemporânea' },
+                { q: 68, topic: 'Geografia (Natureza)' },
+                { q: 74, topic: 'Geografia (Globalização)' },
+                { q: 82, topic: 'Sociologia' },
+                { q: 88, topic: 'Filosofia' },
+            ],
+            natureza: [
+                { q: 93, topic: 'Biologia (Citologia)' },
+                { q: 98, topic: 'Biologia (Genética)' },
+                { q: 104, topic: 'Biologia (Ecologia)' },
+                { q: 115, topic: 'Química (Geral)' },
+                { q: 123, topic: 'Física (Mecânica)' },
+                { q: 131, topic: 'Física (Termodinâmica)' },
+            ],
+            matematica: [
+                { q: 139, topic: 'Matemática (Funções)' },
+                { q: 147, topic: 'Matemática (Logaritmos)' },
+                { q: 154, topic: 'Geometria (Plana)' },
+                { q: 162, topic: 'Geometria Analítica' },
+                { q: 171, topic: 'Matemática Financeira' },
+            ]
+        };
+
+        function renderQuestions() {
+            // Renderiza Linguagens
+            const linguagensList = document.getElementById('linguagens-list');
+            linguagensList.innerHTML = questionsData.linguagens.map((item, idx) => `
+                <label class="question-item ${idx < 8 ? 'selected' : ''}" onclick="toggleQuestion(this)">
+                    <input type="checkbox" class="question-checkbox" ${idx < 8 ? 'checked' : ''} onchange="updateCounter()">
+                    <span class="question-text">${item.topic}</span>
+                    <span class="question-number">Q${item.q}</span>
+                </label>
+            `).join('');
+
+            // Renderiza Humanas
+            const humanasList = document.getElementById('humanas-list');
+            humanasList.innerHTML = questionsData.humanas.map((item, idx) => `
+                <label class="question-item ${idx < 3 ? 'selected' : ''}" onclick="toggleQuestion(this)">
+                    <input type="checkbox" class="question-checkbox" ${idx < 3 ? 'checked' : ''} onchange="updateCounter()">
+                    <span class="question-text">${item.topic}</span>
+                    <span class="question-number">Q${item.q}</span>
+                </label>
+            `).join('');
+
+            // Renderiza Natureza
+            const naturezaList = document.getElementById('natureza-list');
+            naturezaList.innerHTML = questionsData.natureza.map((item, idx) => `
+                <label class="question-item ${idx < 2 ? 'selected' : ''}" onclick="toggleQuestion(this)">
+                    <input type="checkbox" class="question-checkbox" ${idx < 2 ? 'checked' : ''} onchange="updateCounter()">
+                    <span class="question-text">${item.topic}</span>
+                    <span class="question-number">Q${item.q}</span>
+                </label>
+            `).join('');
+
+            // Renderiza Matemática
+            const matematicaList = document.getElementById('matematica-list');
+            matematicaList.innerHTML = questionsData.matematica.map((item, idx) => `
+                <label class="question-item ${idx < 2 ? 'selected' : ''}" onclick="toggleQuestion(this)">
+                    <input type="checkbox" class="question-checkbox" ${idx < 2 ? 'checked' : ''} onchange="updateCounter()">
+                    <span class="question-text">${item.topic}</span>
+                    <span class="question-number">Q${item.q}</span>
+                </label>
+            `).join('');
+        }
+
+        function toggleQuestion(element) {
+            const checkbox = element.querySelector('.question-checkbox');
+            checkbox.checked = !checkbox.checked;
+            
+            if (checkbox.checked) {
+                element.classList.add('selected');
+            } else {
+                element.classList.remove('selected');
+            }
+            
+            updateCounter();
+        }
+
+        function updateCounter() {
+            const checkboxes = document.querySelectorAll('.question-checkbox:checked');
+            const count = checkboxes.length;
+            const total = document.querySelectorAll('.question-checkbox').length;
+            
+            document.getElementById('counter').textContent = `${count} de ${total} selecionadas`;
+            
+            const footerText = document.getElementById('footerText');
+            const distributeBtn = document.getElementById('distributeBtn');
+            
+            if (count === 0) {
+                footerText.textContent = 'Selecione pelo menos uma questão';
+                footerText.classList.add('error');
+                distributeBtn.disabled = true;
+                distributeBtn.textContent = 'Distribuir';
+            } else {
+                footerText.textContent = `${count} questões serão adicionadas ao cronograma`;
+                footerText.classList.remove('error');
+                distributeBtn.disabled = false;
+                distributeBtn.textContent = `Distribuir (${count})`;
+            }
+        }
+
+        function selectAll() {
+            document.querySelectorAll('.question-checkbox').forEach(cb => {
+                cb.checked = true;
+                cb.closest('.question-item').classList.add('selected');
+            });
+            updateCounter();
+        }
+
+        function deselectAll() {
+            document.querySelectorAll('.question-checkbox').forEach(cb => {
+                cb.checked = false;
+                cb.closest('.question-item').classList.remove('selected');
+            });
+            updateCounter();
+        }
+
+        // Inicializar
+        renderQuestions();
+        updateCounter();
+    </script>
+</body>
+</html>

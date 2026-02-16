@@ -34,18 +34,45 @@ export const styles = StyleSheet.create({
     fontSize: 9,
     color: '#6b7280',
   },
-  studentInfo: {
+  infoRow: {
     flexDirection: 'row',
-    gap: 20,
-    fontSize: 9,
-    color: '#374151',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingTop: 6,
+    borderTop: '1 solid #e5e7eb',
   },
-  infoItem: {
-    flexDirection: 'row',
+  infoGroup: {
+    flexDirection: 'column',
+    gap: 2,
+  },
+  infoText: {
+    fontSize: 8,
+    color: '#374151',
   },
   infoLabel: {
     fontWeight: 'bold',
-    marginRight: 4,
+  },
+  triScoresRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  triBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: '2 6',
+    borderRadius: 10,
+    gap: 3,
+  },
+  triBadgeLabel: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  triBadgeValue: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   grid: {
     flexDirection: 'row',

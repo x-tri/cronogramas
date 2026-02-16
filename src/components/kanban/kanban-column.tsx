@@ -6,6 +6,8 @@ import { KanbanCell } from './kanban-cell'
 interface KanbanColumnProps {
   dia: DiaSemana
   officialSchedule: HorarioOficial[]
+  dropTarget?: { dia: DiaSemana; turno: Turno; slotIndex: number } | null
+  dropMode?: 'swap' | 'move' | 'blocked'
   onSlotClick?: (turno: Turno, slotIndex: number) => void
   onBlockEdit?: (block: BlocoCronograma) => void
   onBlockDelete?: (blockId: string) => void
@@ -16,6 +18,8 @@ interface KanbanColumnProps {
 export function KanbanColumn({
   dia,
   officialSchedule,
+  dropTarget,
+  dropMode,
   onSlotClick,
   onBlockEdit,
   onBlockDelete,
@@ -28,7 +32,7 @@ export function KanbanColumn({
   return (
     <div
       className={`
-        flex flex-col rounded-lg
+        flex flex-col rounded-lg min-w-[140px]
         ${isWeekend 
           ? 'bg-[#f0fdf4]' 
           : 'bg-white'
@@ -75,6 +79,9 @@ export function KanbanColumn({
               dia={dia}
               turno={turno}
               officialSchedule={officialSchedule}
+              isDropTarget={dropTarget?.dia === dia && dropTarget?.turno === turno}
+              dropSlotIndex={dropTarget?.dia === dia && dropTarget?.turno === turno ? dropTarget?.slotIndex : undefined}
+              dropMode={dropMode}
               onSlotClick={(slotIndex) => onSlotClick?.(turno, slotIndex)}
               onBlockEdit={onBlockEdit}
               onBlockDelete={onBlockDelete}

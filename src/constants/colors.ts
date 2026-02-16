@@ -65,11 +65,57 @@ const AREA_KEYWORDS: Record<AreaEnem, string[]> = {
     'maneirismo', 'barroco', 'arcadismo', 'realismo', 'naturalismo',
   ],
   humanas: [
-    'história', 'geografia', 'filosofia', 'sociologia', 'geopolítica',
-    'política', 'capitalismo', 'globalização', 'guerra', 'revolução',
-    'colonização', 'brasil colônia', 'império', 'república', 'ditadura',
-    'democracia', 'cidadania', 'direitos humanos', 'meio ambiente',
-    'urbanização', 'população', 'migração', 'clima',
+    // Disciplinas principais
+    'história', 'historia', 'geografia', 'geografia', 'filosofia', 'filosofia', 
+    'sociologia', 'sociologia', 'atualidades',
+    // Geopolítica e política
+    'geopolítica', 'geopolitica', 'política', 'politica', 'politico', 'político',
+    'diplomacia', 'relações internacionais', 'relacoes internacionais',
+    // Sistemas econômicos e sociais
+    'capitalismo', 'socialismo', 'comunismo', 'neoliberalismo', 'globalização', 
+    'globalizacao', 'mercantilismo', 'feudalismo', 'escravismo',
+    // Conflitos e movimentos
+    'guerra', 'guerras', 'revolução', 'revolucao', 'revoluções', 'revolucoes',
+    'independência', 'independencia', 'emancipação', 'emancipacao',
+    // Períodos históricos - Brasil
+    'colonização', 'colonizacao', 'brasil colônia', 'brasil colonia', 
+    'brasil colônia', 'brasil colonia', 'período colonial', 'periodo colonial',
+    'quatrocentão', 'quilombos', 'quilombo', 'bandeirantes', 'bandeirantismo',
+    'escravidão', 'escravidao', 'tráfico negreiro', 'trafico negreiro',
+    'invasões holandesas', 'invasoes holandesas', 'mineração', 'mineracao',
+    'ciclo do ouro', 'ciclo do café', 'ciclo da borracha', 'ciclo do açúcar',
+    'império', 'imperio', 'primeiro reinado', 'regência', 'regencias',
+    'segundo reinado', 'república', 'republica', 'república velha', 
+    'república velha', 'era vargas', 'estado novo', 'ditadura', 'ditadura militar',
+    'redemocratização', 'redemocratizacao', 'nova república', 'nova republica',
+    // Períodos históricos - Geral
+    'pré-história', 'pre-historia', 'antiguidade', 'egito', 'mesopotâmia',
+    'mesopotamia', 'grécia', 'grecia', 'roma', 'império romano', 'imperio romano',
+    'idade média', 'idade media', 'feudalismo', 'renascimento', 'reforma',
+    'protestante', 'absolutismo', 'iluminismo', 'revolução francesa',
+    'revolucao francesa', 'revolução industrial', 'revolucao industrial',
+    'nazismo', 'fascismo', 'bolchevique', 'revolução russa', 'revolucao russa',
+    'guerra fria', 'descolonização', 'descolonizacao',
+    // Sistema político
+    'democracia', 'democracia', 'cidadania', 'cidadania', 'constituição',
+    'constituicao', 'direitos humanos', 'direitos fundamentais', 'estado',
+    'governo', 'poder executivo', 'poder legislativo', 'poder judiciário',
+    'poder judiciario', 'partidos políticos', 'sistema eleitoral',
+    // Geografia
+    'meio ambiente', 'meio-ambiente', 'ecossistema', 'bioma', 'vegetação',
+    'vegetacao', 'relevo', 'clima', 'hidrografia', 'latitude', 'longitude',
+    'coordenadas geográficas', 'projeções cartográficas', 'escala',
+    'urbanização', 'urbanizacao', 'metropolização', 'conurbação', 'conurbacao',
+    'população', 'populacao', 'demografia', 'taxa de natalidade', 'migração',
+    'migracao', 'imigração', 'imigracao', 'emigração', 'emigracao',
+    'divisão territorial', 'divisao territorial', 'regiões brasileiras',
+    'regioes brasileiras', 'amazônia', 'amazonia', 'cerrado', 'mata atlântica',
+    'pampa', 'pantanal', 'caatinga', 'indústria', 'industria', 'agropecuária',
+    'agropecuaria', 'comércio', 'comercio', 'transporte', 'globalização',
+    // Sociologia
+    'cultura', 'indivíduo', 'individuo', 'sociedade', 'estrutura social',
+    'estratificação', 'movimentos sociais', 'conflito social', 'desigualdade',
+    'etnia', 'gênero', 'identidade', 'modernidade', 'pós-modernidade',
   ],
   natureza: [
     'física', 'química', 'biologia', 'genética', 'ecologia', 'evolução',
@@ -94,12 +140,22 @@ const AREA_KEYWORDS: Record<AreaEnem, string[]> = {
 }
 
 export function detectAreaFromTitle(title: string): AreaEnem | null {
-  const lowerTitle = title.toLowerCase()
+  // Normaliza o título: minúsculas, remove acentos extras de forma simples
+  const normalizedTitle = title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
 
   for (const [area, keywords] of Object.entries(AREA_KEYWORDS)) {
     if (area === 'outros') continue
     for (const keyword of keywords) {
-      if (lowerTitle.includes(keyword)) {
+      // Normaliza a keyword também para comparação consistente
+      const normalizedKeyword = keyword
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+      
+      if (normalizedTitle.includes(normalizedKeyword)) {
         return area as AreaEnem
       }
     }

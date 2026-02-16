@@ -1,25 +1,28 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "./styles/theme-notion.css";
+@import "./styles/theme-apple.css";
 
-/* Base styles - Tema Notion */
+/* Base styles - Tema Apple-like */
 html {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   min-height: 100vh;
-  background-color: #ffffff;
-  color: #37352f;
-  line-height: 1.5;
+  background-color: #fafafa;
+  color: #1d1d1f;
+  line-height: 1.47059;
+  font-weight: 400;
+  letter-spacing: -0.022em;
 }
 
-/* Scrollbar estilo Notion */
+/* Scrollbar estilo Apple */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -27,43 +30,43 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d1cd;
-  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #b8b8b4;
+  background: rgba(0, 0, 0, 0.25);
 }
 
-/* Seleção de texto */
+/* Seleção de texto estilo Apple */
 ::selection {
-  background: rgba(45, 170, 70, 0.2);
-  color: #37352f;
+  background: rgba(0, 113, 227, 0.2);
+  color: inherit;
 }
 
-/* Focus minimalista */
+/* Focus minimalista estilo Apple */
 *:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.35);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15);
 }
 
-/* Utilitários Notion */
+/* Container principal estilo Apple */
 .notion-page {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
 }
 
-/* Loading skeleton estilo Notion */
+/* Loading skeleton estilo Apple */
 @keyframes shimmer {
   0% { background-position: -1000px 0; }
   100% { background-position: 1000px 0; }
 }
 
 .notion-skeleton {
-  background: linear-gradient(90deg, #f1f1ef 25%, #e3e2e0 50%, #f1f1ef 75%);
+  background: linear-gradient(90deg, #f5f5f7 25%, #e8e8ed 50%, #f5f5f7 75%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite linear;
 }
@@ -75,12 +78,40 @@ body {
 }
 
 .drag-over {
-  background: rgba(35, 131, 226, 0.1);
+  background: rgba(0, 113, 227, 0.08);
 }
 
-/* Utilitários de texto */
+/* Utilitários de texto Apple */
 .text-balance {
   text-wrap: balance;
+}
+
+.text-apple-headline {
+  font-size: 48px;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+  line-height: 1.08349;
+}
+
+.text-apple-title {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.021em;
+  line-height: 1.14286;
+}
+
+.text-apple-body {
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.022em;
+  line-height: 1.47059;
+}
+
+.text-apple-caption {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.33337;
 }
 
 /* Line clamp */
@@ -103,4 +134,74 @@ body {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Animações suaves */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Hover effects */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Gradientes suaves */
+.gradient-apple {
+  background: linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
+}
+
+/* Sombras Apple-like */
+.shadow-apple-sm {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-apple-md {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.shadow-apple-lg {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.shadow-apple-xl {
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.16);
 }

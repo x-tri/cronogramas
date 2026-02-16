@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import './index.css'
-import App from './App.tsx'
+import { AppRouter } from './AppRouter'
 import { initializeRepository, RepositoryProvider } from './data/factory'
 import { queryClient } from './lib/query-client'
 
@@ -20,7 +20,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RepositoryProvider repository={repository} mode={mode}>
-        <App />
+        <AppRouter />
       </RepositoryProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

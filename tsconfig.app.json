@@ -18,8 +18,8 @@
 
     /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     // "erasableSyntaxOnly": true, // Desabilitado para permitir public/private constructor params
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true

@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Visual - Questões Erradas Individuais</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e5e5e5;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+        .close-btn:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .scores {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        .score-item {
+            text-align: center;
+        }
+        .score-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .score-bar {
+            height: 6px;
+            background: #e5e5e5;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+        .score-fill {
+            height: 100%;
+            background: #3b82f6;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .score-value {
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+        }
+        .topics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .topics-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+        .topics-count {
+            font-size: 13px;
+            color: #666;
+        }
+        .topics-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .action-link {
+            font-size: 12px;
+            color: #3b82f6;
+            text-decoration: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+        }
+        .action-link:hover {
+            text-decoration: underline;
+        }
+        .separator {
+            color: #ddd;
+        }
+        .topics-list {
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            padding: 8px;
+            background: #f9f9f9;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .area-group {
+            margin-bottom: 12px;
+        }
+        .area-group:last-child {
+            margin-bottom: 0;
+        }
+        .area-header {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .area-linguagens { background: #dbeafe; color: #1e40af; }
+        .area-humanas { background: #ffedd5; color: #9a3412; }
+        .area-natureza { background: #d1fae5; color: #065f46; }
+        .area-matematica { background: #fee2e2; color: #991b1b; }
+        
+        .question-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .question-item:hover {
+            background: #f0f0f0;
+        }
+        .question-item.selected {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+        .question-item:not(.selected) {
+            background: white;
+            border: 1px solid transparent;
+        }
+        .question-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #3b82f6;
+        }
+        .question-text {
+            flex: 1;
+            font-size: 13px;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .question-number {
+            font-size: 12px;
+            font-weight: 500;
+            color: #9ca3af;
+            background: #f3f4f6;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e5e5e5;
+        }
+        .footer-text {
+            font-size: 14px;
+            color: #666;
+        }
+        .footer-text.error {
+            color: #dc2626;
+        }
+        .buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+        .btn-primary {
+            background: #111;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #333;
+        }
+        .btn-primary:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .info-box {
+            background: #dbeafe;
+            border: 1px solid #93c5fd;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .info-box h2 {
+            font-size: 16px;
+            color: #1e40af;
+            margin-bottom: 8px;
+        }
+        .info-box p {
+            font-size: 14px;
+            color: #1e40af;
+            line-height: 1.5;
+        }
+        .info-box ol {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+        .info-box li {
+            font-size: 14px;
+            color: #1e40af;
+            margin-bottom: 4px;
+        }
+        .code-block {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 8px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste Visual - Questões Erradas Individuais</h1>
+        
+        <div class="info-box">
+            <h2>✅ NOVA Funcionalidade: Questões Detalhadas</h2>
+            <p>Agora você vê <strong>CADA questão errada individualmente</strong> com seu assunto específico!</p>
+            
+            <div class="code-block">
+// Exemplo de como ficam as questões:
+✓ Q5 - Interpretação de Texto (Linguagens)
+✓ Q47 - História do Brasil - Colônia (Humanas)  
+✓ Q98 - Biologia - Genética (Natureza)
+✓ Q142 - Matemática - Funções (Matemática)
+            </div>
+            
+            <ol style="margin-top: 12px;">
+                <li>Abra o terminal no diretório do projeto</li>
+                <li>Execute: <code>./start-dev.sh</code> ou <code>npm run dev</code></li>
+                <li>Acesse: <code>http://localhost:5173</code></li>
+                <li>Digite uma matrícula e clique "Analisar Simulado"</li>
+            </ol>
+        </div>
+
+        <div class="card">
+            <div class="header">
+                <div>
+                    <div class="title">Simulado ENEM 2024</div>
+                    <div class="subtitle">120 acertos • 45 erros • 15 em branco</div>
+                </div>
+                <button class="close-btn">&times;</button>
+            </div>
+
+            <div class="scores">
+                <div class="score-item">
+                    <div class="score-label">LC</div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: 70%"></div>
+                    </div>
+                    <div class="score-value">650</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label">CH</div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: 80%"></div>
+                    </div>
+                    <div class="score-value">700</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label">CN</div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: 100%"></div>
+                    </div>
+                    <div class="score-value">800</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label">MT</div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: 90%"></div>
+                    </div>
+                    <div class="score-value">750</div>
+                </div>
+            </div>
+
+            <div class="topics-section">
+                <div class="topics-header">
+                    <span class="topics-title">Selecione as questões erradas para revisar</span>
+                    <span class="topics-count" id="counter">8 de 12 selecionadas</span>
+                </div>
+                
+                <div class="topics-actions">
+                    <button class="action-link" onclick="selectAll()">Selecionar todas</button>
+                    <span class="separator">|</span>
+                    <button class="action-link" onclick="deselectAll()">Limpar seleção</button>
+                </div>
+
+                <div class="topics-list">
+                    <!-- LINGUAGENS -->
+                    <div class="area-group">
+                        <div class="area-header area-linguagens">Linguagens (3 questões)</div>
+                        
+                        <label class="question-item selected" onclick="toggleQuestion(this, 3)">
+                            <input type="checkbox" class="question-checkbox" checked onchange="updateCounter()">
+                            <span class="question-text">Q3 - Interpretação de Texto</span>
+                            <span class="question-number">Q3</span>
+                        </label>
+                        
+                        <label class="question-item selected" onclick="toggleQuestion(this, 3)">
+                            <input type="checkbox" class="question-checkbox" checked onchange="updateCounter()">
+                            <span class="question-text">Q12 - Gramática (Morfologia)</span>
+                            <span class="question-number">Q12</span>
+                        </label>
+                        
+                        <label class="question-item selected" onclick="toggleQuestion(this, 3)">
+                            <input type="checkbox" class="question-checkbox" checked onchange="updateCounter()">
+                            <span class="question-text">Q28 - Literatura Brasileira</span>
+                            <span class="question-number">Q28</span>
+                        </label>
+                    </div>
+
+                    <!-- HUMANAS -->
+                    <div class="area-group">
+                        <div class="area-header area-humanas">Humanas (2 questões)</div>
+                        
+                        <label class="question-item selected" onclick="toggleQuestion(this, 2)">
+                            <input type="checkbox" class="question-checkbox" checked onchange="updateCounter()">
+                            <span class="question-text">Q52 - História do Brasil (Império)</span>
+                            <span class="question-number">Q52</span>
+                        </label>
+                        
+                        <label class="question-item" onclick="toggleQuestion(this, 2)">
+                            <input type="checkbox" class="question-checkbox" onchange="updateCounter()">
+                            <span class="question-text">Q73 - Geografia (Globalização)</span>
+                            <span class="question-number">Q73</span>
+                        </label>
+                    </div>
+
+                    <!-- NATUREZA -->
+                    <div class="area-group">
+                        <div class="area-header area-natureza">Natureza (4 questões)</div>
+                        
+                        <label class="question-item selected" onclick="toggleQuestion(this, 4)">
+                            <input type="checkbox" class="question-checkbox" checked onchange="updateCounter()">
+                            <span class="question-text">Q95 - Biologia (Citologia)</span>
+                            <span class="question-number">Q95</span>
+                        </label>
+                        
+                        <label class="question-item selected" onclick="toggleQuestion(this, 4)">
+                            <input type="checkbox" class="question-checkbox" checked onchange="updateCounter()">
+                            <span class="question-text">Q98 - Biologia (Genética)</span>
+                            <span class="question-number">Q98</span>
+                        </label>
+                        
+                        <label class="question-item" onclick="toggleQuestion(this, 4)">
+                            <input type="checkbox" class="question-checkbox" onchange="updateCounter()">
+                            <span class="question-text">Q118 - Química (Orgânica)</span>
+                            <span class="question-number">Q118</span>
+                        </label>
+                        
+                        <label class="question-item selected" onclick="toggleQuestion(this, 4)">
+                            <input type="checkbox" class="question-checkbox" checked onchange="updateCounter()">
+                            <span class="question-text">Q127 - Física (Mecânica)</span>
+                            <span class="question-number">Q127</span>
+                        </label>
+                    </div>
+
+                    <!-- MATEMÁTICA -->
+                    <div class="area-group">
+                        <div class="area-header area-matematica">Matemática (3 questões)</div>
+                        
+                        <label class="question-item selected" onclick="toggleQuestion(this, 3)">
+                            <input type="checkbox" class="question-checkbox" checked onchange="updateCounter()">
+                            <span class="question-text">Q142 - Matemática (Funções)</span>
+                            <span class="question-number">Q142</span>
+                        </label>
+                        
+                        <label class="question-item selected" onclick="toggleQuestion(this, 3)">
+                            <input type="checkbox" class="question-checkbox" checked onchange="updateCounter()">
+                            <span class="question-text">Q156 - Geometria (Plana)</span>
+                            <span class="question-number">Q156</span>
+                        </label>
+                        
+                        <label class="question-item" onclick="toggleQuestion(this, 3)">
+                            <input type="checkbox" class="question-checkbox" onchange="updateCounter()">
+                            <span class="question-text">Q169 - Estatística e Probabilidade</span>
+                            <span class="question-number">Q169</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <span class="footer-text" id="footerText">8 questões serão adicionadas</span>
+                <div class="buttons">
+                    <button class="btn btn-secondary">Cancelar</button>
+                    <button class="btn btn-primary" id="distributeBtn" onclick="distribute()">Distribuir (8)</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; padding: 16px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;">
+            <h3 style="font-size: 14px; color: #166534; margin-bottom: 12px;">✨ O que mudou:</h3>
+            <ul style="font-size: 13px; color: #166534; margin-left: 20px; line-height: 2;">
+                <li><strong>Antes:</strong> "Linguagens - 10 erros para revisar" (só via a quantidade)</li>
+                <li><strong>Agora:</strong> Lista cada questão individualmente com o assunto específico</li>
+                <li>Exemplo: "Q12 - Gramática (Morfologia)" ou "Q98 - Biologia (Genética)"</li>
+                <li>Agrupado por área (Linguagens, Humanas, Natureza, Matemática)</li>
+                <li>Você seleciona quais questões específicas quer revisar</li>
+                <li>Cada questão vira um bloco no cronograma com seu assunto detalhado</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 20px; padding: 16px; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px;">
+            <h3 style="font-size: 14px; color: #92400e; margin-bottom: 8px;">⚠️ Importante:</h3>
+            <p style="font-size: 13px; color: #92400e; line-height: 1.6;">
+                Se o banco de dados tiver a lista detalhada das questões erradas (<code>wrong_questions</code> ou 
+                <code>questoes_erradas</code>), o sistema mostrará cada uma individualmente. Caso contrário, 
+                usará o resumo por área como fallback.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let selectedQuestions = new Set([3, 12, 28, 52, 95, 98, 127, 142, 156]); // Simulando seleção
+        const totalQuestions = 12;
+
+        function toggleQuestion(element, areaId) {
+            const checkbox = element.querySelector('.question-checkbox');
+            checkbox.checked = !checkbox.checked;
+            
+            if (checkbox.checked) {
+                element.classList.add('selected');
+            } else {
+                element.classList.remove('selected');
+            }
+            
+            updateCounter();
+        }
+
+        function updateCounter() {
+            const checkboxes = document.querySelectorAll('.question-checkbox:checked');
+            const count = checkboxes.length;
+            
+            document.getElementById('counter').textContent = `${count} de ${totalQuestions} selecionadas`;
+            
+            const footerText = document.getElementById('footerText');
+            const distributeBtn = document.getElementById('distributeBtn');
+            
+            if (count === 0) {
+                footerText.textContent = 'Selecione pelo menos uma questão';
+                footerText.classList.add('error');
+                distributeBtn.disabled = true;
+                distributeBtn.textContent = 'Distribuir';
+            } else {
+                footerText.textContent = `${count} questão${count > 1 ? 's' : ''} serão adicionadas`;
+                footerText.classList.remove('error');
+                distributeBtn.disabled = false;
+                distributeBtn.textContent = `Distribuir (${count})`;
+            }
+        }
+
+        function selectAll() {
+            document.querySelectorAll('.question-checkbox').forEach(cb => {
+                cb.checked = true;
+                cb.closest('.question-item').classList.add('selected');
+            });
+            updateCounter();
+        }
+
+        function deselectAll() {
+            document.querySelectorAll('.question-checkbox').forEach(cb => {
+                cb.checked = false;
+                cb.closest('.question-item').classList.remove('selected');
+            });
+            updateCounter();
+        }
+
+        function distribute() {
+            const count = document.querySelectorAll('.question-checkbox:checked').length;
+            if (count > 0) {
+                alert(`✅ ${count} questão(s) seriam distribuídas para o cronograma!\n\nCada questão vira um bloco de revisão com seu assunto específico.`);
+            }
+        }
+
+        // Inicializar
+        updateCounter();
+    </script>
+</body>
+</html>

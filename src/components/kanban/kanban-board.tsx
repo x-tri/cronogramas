@@ -1,6 +1,6 @@
-import { DndContext, DragOverlay, pointerWithin } from '@dnd-kit/core'
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
-import { useState } from 'react'
+import { DndContext, DragOverlay, pointerWithin, useSensor, useSensors, PointerSensor, defaultDropAnimationSideEffects } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent, DragOverEvent, DropAnimation } from '@dnd-kit/core'
+import { useState, useCallback } from 'react'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, type BlocoCronograma, type DiaSemana, type Turno } from '../../types/domain'
 import { getSlotByIndex } from '../../constants/time-slots'
@@ -21,8 +21,21 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
   const removeBlock = useCronogramaStore((state) => state.removeBlock)
   const updateBlock = useCronogramaStore((state) => state.updateBlock)
   const moveBlock = useCronogramaStore((state) => state.moveBlock)
+  const swapBlocks = useCronogramaStore((state) => state.swapBlocks)
+
 
   const [activeBlock, setActiveBlock] = useState<BlocoCronograma | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ dia: DiaSemana; turno: Turno; slotIndex: number } | null>(null)
+  const [dropMode, setDropMode] = useState<'swap' | 'move' | 'blocked'>('blocked')
+
+  // Configuração dos sensores para melhorar a detecção de drag
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Mínimo de 8px de movimento para iniciar o drag
+      },
+    })
+  )
 
   const handleBlockDelete = async (blockId: string) => {
     try {
@@ -50,16 +63,69 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
     }
   }
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const blockId = event.active.id as string
     const block = blocks.find((b) => b.id === blockId)
     if (block) {
       setActiveBlock(block)
     }
-  }
+  }, [blocks])
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { over } = event
+    if (!over) {
+      setDropTarget(null)
+      return
+    }
+
+    const dropData = over.data.current as {
+      dia: DiaSemana
+      turno: Turno
+      slotIndex: number
+    } | undefined
+
+    if (!dropData) {
+      setDropTarget(null)
+      return
+    }
+
+    const { dia, turno, slotIndex } = dropData
+    const slot = getSlotByIndex(turno, slotIndex)
+    if (!slot) {
+      setDropTarget(null)
+      return
+    }
+
+    // Check if slot is occupied by official class
+    const isOccupiedByOfficial = officialSchedule.some(
+      (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slot.inicio
+    )
+
+    if (isOccupiedByOfficial) {
+      setDropTarget({ dia, turno, slotIndex })
+      setDropMode('blocked')
+      return
+    }
+
+    // Check if slot is occupied by another block
+    const occupyingBlock = blocks.find(
+      (b) => b.diaSemana === dia && b.turno === turno && b.horarioInicio === slot.inicio
+    )
+
+    setDropTarget({ dia, turno, slotIndex })
+    
+    if (occupyingBlock && occupyingBlock.id !== activeBlock?.id) {
+      // Slot is occupied by another block - show swap mode
+      setDropMode('swap')
+    } else {
+      // Slot is empty - allow move
+      setDropMode('move')
+    }
+  }, [blocks, officialSchedule, activeBlock])
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveBlock(null)
+    setDropTarget(null)
 
     const { active, over } = event
     if (!over) return
@@ -77,21 +143,38 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
     const slot = getSlotByIndex(turno, slotIndex)
     if (!slot) return
 
+    // Check if slot is occupied by official class
     const isOccupiedByOfficial = officialSchedule.some(
       (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slot.inicio
     )
     if (isOccupiedByOfficial) return
 
-    const isOccupiedByBlock = blocks.some(
-      (b) => b.id !== blockId && b.diaSemana === dia && b.turno === turno && b.horarioInicio === slot.inicio
+    // Find if there's a block in the target slot
+    const targetBlock = blocks.find(
+      (b) => b.diaSemana === dia && b.turno === turno && b.horarioInicio === slot.inicio && b.id !== blockId
     )
-    if (isOccupiedByBlock) return
 
     try {
-      await moveBlock(blockId, dia, turno, slotIndex)
+      if (targetBlock) {
+        // Swap the blocks
+        await swapBlocks(blockId, targetBlock.id)
+      } else {
+        // Simple move to empty slot
+        await moveBlock(blockId, dia, turno, slotIndex)
+      }
     } catch (err) {
-      console.error('Failed to move block:', err)
+      console.error('Failed to move/swap block:', err)
     }
+  }, [blocks, officialSchedule, moveBlock, swapBlocks])
+
+  const dropAnimation: DropAnimation = {
+    sideEffects: defaultDropAnimationSideEffects({
+      styles: {
+        active: {
+          opacity: '0.5',
+        },
+      },
+    }),
   }
 
   if (isLoadingSchedule) {
@@ -111,8 +194,10 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
 
   return (
     <DndContext
+      sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
       <div className="bg-[#f7f6f3] rounded-lg p-5 w-full">
@@ -132,18 +217,25 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
               <span>Revisão</span>
             </span>
           </div>
-          <div className="text-sm text-[#9ca3af]">
-            Arraste para reorganizar
+          <div className="flex items-center gap-4 text-sm text-[#9ca3af]">
+            <span className="flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              <span>Solte sobre um bloco para trocar</span>
+            </span>
           </div>
         </div>
 
         {/* Grid do Kanban - ocupa 100% da largura */}
-        <div className="grid grid-cols-7 gap-3 w-full">
+        <div className="grid grid-cols-7 gap-4 w-full">
           {DIAS_SEMANA.map((dia) => (
             <KanbanColumn
               key={dia}
               dia={dia}
               officialSchedule={officialSchedule}
+              dropTarget={dropTarget}
+              dropMode={dropMode}
               onSlotClick={(turno, slotIndex) =>
                 onSlotClick?.(dia, turno, slotIndex)
               }
@@ -156,9 +248,9 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
         </div>
       </div>
 
-      <DragOverlay>
+      <DragOverlay dropAnimation={dropAnimation}>
         {activeBlock && (
-          <div className="w-52 opacity-90 rotate-1">
+          <div className="w-52 opacity-90 rotate-1 shadow-2xl">
             <BlockCard block={activeBlock} isDragging />
           </div>
         )}

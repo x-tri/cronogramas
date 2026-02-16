@@ -52,6 +52,8 @@ type CronogramaState = {
     turno: Turno,
     slotIndex: number
   ) => Promise<void>
+  swapBlocks: (blockId1: string, blockId2: string) => Promise<void>
+  pushBlocks: (blockId: string, dia: DiaSemana, turno: Turno, slotIndex: number) => Promise<void>
 
   // Cronograma management
   loadCronograma: (alunoId: string) => Promise<void>
@@ -67,6 +69,9 @@ type CronogramaState = {
 
   // Reset
   reset: () => void
+
+  // Clear all blocks for current cronograma
+  clearAllBlocks: () => Promise<void>
 }
 
 const initialState = {
@@ -198,6 +203,56 @@ export const useCronogramaStore = create<CronogramaState>()(
         }
       },
 
+      swapBlocks: async (blockId1, blockId2) => {
+        const block1 = get().blocks.find((b) => b.id === blockId1)
+        const block2 = get().blocks.find((b) => b.id === blockId2)
+        if (!block1 || !block2) return
+
+        set({ isSaving: true, error: null })
+        try {
+          const repo = getRepository()
+          
+          // Swap the positions
+          const updates1 = {
+            diaSemana: block2.diaSemana,
+            turno: block2.turno,
+            horarioInicio: block2.horarioInicio,
+            horarioFim: block2.horarioFim,
+          }
+          const updates2 = {
+            diaSemana: block1.diaSemana,
+            turno: block1.turno,
+            horarioInicio: block1.horarioInicio,
+            horarioFim: block1.horarioFim,
+          }
+
+          const [updatedBlock1, updatedBlock2] = await Promise.all([
+            repo.blocos.updateBloco(blockId1, updates1),
+            repo.blocos.updateBloco(blockId2, updates2),
+          ])
+
+          set((state) => ({
+            blocks: state.blocks.map((b) => {
+              if (b.id === blockId1) return updatedBlock1
+              if (b.id === blockId2) return updatedBlock2
+              return b
+            }),
+            isSaving: false,
+          }))
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Erro ao trocar blocos'
+          set({ isSaving: false, error: message })
+          throw error
+        }
+      },
+
+      pushBlocks: async (blockId, dia, turno, slotIndex) => {
+        // This is a placeholder for future implementation of cascading push
+        // For now, it just moves the block normally
+        await get().moveBlock(blockId, dia, turno, slotIndex)
+      },
+
       loadCronograma: async (alunoId) => {
         set({ isSaving: true, isLoadingVersions: true, error: null })
         try {
@@ -280,6 +335,29 @@ export const useCronogramaStore = create<CronogramaState>()(
       },
 
       reset: () => set(initialState),
+
+      clearAllBlocks: async () => {
+        set({ isSaving: true, error: null })
+        try {
+          const repo = getRepository()
+          const { blocks, cronograma } = get()
+          
+          // Delete all blocks from database
+          await Promise.all(
+            blocks.map((block) => repo.blocos.deleteBloco(block.id))
+          )
+          
+          // Clear blocks from state
+          set({ blocks: [], isSaving: false })
+          
+          console.log(`[CronogramaStore] Cleared ${blocks.length} blocks from cronograma ${cronograma?.id}`)
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Erro ao limpar cronograma'
+          set({ isSaving: false, error: message })
+          throw error
+        }
+      },
     }),
     { name: 'cronograma-store' }
   )

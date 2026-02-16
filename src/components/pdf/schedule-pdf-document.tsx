@@ -13,6 +13,13 @@ type SchedulePdfDocumentProps = {
   weekEnd: Date
   officialSchedule: HorarioOficial[]
   blocks: BlocoCronograma[]
+  examTitle?: string | null
+  triScores?: {
+    tri_lc: number | null
+    tri_ch: number | null
+    tri_cn: number | null
+    tri_mt: number | null
+  } | null
 }
 
 export function SchedulePdfDocument({
@@ -21,6 +28,8 @@ export function SchedulePdfDocument({
   weekEnd,
   officialSchedule,
   blocks,
+  examTitle,
+  triScores,
 }: SchedulePdfDocumentProps) {
   const getContent = (dia: DiaSemana, turno: Turno, slotInicio: string) => {
     const official = officialSchedule.find(
@@ -37,7 +46,13 @@ export function SchedulePdfDocument({
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
-        <PdfHeader student={student} weekStart={weekStart} weekEnd={weekEnd} />
+        <PdfHeader 
+          student={student} 
+          weekStart={weekStart} 
+          weekEnd={weekEnd} 
+          examTitle={examTitle}
+          triScores={triScores}
+        />
 
         <View style={styles.grid}>
           {DIAS_SEMANA.map((dia) => (

@@ -15,6 +15,8 @@ interface TimeSlotProps {
   turno: Turno
   officialClass?: HorarioOficial
   customBlock?: BlocoCronograma
+  isDropTarget?: boolean
+  dropMode?: 'swap' | 'move' | 'blocked'
   onClick?: () => void
   onBlockEdit?: (block: BlocoCronograma) => void
   onBlockDelete?: (blockId: string) => void
@@ -29,6 +31,8 @@ export function TimeSlot({
   turno,
   officialClass,
   customBlock,
+  isDropTarget,
+  dropMode,
   onClick,
   onBlockEdit,
   onBlockDelete,
@@ -48,6 +52,16 @@ export function TimeSlot({
     if (officialClass) {
       return 'bg-[#f1f1ef] border-[#e3e2e0] cursor-not-allowed'
     }
+    if (isDropTarget) {
+      if (dropMode === 'blocked') {
+        return 'bg-[#fef2f2] border-[#dc2626] border-2 cursor-not-allowed shadow-inner'
+      }
+      if (dropMode === 'swap') {
+        return 'bg-[#f0fdf4] border-[#16a34a] border-2 cursor-pointer ring-2 ring-[#16a34a]/30 shadow-md'
+      }
+      // dropMode === 'move' - empty slot
+      return 'bg-[#eff6ff] border-[#2383e2] border-2 cursor-pointer shadow-md'
+    }
     if (customBlock) {
       return 'bg-white border-[#e3e2e0]'
     }
@@ -60,9 +74,9 @@ export function TimeSlot({
   return (
     <div
       ref={setNodeRef}
-      onClick={isOccupied ? undefined : onClick}
+      onClick={isOccupied || isDropTarget ? undefined : onClick}
       className={`
-        relative rounded-md border p-2
+        relative rounded-md border p-2.5 min-h-[56px]
         transition-all duration-100
         ${getContainerStyles()}
       `}
@@ -72,7 +86,7 @@ export function TimeSlot({
         <span className="text-[11px] font-medium text-[#9ca3af]">
           {slot.inicio}
         </span>
-        {!isOccupied && !isOver && (
+        {!isOccupied && !isOver && !isDropTarget && (
           <svg className="w-3.5 h-3.5 text-[#e3e2e0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -110,10 +124,36 @@ export function TimeSlot({
         </div>
       )}
 
-      {/* Estado de Drop */}
-      {isOver && !isOccupied && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#eff6ff]/80 rounded-md">
+      {/* Estado de Drop - Slot vazio (move para espaço vazio) */}
+      {(isDropTarget && dropMode === 'move') && !isOccupied && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#eff6ff]/90 rounded-md z-10 border-2 border-dashed border-[#2383e2]">
+          <span className="text-xs font-medium text-[#1d4ed8]">Mover aqui</span>
+        </div>
+      )}
+
+      {/* Estado de hover (isOver) - quando está arrastando sobre */}
+      {isOver && !isOccupied && !isDropTarget && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#eff6ff]/60 rounded-md z-10">
           <span className="text-xs font-medium text-[#1d4ed8]">Soltar aqui</span>
+        </div>
+      )}
+
+      {/* Estado de Drop - Troca de blocos */}
+      {isDropTarget && dropMode === 'swap' && customBlock && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#f0fdf4]/90 rounded-md border-2 border-dashed border-[#16a34a]">
+          <svg className="w-5 h-5 text-[#16a34a] mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          <span className="text-[10px] font-medium text-[#166534]">Trocar</span>
+        </div>
+      )}
+
+      {/* Estado de Drop - Bloqueado */}
+      {isDropTarget && dropMode === 'blocked' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#fef2f2]/90 rounded-md">
+          <svg className="w-5 h-5 text-[#dc2626]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+          </svg>
         </div>
       )}
     </div>
