@@ -2,6 +2,37 @@ import { useState } from 'react'
 import { useRepository } from '../../data/factory'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { getStudentByMatricula } from '../../services/simulado-analyzer'
+import type { Escola } from '../../types/domain'
+
+type SupabaseStudentLike = {
+  id: string
+  matricula: string
+  name: string
+  turma?: string | null
+  school_id?: string | null
+  school_name?: string | null
+  escola?: string | null
+}
+
+function resolveEscola(student: SupabaseStudentLike): { escola: Escola; escolaNome?: string } {
+  const rawName = (student.school_name ?? student.escola ?? '').trim()
+  const rawId = (student.school_id ?? '').trim()
+  const marker = `${rawId} ${rawName}`.toLowerCase()
+
+  if (marker.includes('xtri')) {
+    return { escola: 'XTRI', escolaNome: rawName || 'Escola XTRI' }
+  }
+
+  if (marker.includes('marista')) {
+    return { escola: 'MARISTA', escolaNome: rawName || 'Colégio Marista de Natal' }
+  }
+
+  if (rawName) {
+    return { escola: 'MARISTA', escolaNome: rawName }
+  }
+
+  return { escola: 'MARISTA' }
+}
 
 export function StudentSearch() {
   const [matricula, setMatricula] = useState('')
@@ -35,6 +66,7 @@ export function StudentSearch() {
       if (!student) {
         const supabaseStudent = await getStudentByMatricula(trimmed)
         if (supabaseStudent) {
+          const { escola, escolaNome } = resolveEscola(supabaseStudent)
           student = {
             id: supabaseStudent.id,
             matricula: supabaseStudent.matricula,
@@ -42,7 +74,8 @@ export function StudentSearch() {
             turma: supabaseStudent.turma ?? 'A',
             email: null,
             fotoFilename: null,
-            escola: 'MARISTA',
+            escola,
+            escolaNome,
             createdAt: new Date(),
           }
         }

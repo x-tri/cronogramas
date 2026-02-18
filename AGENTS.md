@@ -48,7 +48,6 @@ Este arquivo fornece orientações precisas para agentes de IA que trabalham no 
 xtri-cronogramas/
 ├── src/
 │   ├── components/           # Componentes React organizados por feature
-│   │   ├── auth/            # Autenticação (login, protected-route, user-header)
 │   │   ├── blocks/          # Blocos do cronograma (cards, editor, seletores)
 │   │   ├── cronograma/      # Componentes de cronograma (histórico, versões, reset)
 │   │   ├── export/          # Exportação (PDF, email)
@@ -62,7 +61,6 @@ xtri-cronogramas/
 │   ├── constants/           # Constantes (cores, time-slots, disciplinas)
 │   │   ├── colors.ts        # Cores por área do ENEM, tipos de bloco, prioridades
 │   │   └── time-slots.ts    # Configuração de turnos e slots horários
-│   ├── contexts/            # React Contexts (auth-context.tsx)
 │   ├── data/                # Camada de dados (Repository Pattern)
 │   │   ├── mock-data/       # Dados mock (alunos, horários, disciplinas)
 │   │   ├── mock-repository.ts
@@ -515,18 +513,6 @@ Adicione a URL da Vercel em: **Settings > API > URL Configuration > Allowed Orig
 ```
 https://seu-projeto.vercel.app
 ```
-
----
-
-## Autenticação
-
-O sistema possui um sistema simples de autenticação:
-
-- **Context**: `src/contexts/auth-context.tsx`
-- **Login**: `src/components/auth/login.tsx`
-- **Protected Route**: `src/components/auth/protected-route.tsx`
-
-Usuários são verificados via tabela `authorized_users` no Supabase.
 
 ---
 

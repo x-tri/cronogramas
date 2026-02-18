@@ -8,10 +8,10 @@ import { BlockEditorModal } from './components/blocks/block-editor-modal'
 import { HistoryDropdown } from './components/cronograma/history-dropdown'
 import { WeekSelector } from './components/week-selector'
 import { ShareDropdown } from './components/export/share-dropdown'
-import { UserHeader } from './components/auth/user-header'
 import { ResetButton } from './components/cronograma/reset-button'
 import { useCronogramaStore } from './stores/cronograma-store'
 import type { BlocoCronograma, DiaSemana, Turno } from './types/domain'
+import { ESCOLA_LABELS } from './types/domain'
 import { TURNOS_CONFIG } from './constants/time-slots'
 
 type SlotSelection = {
@@ -22,6 +22,8 @@ type SlotSelection = {
 
 function AppContent() {
   const currentStudent = useCronogramaStore((state) => state.currentStudent)
+  const currentSchoolName = currentStudent?.escolaNome?.trim()
+    || (currentStudent ? ESCOLA_LABELS[currentStudent.escola] : 'Colégio')
   const [selectedSlot, setSelectedSlot] = useState<SlotSelection | null>(null)
   const [editingBlock, setEditingBlock] = useState<BlocoCronograma | null>(null)
 
@@ -68,15 +70,12 @@ function AppContent() {
                   XTRI Cronogramas
                 </h1>
                 <span className="text-[#9ca3af]">/</span>
-                <span className="text-sm text-[#6b6b67]">Colégio Marista</span>
+                <span className="text-sm text-[#6b6b67]">{currentSchoolName}</span>
               </div>
             </div>
 
             {/* Ações do Header */}
             <div className="flex items-center gap-4">
-              {/* User Info */}
-              <UserHeader />
-              
               {currentStudent && (
                 <>
                   <div className="h-4 w-px bg-[#e3e2e0]" />
@@ -233,5 +232,4 @@ function AppContent() {
   )
 }
 
-// Exporta o AppContent para uso com ProtectedRoute
 export { AppContent }
