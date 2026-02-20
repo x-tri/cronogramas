@@ -147,6 +147,9 @@ export type SupabaseStudent = {
   turma: string
   sheet_code: string
   school_id: string
+  school: {
+    name: string
+  }
 }
 
 export type StudentAnswer = {

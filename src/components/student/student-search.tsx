@@ -66,7 +66,7 @@ export function StudentSearch() {
       if (!student) {
         const supabaseStudent = await getStudentByMatricula(trimmed)
         if (supabaseStudent) {
-          const { escola, escolaNome } = resolveEscola(supabaseStudent)
+          const schoolName = supabaseStudent?.school?.name
           student = {
             id: supabaseStudent.id,
             matricula: supabaseStudent.matricula,
@@ -74,8 +74,8 @@ export function StudentSearch() {
             turma: supabaseStudent.turma ?? 'A',
             email: null,
             fotoFilename: null,
-            escola,
-            escolaNome,
+            escola: schoolName as Escola,
+            escolaNome: schoolName,
             createdAt: new Date(),
           }
         }

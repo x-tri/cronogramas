@@ -500,7 +500,7 @@ export async function getStudentByMatricula(
   // Tentar buscar exatamente como foi passado
   const { data, error } = await supabase
     .from('students')
-    .select('*')
+    .select('*,school:schools(*)')
     .eq('matricula', matricula)
     .maybeSingle()
 

@@ -28,6 +28,9 @@ describe('Simulado Analyzer', () => {
     turma: '2A',
     sheet_code: mockSheetCode,
     school_id: 'school-1',
+    school: {
+      name: 'Escola Teste',
+    }
   }
 
   const mockStudentAnswer = {
