@@ -263,6 +263,7 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
       <PlanoEstudoIA
         plano={plano}
         nomeAluno={currentStudent?.name ?? null}
+        simuladoTitle={plano.resumo ? 'Simulado' : 'Simulado'}
         onClose={() => setPlano(null)}
       />
     )
@@ -435,6 +436,7 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
           <PlanoEstudoIA
             plano={plano}
             nomeAluno={result.studentAnswer.student_name}
+            simuladoTitle={result.exam.title}
             onClose={() => setPlano(null)}
           />
         </div>
