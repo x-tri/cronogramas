@@ -53,7 +53,7 @@ export function DisciplinaSelector({
             <optgroup key={area} label={AREA_LABELS[area]}>
               {disciplinas.map((d) => (
                 <option key={d.codigo} value={d.codigo}>
-                  {d.nome} - {d.professor}
+                  {d.nome}
                 </option>
               ))}
             </optgroup>
