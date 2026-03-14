@@ -9,50 +9,35 @@ import { getTRIScoresFromStudentAnswers } from './tri-scores'
 export async function analyzeStudentSimulado(
   matricula: string,
 ): Promise<SimuladoResult | null> {
-  console.log('[SimuladoAnalyzer] Iniciando busca para matrícula:', matricula)
+  const normalized = matricula.trim().replace(/^0+/, '') || '0'
 
-  // Normalizar matrícula para busca
-  const normalizedMatricula = matricula.trim().replace(/^0+/, '') || '0'
-  console.log('[SimuladoAnalyzer] Matrícula normalizada:', normalizedMatricula)
+  // ── Disparar todas as buscas em paralelo ──────────────────────────────────
+  const [student, realErrors, projetoResult, triScores] = await Promise.all([
+    getStudentByMatricula(matricula).then(s =>
+      s ? s : normalized !== matricula.trim() ? getStudentByMatricula(normalized) : null
+    ),
+    getRealStudentErrors(matricula),
+    getSimuladoFromProjetos(matricula).then(r =>
+      r ? r : normalized !== matricula.trim() ? getSimuladoFromProjetos(normalized) : null
+    ),
+    getTRIScoresFromStudentAnswers(matricula, undefined),
+  ])
 
-  // Buscar o aluno primeiro para obter o sheet_code (para buscar notas TRI depois)
-  let student = await getStudentByMatricula(matricula)
-  if (!student && normalizedMatricula !== matricula.trim()) {
-    student = await getStudentByMatricula(normalizedMatricula)
+  // Função auxiliar: mescla notas TRI no resultado se estiverem faltando
+  const mergeTRI = (result: SimuladoResult): SimuladoResult => {
+    if (!triScores) return result
+    const sa = result.studentAnswer
+    sa.tri_lc = sa.tri_lc ?? triScores.tri_lc
+    sa.tri_ch = sa.tri_ch ?? triScores.tri_ch
+    sa.tri_cn = sa.tri_cn ?? triScores.tri_cn
+    sa.tri_mt = sa.tri_mt ?? triScores.tri_mt
+    return result
   }
 
-  // Buscar notas TRI da tabela student_answers - SEMPRE priorizar matrícula
-  let triScores: {
-    tri_lc: number | null
-    tri_ch: number | null
-    tri_cn: number | null
-    tri_mt: number | null
-  } | null = null
-  if (matricula) {
-    console.log('[SimuladoAnalyzer] Buscando notas TRI pela matrícula:', matricula)
-    triScores = await getTRIScoresFromStudentAnswers(matricula, student?.sheet_code)
-    console.log('[SimuladoAnalyzer] Notas TRI retornadas:', triScores)
-  } else {
-    console.log('[SimuladoAnalyzer] Matrícula não fornecida')
-  }
-
-  // ===== NOVO: 0. Tentar buscar erros REAIS linkando com conteúdos da prova =====
-  console.log(
-    '[SimuladoAnalyzer] === TENTATIVA 0: Buscando erros reais com conteúdos ===',
-  )
-  const realErrors = await getRealStudentErrors(matricula)
+  // ── Prioridade 0: erros reais linkados a conteúdos ────────────────────────
   if (realErrors && realErrors.wrongQuestions.length > 0) {
-    console.log(
-      '[SimuladoAnalyzer] ✅ Erros reais encontrados:',
-      realErrors.wrongQuestions.length,
-    )
-
-    // Montar o resultado completo
-    const topicsSummary = groupByTopic(realErrors.wrongQuestions)
-
-    // Criar um objeto de resultado compatível com notas TRI
-    const result: SimuladoResult = {
-      exam: realErrors.exam || {
+    return mergeTRI({
+      exam: realErrors.exam ?? {
         id: 'real-exam',
         title: 'Simulado - Erros Reais',
         answer_key: [],
@@ -60,7 +45,7 @@ export async function analyzeStudentSimulado(
       },
       studentAnswer: {
         id: matricula,
-        exam_id: realErrors.exam?.id || 'real-exam',
+        exam_id: realErrors.exam?.id ?? 'real-exam',
         student_number: matricula,
         student_name: student?.name ?? null,
         turma: student?.turma ?? null,
@@ -77,110 +62,29 @@ export async function analyzeStudentSimulado(
         created_at: new Date().toISOString(),
       },
       wrongQuestions: realErrors.wrongQuestions,
-      topicsSummary,
+      topicsSummary: groupByTopic(realErrors.wrongQuestions),
+    })
+  }
+
+  // ── Prioridade 1: tabela projetos ─────────────────────────────────────────
+  if (projetoResult) {
+    return mergeTRI(projetoResult)
+  }
+
+  // ── Prioridade 2: fallback student_answers + exams ────────────────────────
+  const sheetCode = student?.sheet_code
+
+  const fallback = await (async () => {
+    const r = await getLatestSimuladoResult(matricula)
+    if (r) return r
+    if (normalized !== matricula.trim()) {
+      const r2 = await getLatestSimuladoResult(normalized)
+      if (r2) return r2
     }
-
-    console.log(
-      '[SimuladoAnalyzer] ✅ Retornando resultado com erros reais e notas TRI!',
-    )
-    return result
-  }
-  console.log('[SimuladoAnalyzer] ⚠️ Não encontrou erros reais, tentando outros métodos...')
-
-  // 1. Tentar buscar da tabela PROJETOS (principal)
-  console.log('[SimuladoAnalyzer] === TENTATIVA 1: Buscando na tabela projetos ===')
-  let result = await getSimuladoFromProjetos(matricula)
-  if (result) {
-    console.log('[SimuladoAnalyzer] ✅ Encontrado na tabela projetos!')
-    // Mesclar notas TRI se não estiverem presentes
-    if (
-      triScores &&
-      (!result.studentAnswer.tri_lc ||
-        !result.studentAnswer.tri_ch ||
-        !result.studentAnswer.tri_cn ||
-        !result.studentAnswer.tri_mt)
-    ) {
-      result.studentAnswer.tri_lc = result.studentAnswer.tri_lc ?? triScores.tri_lc
-      result.studentAnswer.tri_ch = result.studentAnswer.tri_ch ?? triScores.tri_ch
-      result.studentAnswer.tri_cn = result.studentAnswer.tri_cn ?? triScores.tri_cn
-      result.studentAnswer.tri_mt = result.studentAnswer.tri_mt ?? triScores.tri_mt
-      console.log('[SimuladoAnalyzer] Notas TRI mescladas ao resultado da tabela projetos')
-    }
-    return result
-  }
-
-  // 1.1 Tentar com matrícula normalizada na tabela projetos
-  if (normalizedMatricula !== matricula.trim()) {
-    console.log(
-      '[SimuladoAnalyzer] TENTATIVA 1.1: Buscando na tabela projetos com matrícula normalizada:',
-      normalizedMatricula,
-    )
-    result = await getSimuladoFromProjetos(normalizedMatricula)
-    if (result) {
-      console.log(
-        '[SimuladoAnalyzer] ✅ Encontrado na tabela projetos com matrícula normalizada!',
-      )
-      // Mesclar notas TRI se não estiverem presentes
-      if (
-        triScores &&
-        (!result.studentAnswer.tri_lc ||
-          !result.studentAnswer.tri_ch ||
-          !result.studentAnswer.tri_cn ||
-          !result.studentAnswer.tri_mt)
-      ) {
-        result.studentAnswer.tri_lc = result.studentAnswer.tri_lc ?? triScores.tri_lc
-        result.studentAnswer.tri_ch = result.studentAnswer.tri_ch ?? triScores.tri_ch
-        result.studentAnswer.tri_cn = result.studentAnswer.tri_cn ?? triScores.tri_cn
-        result.studentAnswer.tri_mt = result.studentAnswer.tri_mt ?? triScores.tri_mt
-      }
-      return result
-    }
-  }
-
-  // 2. Fallback para tabela student_answers + exams
-  console.log(
-    '[SimuladoAnalyzer] TENTATIVA 2: Fallback para student_answers + exams...',
-  )
-  result = await getLatestSimuladoResult(matricula)
-
-  // Se não encontrou e matrícula foi normalizada, tentar com formato normalizado
-  if (!result && normalizedMatricula !== matricula.trim()) {
-    console.log(
-      '[SimuladoAnalyzer] TENTATIVA 2.1: Fallback com matrícula normalizada:',
-      normalizedMatricula,
-    )
-    result = await getLatestSimuladoResult(normalizedMatricula)
-  }
-
-  // Se não encontrou por matrícula, mas encontrou student com sheet_code, tentar por sheet_code
-  if (!result && student?.sheet_code) {
-    console.log(
-      '[SimuladoAnalyzer] TENTATIVA 2.2: Buscando por sheet_code:',
-      student.sheet_code,
-    )
-    result = await getLatestSimuladoResult(student.sheet_code)
-  }
-
-  if (!result) {
-    console.log('[SimuladoAnalyzer] ❌ Nenhum resultado encontrado')
+    if (sheetCode) return getLatestSimuladoResult(sheetCode)
     return null
-  }
+  })()
 
-  // Mesclar notas TRI ao resultado final (fallback)
-  if (
-    triScores &&
-    (!result.studentAnswer.tri_lc ||
-      !result.studentAnswer.tri_ch ||
-      !result.studentAnswer.tri_cn ||
-      !result.studentAnswer.tri_mt)
-  ) {
-    result.studentAnswer.tri_lc = result.studentAnswer.tri_lc ?? triScores.tri_lc
-    result.studentAnswer.tri_ch = result.studentAnswer.tri_ch ?? triScores.tri_ch
-    result.studentAnswer.tri_cn = result.studentAnswer.tri_cn ?? triScores.tri_cn
-    result.studentAnswer.tri_mt = result.studentAnswer.tri_mt ?? triScores.tri_mt
-    console.log('[SimuladoAnalyzer] Notas TRI mescladas ao resultado final')
-  }
-
-  console.log('[SimuladoAnalyzer] ✅ Encontrado no fallback student_answers')
-  return result
+  if (!fallback) return null
+  return mergeTRI(fallback)
 }

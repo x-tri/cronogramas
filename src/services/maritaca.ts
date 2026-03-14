@@ -116,8 +116,8 @@ export async function gerarPlanoEstudo(result: SimuladoResult): Promise<PlanoEst
     body: JSON.stringify({
       model: MARITACA_MODEL,
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 3000,
+      temperature: 0.4,
+      max_tokens: 2000,
     }),
   })
 
