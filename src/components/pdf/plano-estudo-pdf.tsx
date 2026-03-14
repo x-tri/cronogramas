@@ -1,284 +1,212 @@
-import { Document, Page, View, Text } from '@react-pdf/renderer'
-import { StyleSheet } from '@react-pdf/renderer'
+import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { PlanoEstudo } from '../../services/maritaca'
 
-const styles = StyleSheet.create({
+const AREA_COLORS: Record<string, string> = {
+  cn: '#10b981',
+  ch: '#f97316',
+  lc: '#3b82f6',
+  mt: '#ef4444',
+  revisao: '#8b5cf6',
+  pausa: '#9ca3af',
+}
+
+const PRIO_COLORS: Record<string, string> = {
+  ALTA: '#dc2626',
+  MEDIA: '#d97706',
+  BAIXA: '#6b7280',
+}
+
+const s = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
     fontSize: 9,
-    paddingTop: 36,
-    paddingBottom: 48,
-    paddingHorizontal: 36,
+    paddingTop: 40,
+    paddingBottom: 52,
+    paddingHorizontal: 44,
     backgroundColor: '#ffffff',
     color: '#1d1d1f',
   },
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginBottom: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: '#0071e3',
-  },
-  headerLeft: { flexDirection: 'column', gap: 2 },
-  headerTitle: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: '#1d1d1f', letterSpacing: -0.5 },
-  headerSubtitle: { fontSize: 9, color: '#6b7280' },
-  headerRight: { flexDirection: 'column', alignItems: 'flex-end', gap: 2 },
-  headerBrand: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#0071e3' },
-  headerDate: { fontSize: 8, color: '#9ca3af' },
-  // Meta badges row
-  metaRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  metaBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    backgroundColor: '#f0f7ff',
+  // ── Header ──
+  headerCenter: { alignItems: 'center', marginBottom: 4 },
+  h1: { fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#1d1d1f', letterSpacing: -0.5 },
+  headerSub: { fontSize: 9, color: '#6b7280', marginTop: 3 },
+  divider: { height: 1, backgroundColor: '#e3e2e0', marginVertical: 14 },
+  // ── Estratégia ──
+  estrategiaBox: {
     borderLeftWidth: 3,
     borderLeftColor: '#0071e3',
+    paddingLeft: 10,
+    marginBottom: 14,
   },
-  metaBadgeLabel: { fontSize: 7, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 },
-  metaBadgeValue: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#1d4ed8', marginTop: 1 },
-  // Resumo
-  resumoBox: {
-    backgroundColor: '#f0f7ff',
-    borderLeftWidth: 3,
-    borderLeftColor: '#0071e3',
-    borderRadius: 4,
-    padding: 10,
+  estrategiaLabel: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#1d1d1f', marginBottom: 4 },
+  estrategiaText: { fontSize: 8.5, color: '#374151', lineHeight: 1.6 },
+  // ── Diagnóstico ──
+  diagBox: {
+    borderWidth: 1,
+    borderColor: '#e3e2e0',
+    borderRadius: 5,
+    padding: 12,
     marginBottom: 16,
   },
-  resumoLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#0071e3', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  resumoText: { fontSize: 9, color: '#1e40af', lineHeight: 1.5 },
-  // Área card
-  areaCard: {
-    marginBottom: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#e3e2e0',
-    overflow: 'hidden',
-  },
-  areaHeader: {
+  diagTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#1d1d1f', marginBottom: 7, textTransform: 'uppercase', letterSpacing: 0.5 },
+  diagRow: { flexDirection: 'row', marginBottom: 4, flexWrap: 'wrap' },
+  diagLabel: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#1d1d1f', marginRight: 4 },
+  diagItems: { fontSize: 8.5, color: '#dc2626', flex: 1, lineHeight: 1.5 },
+  diagItemsGreen: { fontSize: 8.5, color: '#059669', flex: 1, lineHeight: 1.5 },
+  diagItemsMeta: { fontSize: 8.5, color: '#1d4ed8', flex: 1, lineHeight: 1.5 },
+  // ── Tabela ──
+  tableHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    backgroundColor: '#f7f6f3',
+    borderBottomWidth: 1,
+    borderBottomColor: '#d1d0cb',
+    paddingBottom: 5,
+    marginBottom: 4,
   },
-  areaHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  areaDot: { width: 8, height: 8, borderRadius: 4 },
-  areaNome: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#1d1d1f' },
-  areaTRI: {
-    fontSize: 8,
-    color: '#6b7280',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e3e2e0',
-    borderRadius: 3,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  prioridadeTag: {
-    fontSize: 7,
-    fontFamily: 'Helvetica-Bold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  areaBody: { padding: 10 },
-  // Tópicos
-  topicosLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  topicosRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8 },
-  topicoBadge: {
-    fontSize: 7.5,
-    color: '#4b5563',
-    backgroundColor: '#f1f1ef',
-    borderWidth: 1,
-    borderColor: '#e3e2e0',
-    borderRadius: 3,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  // Estratégia
-  estrategiaLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
-  estrategiaText: { fontSize: 8.5, color: '#374151', lineHeight: 1.5, marginBottom: 8 },
-  // Ações
-  acoesLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  acaoRow: { flexDirection: 'row', gap: 5, marginBottom: 3, alignItems: 'flex-start' },
-  acaoBullet: { fontSize: 8, color: '#9ca3af', marginTop: 1 },
-  acaoText: { fontSize: 8, color: '#4b5563', lineHeight: 1.4, flex: 1 },
-  // Divider
-  divider: { height: 1, backgroundColor: '#e3e2e0', marginVertical: 8 },
-  // Semanas e meta
-  bottomRow: {
+  thHorario: { width: 70, fontSize: 8, color: '#9ca3af', fontFamily: 'Helvetica-Bold' },
+  thAtividade: { flex: 1, fontSize: 8, color: '#9ca3af', fontFamily: 'Helvetica-Bold', marginLeft: 8 },
+  thPrio: { width: 56, fontSize: 8, color: '#9ca3af', fontFamily: 'Helvetica-Bold', textAlign: 'right' },
+  // ── Linha da tabela ──
+  tableRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f1ef',
+    paddingVertical: 8,
   },
-  bottomBox: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 6,
+  tdCheckbox: {
+    width: 14,
+    height: 14,
     borderWidth: 1,
-    borderColor: '#e3e2e0',
+    borderColor: '#d1d0cb',
+    borderRadius: 2,
+    marginTop: 1,
+    marginRight: 6,
+    flexShrink: 0,
   },
-  bottomBoxLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  bottomBoxText: { fontSize: 9, color: '#37352f', lineHeight: 1.5 },
-  // Recomendação
-  recomBox: {
-    backgroundColor: '#f5f3ff',
-    borderLeftWidth: 3,
-    borderLeftColor: '#8b5cf6',
-    borderRadius: 4,
-    padding: 10,
-    marginBottom: 16,
-  },
-  recomLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  recomText: { fontSize: 9, color: '#5b21b6', lineHeight: 1.5 },
-  // Footer
+  tdHorario: { width: 60, fontSize: 8, color: '#6b7280', flexShrink: 0, marginTop: 1 },
+  tdBody: { flex: 1, marginLeft: 4 },
+  tdTitulo: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#1d1d1f', marginBottom: 3 },
+  tdDescricao: { fontSize: 8, color: '#4b5563', lineHeight: 1.5, marginBottom: 3 },
+  tdDica: { fontSize: 7.5, color: '#0071e3', fontStyle: 'italic', lineHeight: 1.4 },
+  tdPrio: { width: 52, alignItems: 'flex-end', flexShrink: 0 },
+  tdPrioText: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', letterSpacing: 0.3, marginTop: 2 },
+  // ── Footer ──
   footer: {
     position: 'absolute',
-    bottom: 24,
-    left: 36,
-    right: 36,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    bottom: 20,
+    left: 44,
+    right: 44,
+    alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: '#e3e2e0',
-    paddingTop: 6,
+    paddingTop: 7,
   },
-  footerText: { fontSize: 7, color: '#c1c0bb' },
-  sectionTitle: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#37352f', marginBottom: 8, marginTop: 4 },
+  footerText: { fontSize: 7.5, color: '#9ca3af' },
+  footerSub: { fontSize: 7, color: '#c1c0bb', marginTop: 2 },
+  // ── Pausa (itálico) ──
+  pausaTitulo: { fontSize: 9, fontFamily: 'Helvetica-Oblique', color: '#6b7280', marginBottom: 3 },
+  pausaDescricao: { fontSize: 8, color: '#9ca3af', fontStyle: 'italic', lineHeight: 1.4, marginBottom: 2 },
+  pausaDica: { fontSize: 7.5, color: '#10b981', fontStyle: 'italic' },
 })
 
-const PRIORIDADE_STYLES = {
-  alta: { bg: '#fef2f2', text: '#b91c1c' },
-  media: { bg: '#fff7ed', text: '#c2410c' },
-  baixa: { bg: '#f0fdf4', text: '#047857' },
-}
-const PRIORIDADE_LABELS = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }
-
-type PlanoEstudoPDFProps = {
+type Props = {
   plano: PlanoEstudo
   nomeAluno: string | null
   simuladoTitle: string
 }
 
-export function PlanoEstudoPDF({ plano, nomeAluno, simuladoTitle }: PlanoEstudoPDFProps) {
-  const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+export function PlanoEstudoPDF({ plano, nomeAluno, simuladoTitle }: Props) {
+  const hoje = new Date().toLocaleDateString('pt-BR', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
 
   return (
     <Document title={`Plano de Estudos — ${nomeAluno ?? 'Aluno'}`}>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={s.page}>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>Plano de Estudos ENEM</Text>
-            <Text style={styles.headerSubtitle}>{nomeAluno ?? 'Aluno(a)'} · {simuladoTitle}</Text>
+        {/* Header centralizado */}
+        <View style={s.headerCenter}>
+          <Text style={s.h1}>Plano de Estudos Personalizado</Text>
+          <Text style={s.headerSub}>
+            Gerado por IA - XTRI{nomeAluno ? ` | ${nomeAluno}` : ''} | {hoje}
+          </Text>
+        </View>
+
+        <View style={s.divider} />
+
+        {/* Estratégia */}
+        <View style={s.estrategiaBox}>
+          <Text style={s.estrategiaLabel}>Estrategia:</Text>
+          <Text style={s.estrategiaText}>{plano.estrategia}</Text>
+        </View>
+
+        {/* Diagnóstico */}
+        <View style={s.diagBox}>
+          <Text style={s.diagTitle}>Diagnostico do Aluno</Text>
+          <View style={s.diagRow}>
+            <Text style={s.diagLabel}>Pontos fracos:</Text>
+            <Text style={s.diagItems}>{plano.diagnostico.pontosFracos.join(', ')}</Text>
           </View>
-          <View style={styles.headerRight}>
-            <Text style={styles.headerBrand}>XTRI</Text>
-            <Text style={styles.headerDate}>{hoje}</Text>
+          <View style={s.diagRow}>
+            <Text style={s.diagLabel}>Pontos fortes:</Text>
+            <Text style={s.diagItemsGreen}>{plano.diagnostico.pontosFortes.join(', ')}</Text>
+          </View>
+          <View style={s.diagRow}>
+            <Text style={s.diagLabel}>Meta proximo simulado:</Text>
+            <Text style={s.diagItemsMeta}>{plano.diagnostico.metaProximoSimulado}</Text>
           </View>
         </View>
 
-        {/* Meta badges */}
-        <View style={styles.metaRow}>
-          <View style={styles.metaBadge}>
-            <Text style={styles.metaBadgeLabel}>Distribuição Semanal</Text>
-            <Text style={styles.metaBadgeValue}>{plano.semanas}</Text>
-          </View>
-          {plano.metaTRI && (
-            <View style={[styles.metaBadge, { borderLeftColor: '#8b5cf6', backgroundColor: '#f5f3ff' }]}>
-              <Text style={[styles.metaBadgeLabel, { color: '#7c3aed' }]}>Meta próximo simulado</Text>
-              <Text style={[styles.metaBadgeValue, { color: '#6d28d9' }]}>{plano.metaTRI}</Text>
-            </View>
-          )}
+        {/* Tabela de atividades */}
+        <View style={s.tableHeader}>
+          <Text style={s.thHorario}>Horario</Text>
+          <Text style={s.thAtividade}>Atividade</Text>
+          <Text style={s.thPrio}>Prioridade</Text>
         </View>
 
-        {/* Resumo */}
-        <View style={styles.resumoBox}>
-          <Text style={styles.resumoLabel}>Análise do Desempenho</Text>
-          <Text style={styles.resumoText}>{plano.resumo}</Text>
-        </View>
+        {plano.atividades.map((a, i) => {
+          const isPausa = a.area === 'pausa'
+          const areaColor = AREA_COLORS[a.area] ?? '#6b7280'
+          const prioColor = PRIO_COLORS[a.prioridade] ?? '#6b7280'
 
-        {/* Seção áreas */}
-        <Text style={styles.sectionTitle}>Plano por Área de Conhecimento</Text>
+          return (
+            <View key={i} style={s.tableRow} wrap={false}>
+              {/* Checkbox */}
+              <View style={s.tdCheckbox} />
 
-        {plano.porArea
-          .slice()
-          .sort((a, b) => {
-            const order = { alta: 0, media: 1, baixa: 2 }
-            return order[a.prioridade] - order[b.prioridade]
-          })
-          .map((area) => {
-            const prio = PRIORIDADE_STYLES[area.prioridade] ?? PRIORIDADE_STYLES.media
-            const prioLabel = PRIORIDADE_LABELS[area.prioridade]
-            return (
-              <View key={area.area} style={styles.areaCard}>
-                {/* Header da área */}
-                <View style={styles.areaHeader}>
-                  <View style={styles.areaHeaderLeft}>
-                    <View style={[styles.areaDot, { backgroundColor: area.cor }]} />
-                    <Text style={styles.areaNome}>{area.area}</Text>
-                    {area.nota && <Text style={styles.areaTRI}>TRI {area.nota}</Text>}
-                  </View>
-                  <Text style={[styles.prioridadeTag, { backgroundColor: prio.bg, color: prio.text }]}>
-                    Prioridade {prioLabel}
+              {/* Horário */}
+              <Text style={s.tdHorario}>{a.horario}</Text>
+
+              {/* Corpo */}
+              <View style={s.tdBody}>
+                <Text style={isPausa ? s.pausaTitulo : [s.tdTitulo, { color: isPausa ? '#6b7280' : '#1d1d1f' }]}>
+                  {a.titulo}
+                </Text>
+                <Text style={isPausa ? s.pausaDescricao : s.tdDescricao}>
+                  {a.descricao}
+                </Text>
+                {a.dica ? (
+                  <Text style={isPausa ? s.pausaDica : s.tdDica}>
+                    Dica: {a.dica}
                   </Text>
-                </View>
-
-                {/* Body */}
-                <View style={styles.areaBody}>
-                  {/* Tópicos */}
-                  <Text style={styles.topicosLabel}>Tópicos a Revisar</Text>
-                  <View style={styles.topicosRow}>
-                    {area.topicos.map((t) => (
-                      <Text key={t} style={styles.topicoBadge}>{t}</Text>
-                    ))}
-                  </View>
-
-                  {/* Estratégia */}
-                  <Text style={styles.estrategiaLabel}>Estratégia</Text>
-                  <Text style={styles.estrategiaText}>{area.estrategia}</Text>
-
-                  {/* Ações */}
-                  {area.acoes && area.acoes.length > 0 && (
-                    <>
-                      <Text style={styles.acoesLabel}>Ações Concretas</Text>
-                      {area.acoes.map((acao, i) => (
-                        <View key={i} style={styles.acaoRow}>
-                          <Text style={styles.acaoBullet}>→</Text>
-                          <Text style={styles.acaoText}>{acao}</Text>
-                        </View>
-                      ))}
-                    </>
-                  )}
-                </View>
+                ) : null}
               </View>
-            )
-          })}
 
-        {/* Recomendação geral */}
-        <View style={styles.recomBox}>
-          <Text style={styles.recomLabel}>Recomendação Geral</Text>
-          <Text style={styles.recomText}>{plano.recomendacaoGeral}</Text>
-        </View>
+              {/* Prioridade */}
+              <View style={s.tdPrio}>
+                {!isPausa && (
+                  <Text style={[s.tdPrioText, { color: prioColor }]}>
+                    {a.prioridade}
+                  </Text>
+                )}
+              </View>
+            </View>
+          )
+        })}
 
         {/* Footer */}
-        <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>Plano gerado por IA Maritaca Sabiá · XTRI — Preparação ENEM</Text>
-          <Text style={styles.footerText}>Valide com seu professor · {hoje}</Text>
+        <View style={s.footer} fixed>
+          <Text style={s.footerText}>Gerado automaticamente pela IA do XTRI - Plataforma de Estudos para o ENEM</Text>
+          <Text style={s.footerSub}>Plano personalizado com base nos seus resultados de simulado. · {simuladoTitle}</Text>
         </View>
 
       </Page>
