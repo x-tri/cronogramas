@@ -6,6 +6,8 @@ import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, TURNOS } from '../../types/domain'
 import { TURNOS_CONFIG } from '../../constants/time-slots'
 import { getColorFromQuestionNumber } from '../../constants/colors'
+import type { PlanoEstudo } from '../../services/maritaca'
+import { PlanoEstudoIA } from './plano-estudo-ia'
 
 type SimuladoAnalyzerProps = {
   matricula: string
@@ -13,8 +15,10 @@ type SimuladoAnalyzerProps = {
 
 export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false)
   const [result, setResult] = useState<SimuladoResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [plano, setPlano] = useState<PlanoEstudo | null>(null)
   const [selectedQuestions, setSelectedQuestions] = useState<Set<number>>(new Set())
 
   const blocks = useCronogramaStore((state) => state.blocks)
@@ -50,15 +54,40 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
     }
   }
 
-  const handleDiagnose = async () => {
-    const { diagnoseStudentAnswers } = await import('../../services/simulado-analyzer')
-    console.log('Iniciando diagnóstico...')
-    await diagnoseStudentAnswers(matricula)
-    alert('Diagnóstico completo! Verifique o console do navegador (F12).')
+  const handleGerarPlano = async () => {
+    setIsGeneratingPlan(true)
+    setError(null)
+    setPlano(null)
+
+    try {
+      // Se ainda não analisou o simulado, analisar primeiro
+      let simuladoResult = result
+      if (!simuladoResult) {
+        const { analyzeStudentSimulado } = await import('../../services/simulado-analyzer')
+        const data = await analyzeStudentSimulado(matricula)
+        if (!data) {
+          setError('Nenhum simulado encontrado para gerar o plano')
+          return
+        }
+        simuladoResult = data
+        setResult(data)
+        setSelectedQuestions(new Set(data.wrongQuestions.map(q => q.questionNumber)))
+      }
+
+      const { gerarPlanoEstudo } = await import('../../services/maritaca')
+      const planoGerado = await gerarPlanoEstudo(simuladoResult)
+      setPlano(planoGerado)
+    } catch (err) {
+      console.error('Erro ao gerar plano:', err)
+      setError('Erro ao gerar plano de estudos. Verifique a chave da API.')
+    } finally {
+      setIsGeneratingPlan(false)
+    }
   }
 
   const handleCloseResult = useCallback(() => {
     setResult(null)
+    setPlano(null)
     setSelectedQuestions(new Set())
     setError(null)
   }, [])
@@ -200,7 +229,7 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
     await addBlock(blockData)
   }
 
-  if (!result) {
+  if (!result && !plano) {
     return (
       <div className="flex items-center gap-3">
         <Button
@@ -214,16 +243,28 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
           Analisar Simulado
         </Button>
         <Button
-          onClick={handleDiagnose}
+          onClick={handleGerarPlano}
           onMouseEnter={preloadAnalyzer}
           onFocus={preloadAnalyzer}
+          isLoading={isGeneratingPlan}
           variant="outline"
           size="sm"
         >
-          🔍 Diagnóstico
+          ✨ Plano IA
         </Button>
         {error && <span className="text-sm text-red-600">{error}</span>}
       </div>
+    )
+  }
+
+  // Exibe apenas o plano IA (sem ter aberto o simulado completo)
+  if (plano && !result) {
+    return (
+      <PlanoEstudoIA
+        plano={plano}
+        nomeAluno={currentStudent?.name ?? null}
+        onClose={() => setPlano(null)}
+      />
     )
   }
 
@@ -371,6 +412,14 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
             : 'Selecione pelo menos uma questão'}
         </span>
         <div className="flex gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGerarPlano}
+            isLoading={isGeneratingPlan}
+          >
+            ✨ Plano IA
+          </Button>
           <Button variant="secondary" onClick={handleCloseResult}>
             Cancelar
           </Button>
@@ -379,6 +428,17 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
           </Button>
         </div>
       </div>
+
+      {/* Plano IA (exibido dentro do card quando gerado com simulado aberto) */}
+      {plano && (
+        <div className="pt-2 border-t border-gray-100">
+          <PlanoEstudoIA
+            plano={plano}
+            nomeAluno={result.studentAnswer.student_name}
+            onClose={() => setPlano(null)}
+          />
+        </div>
+      )}
     </div>
   )
 }
