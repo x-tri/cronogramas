@@ -1,6 +1,7 @@
 import type { SimuladoResult } from '../types/supabase'
 
-const MARITACA_API_URL = 'https://chat.maritaca.ai/api/chat/completions'
+// Chamada via Edge Function do Supabase para evitar CORS (API key fica server-side)
+const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/maritaca-proxy`
 const MARITACA_MODEL = 'sabia-3'
 
 export interface PlanoEstudo {
@@ -71,16 +72,12 @@ Retorne um JSON válido com exatamente esta estrutura (sem markdown, sem explica
 }
 
 export async function gerarPlanoEstudo(result: SimuladoResult): Promise<PlanoEstudo> {
-  const apiKey = import.meta.env.VITE_MARITACA_KEY
-  if (!apiKey) throw new Error('VITE_MARITACA_KEY não configurada')
-
   const prompt = buildPrompt(result)
 
-  const response = await fetch(MARITACA_API_URL, {
+  const response = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Key ${apiKey}`,
     },
     body: JSON.stringify({
       model: MARITACA_MODEL,
