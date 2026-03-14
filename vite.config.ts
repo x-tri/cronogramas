@@ -20,5 +20,48 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('@supabase')) return 'supabase-vendor'
+          if (id.includes('@dnd-kit')) return 'dnd-vendor'
+          if (id.includes('@tanstack')) return 'react-query-vendor'
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('/scheduler/')
+          ) {
+            return 'react-vendor'
+          }
+          if (
+            id.includes('@react-pdf') ||
+            id.includes('linebreak') ||
+            id.includes('hyphen') ||
+            id.includes('unicode-properties') ||
+            id.includes('unicode-trie') ||
+            id.includes('bidi-js') ||
+            id.includes('fontkit') ||
+            id.includes('restructure') ||
+              id.includes('jay-peg')
+          ) {
+            return 'pdf-vendor'
+          }
+          if (id.includes('yoga-layout')) {
+            return 'pdf-layout-vendor'
+          }
+          if (
+            id.includes('brotli') ||
+            id.includes('pako') ||
+            id.includes('tiny-inflate') ||
+            id.includes('crypto-js')
+          ) {
+            return 'pdf-utils-vendor'
+          }
+          return 'vendor'
+        },
+      },
+    },
   },
 })

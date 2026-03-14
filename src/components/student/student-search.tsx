@@ -2,33 +2,26 @@ import { useState } from 'react'
 import { useRepository } from '../../data/factory'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { getStudentByMatricula } from '../../services/simulado-analyzer'
+import { isSupabaseConfigured } from '../../config/repository-config'
 import type { Escola } from '../../types/domain'
 
-type SupabaseStudentLike = {
-  id: string
-  matricula: string
-  name: string
-  turma?: string | null
-  school_id?: string | null
-  school_name?: string | null
-  escola?: string | null
-}
-
-function resolveEscola(student: SupabaseStudentLike): { escola: Escola; escolaNome?: string } {
-  const rawName = (student.school_name ?? student.escola ?? '').trim()
-  const rawId = (student.school_id ?? '').trim()
-  const marker = `${rawId} ${rawName}`.toLowerCase()
+function resolveEscolaByName(rawName: string | null | undefined): {
+  escola: Escola
+  escolaNome?: string
+} {
+  const schoolName = rawName?.trim()
+  const marker = (schoolName ?? '').toLowerCase()
 
   if (marker.includes('xtri')) {
-    return { escola: 'XTRI', escolaNome: rawName || 'Escola XTRI' }
+    return { escola: 'XTRI', escolaNome: schoolName || 'Escola XTRI' }
   }
 
   if (marker.includes('marista')) {
-    return { escola: 'MARISTA', escolaNome: rawName || 'Colégio Marista de Natal' }
+    return { escola: 'MARISTA', escolaNome: schoolName || 'Colégio Marista de Natal' }
   }
 
-  if (rawName) {
-    return { escola: 'MARISTA', escolaNome: rawName }
+  if (schoolName) {
+    return { escola: 'MARISTA', escolaNome: schoolName }
   }
 
   return { escola: 'MARISTA' }
@@ -62,11 +55,12 @@ export function StudentSearch() {
     try {
       let student = await repo.students.findByMatricula(trimmed)
 
-      // Fallback: check Supabase if not in mock data
-      if (!student) {
+      // Fallback: check Supabase if not in mock data and Supabase is configured
+      if (!student && isSupabaseConfigured()) {
         const supabaseStudent = await getStudentByMatricula(trimmed)
         if (supabaseStudent) {
           const schoolName = supabaseStudent?.school?.name
+          const { escola, escolaNome } = resolveEscolaByName(schoolName)
           student = {
             id: supabaseStudent.id,
             matricula: supabaseStudent.matricula,
@@ -74,8 +68,8 @@ export function StudentSearch() {
             turma: supabaseStudent.turma ?? 'A',
             email: null,
             fotoFilename: null,
-            escola: schoolName as Escola,
-            escolaNome: schoolName,
+            escola,
+            escolaNome,
             createdAt: new Date(),
           }
         }

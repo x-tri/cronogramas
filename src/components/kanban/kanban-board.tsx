@@ -1,11 +1,12 @@
 import { DndContext, DragOverlay, pointerWithin, useSensor, useSensors, PointerSensor, defaultDropAnimationSideEffects } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent, DragOverEvent, DropAnimation } from '@dnd-kit/core'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, type BlocoCronograma, type DiaSemana, type Turno } from '../../types/domain'
 import { getSlotByIndex } from '../../constants/time-slots'
 import { KanbanColumn } from './kanban-column'
 import { BlockCard } from '../blocks/block-card'
+import { getWeekBounds } from '../week-utils'
 
 type KanbanBoardProps = {
   onSlotClick?: (dia: DiaSemana, turno: Turno, slotIndex: number) => void
@@ -14,10 +15,24 @@ type KanbanBoardProps = {
 
 export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
   const officialSchedule = useCronogramaStore((state) => state.officialSchedule)
-  const isLoadingSchedule = useCronogramaStore(
-    (state) => state.isLoadingSchedule
-  )
+  const isLoadingSchedule = useCronogramaStore((state) => state.isLoadingSchedule)
   const blocks = useCronogramaStore((state) => state.blocks)
+  const selectedWeek = useCronogramaStore((state) => state.selectedWeek)
+
+  // Mapa dia → data real da semana selecionada
+  const dayDates = useMemo(() => {
+    const { start } = getWeekBounds(selectedWeek)
+    const map: Record<DiaSemana, Date> = {
+      segunda: new Date(start),
+      terca:   new Date(new Date(start).setDate(start.getDate() + 1)),
+      quarta:  new Date(new Date(start).setDate(start.getDate() + 2)),
+      quinta:  new Date(new Date(start).setDate(start.getDate() + 3)),
+      sexta:   new Date(new Date(start).setDate(start.getDate() + 4)),
+      sabado:  new Date(new Date(start).setDate(start.getDate() + 5)),
+      domingo: new Date(new Date(start).setDate(start.getDate() + 6)),
+    }
+    return map
+  }, [selectedWeek])
   const removeBlock = useCronogramaStore((state) => state.removeBlock)
   const updateBlock = useCronogramaStore((state) => state.updateBlock)
   const moveBlock = useCronogramaStore((state) => state.moveBlock)
@@ -233,7 +248,9 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
             <KanbanColumn
               key={dia}
               dia={dia}
+              date={dayDates[dia]}
               officialSchedule={officialSchedule}
+              blocks={blocks}
               dropTarget={dropTarget}
               dropMode={dropMode}
               onSlotClick={(turno, slotIndex) =>

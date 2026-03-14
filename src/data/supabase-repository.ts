@@ -183,6 +183,19 @@ export function createSupabaseRepository(): DataRepository {
         return cronogramaFromRow(data as CronogramaRow)
       },
 
+      deleteCronograma: async (id) => {
+        const { error } = await supabase
+          .from('cronogramas')
+          .delete()
+          .eq('id', id)
+
+        if (error) {
+          throw new Error(`Failed to delete cronograma: ${error.message}`)
+        }
+
+        logRepository('Cronograma deletado no Supabase', { id })
+      },
+
       updateCronograma: async (id, updates) => {
         
         

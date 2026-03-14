@@ -38,40 +38,15 @@ export function BlockCard({
     onChangePriority(next)
   }
 
-  // Badge da área do ENEM
-  const getAreaBadge = () => {
-    const areaStyles: Record<string, string> = {
-      natureza: 'bg-[#ecfdf5] text-[#047857] border-[#a7f3d0]',
-      matematica: 'bg-[#fef2f2] text-[#b91c1c] border-[#fecaca]',
-      linguagens: 'bg-[#eff6ff] text-[#1d4ed8] border-[#bfdbfe]',
-      humanas: 'bg-[#fff7ed] text-[#c2410c] border-[#fed7aa]',
-      outros: 'bg-[#f5f3ff] text-[#7c3aed] border-[#ddd6fe]',
-    }
-    const areaLabels: Record<string, string> = {
-      natureza: 'Natureza',
-      matematica: 'Matemática',
-      linguagens: 'Linguagens',
-      humanas: 'Humanas',
-      outros: 'Outro',
-    }
-    return (
-      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${areaStyles[area] || areaStyles.outros}`}>
-        {areaLabels[area] || 'Outro'}
-      </span>
-    )
+  // Cores por área: fundo tênue + borda esquerda + cor do texto do tipo
+  const AREA_STYLES: Record<string, { bg: string; border: string; dot: string }> = {
+    natureza:   { bg: 'bg-[#f0fdf4]', border: 'border-l-[3px] border-l-[#10b981]', dot: 'bg-[#10b981]' },
+    matematica: { bg: 'bg-[#fef2f2]', border: 'border-l-[3px] border-l-[#ef4444]', dot: 'bg-[#ef4444]' },
+    linguagens: { bg: 'bg-[#eff6ff]', border: 'border-l-[3px] border-l-[#3b82f6]', dot: 'bg-[#3b82f6]' },
+    humanas:    { bg: 'bg-[#fff7ed]', border: 'border-l-[3px] border-l-[#f97316]', dot: 'bg-[#f97316]' },
+    outros:     { bg: 'bg-[#f5f3ff]', border: 'border-l-[3px] border-l-[#8b5cf6]', dot: 'bg-[#8b5cf6]' },
   }
-
-  // Borda colorida baseada na área
-  const getAreaBorderClass = () => {
-    const borders: Record<string, string> = {
-      natureza: 'border-l-[3px] border-l-[#10b981]',
-      matematica: 'border-l-[3px] border-l-[#ef4444]',
-      linguagens: 'border-l-[3px] border-l-[#3b82f6]',
-      humanas: 'border-l-[3px] border-l-[#f97316]',
-      outros: 'border-l-[3px] border-l-[#8b5cf6]',
-    }
-    return borders[area] || borders.outros
-  }
+  const areaStyle = AREA_STYLES[area] ?? AREA_STYLES.outros
 
   // Badge de prioridade
   const getPriorityBadge = () => {
@@ -91,18 +66,19 @@ export function BlockCard({
   return (
     <div
       className={`
-        relative bg-white rounded-md border border-[#e3e2e0] overflow-hidden
+        relative rounded-md border border-[#e3e2e0] overflow-hidden
         transition-all duration-100
-        ${isDragging ? 'opacity-60 shadow-sm rotate-1' : 'hover:border-[#d1d1cd]'}
-        ${getAreaBorderClass()}
-        ${block.concluido ? 'opacity-70' : ''}
+        ${areaStyle.bg}
+        ${isDragging ? 'opacity-60 shadow-sm rotate-1' : 'hover:brightness-[0.97]'}
+        ${areaStyle.border}
+        ${block.concluido ? 'opacity-60' : ''}
       `}
     >
       {/* Drag Handle */}
       {dragHandleProps && (
         <div
           {...dragHandleProps}
-          className="absolute top-1 left-1 z-10 cursor-grab active:cursor-grabbing p-1.5 rounded hover:bg-[#f1f1ef] touch-none"
+          className="absolute top-1 left-1 z-10 cursor-grab active:cursor-grabbing p-1.5 rounded hover:bg-black/5 touch-none"
           title="Arrastar"
         >
           <svg className="w-4 h-4 text-[#9ca3af]" viewBox="0 0 24 24" fill="currentColor">
@@ -117,23 +93,21 @@ export function BlockCard({
       )}
 
       <div className={`p-2 pr-1 ${dragHandleProps ? 'pl-6' : ''}`}>
-        {/* Badges: Área + Prioridade */}
-        <div className="flex items-center gap-1.5 mb-1">
-          {getAreaBadge()}
+        {/* Título com dot de prioridade */}
+        <div className="flex items-start gap-1.5 mb-1">
+          <span className={`mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full ${areaStyle.dot}`} />
+          <h4
+            className="text-[12px] font-semibold text-[#37352f] leading-snug line-clamp-2 break-words flex-1"
+            title={block.titulo}
+          >
+            {block.titulo}
+          </h4>
           {getPriorityBadge()}
         </div>
 
-        {/* Título */}
-        <h4 
-          className="text-[13px] font-semibold text-[#37352f] leading-snug line-clamp-2 break-words"
-          title={block.titulo}
-        >
-          {block.titulo}
-        </h4>
-
         {/* Meta info e ações */}
-        <div className="flex items-center justify-between mt-1.5 min-w-0">
-          <span className="text-[11px] text-[#9ca3af] truncate">
+        <div className="flex items-center justify-between mt-1 min-w-0">
+          <span className="text-[10px] text-[#9ca3af] truncate">
             {TIPO_BLOCO_LABELS[block.tipo]}
           </span>
           {/* Ações - container com min-w-0 para não estourar */}
@@ -203,8 +177,8 @@ export function BlockCard({
 
       {/* Overlay de concluído */}
       {block.concluido && (
-        <div className="absolute inset-0 bg-white/40 flex items-center justify-center rounded-md">
-          <svg className="w-6 h-6 text-[#22c55e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-md">
+          <svg className="w-5 h-5 text-[#22c55e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
         </div>

@@ -68,27 +68,34 @@ export function TimeSlot({
     if (isOver) {
       return 'bg-[#eff6ff] border-[#2383e2] border-2 cursor-pointer'
     }
-    return 'bg-white border-[#e3e2e0] hover:border-[#2383e2] hover:bg-[#f7f6f3] cursor-pointer'
+    return 'group bg-white border-[#e3e2e0] hover:border-[#2383e2] hover:bg-[#f0f7ff] cursor-pointer'
   }
+
+  const isEmpty = !isOccupied && !isDropTarget
 
   return (
     <div
       ref={setNodeRef}
       onClick={isOccupied || isDropTarget ? undefined : onClick}
       className={`
-        relative rounded-md border p-2.5 min-h-[56px]
+        relative rounded-md border p-2 min-h-[52px]
         transition-all duration-100
         ${getContainerStyles()}
       `}
     >
-      {/* Horário */}
+      {/* Header do slot: horário + ícone de adicionar */}
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-[#9ca3af]">
+        <span className={`text-[11px] font-semibold tabular-nums transition-colors ${
+          isEmpty ? 'text-[#c1c0bb] group-hover:text-[#2383e2]' : 'text-[#9ca3af]'
+        }`}>
           {slot.inicio}
         </span>
-        {!isOccupied && !isOver && !isDropTarget && (
-          <svg className="w-3.5 h-3.5 text-[#e3e2e0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        {isEmpty && !isOver && (
+          <svg
+            className="w-3 h-3 text-[#d1d0cb] group-hover:text-[#2383e2] transition-colors"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
           </svg>
         )}
       </div>

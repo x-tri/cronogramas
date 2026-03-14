@@ -1,20 +1,33 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { StudentSearch } from "./components/student/student-search";
 import { AlunoAvulsoForm } from "./components/student/aluno-avulso-form";
 import { StudentCard } from "./components/student/student-card";
-import { SimuladoAnalyzer } from "./components/simulado/simulado-analyzer";
 import { KanbanBoard } from "./components/kanban/kanban-board";
 import { BlockEditorModal } from "./components/blocks/block-editor-modal";
 import { HistoryDropdown } from "./components/cronograma/history-dropdown";
 import { WeekSelector } from "./components/week-selector";
-import { ShareDropdown } from "./components/export/share-dropdown";
 import { ResetButton } from "./components/cronograma/reset-button";
 import { useCronogramaStore } from "./stores/cronograma-store";
 import type { BlocoCronograma, DiaSemana, Turno } from "./types/domain";
 import { ESCOLA_LABELS } from "./types/domain";
 import { TURNOS_CONFIG } from "./constants/time-slots";
-import { getCurrentUser, type User } from "./lib/auth";
+import { getWeekBounds } from "./components/week-utils";
+import { getCurrentUser, logout, type User } from "./lib/auth";
 import { LoginForm } from "./components/login-form";
+import { CronogramaHistoryList } from "./components/cronograma/cronograma-history-list";
+import { TimelineView } from "./components/kanban/timeline-view";
+
+const ShareDropdown = lazy(() =>
+  import("./components/export/share-dropdown").then((mod) => ({
+    default: mod.ShareDropdown,
+  })),
+);
+
+const SimuladoAnalyzer = lazy(() =>
+  import("./components/simulado/simulado-analyzer").then((mod) => ({
+    default: mod.SimuladoAnalyzer,
+  })),
+);
 
 type SlotSelection = {
   dia: DiaSemana;
@@ -24,13 +37,26 @@ type SlotSelection = {
 
 function AppContent() {
   const currentStudent = useCronogramaStore((state) => state.currentStudent);
+  const selectedWeek = useCronogramaStore((state) => state.selectedWeek);
+
+  const dayDates = useMemo(() => {
+    const { start } = getWeekBounds(selectedWeek);
+    return {
+      segunda: new Date(start),
+      terca:   new Date(new Date(start).setDate(start.getDate() + 1)),
+      quarta:  new Date(new Date(start).setDate(start.getDate() + 2)),
+      quinta:  new Date(new Date(start).setDate(start.getDate() + 3)),
+      sexta:   new Date(new Date(start).setDate(start.getDate() + 4)),
+      sabado:  new Date(new Date(start).setDate(start.getDate() + 5)),
+      domingo: new Date(new Date(start).setDate(start.getDate() + 6)),
+    } as Record<DiaSemana, Date>;
+  }, [selectedWeek]);
   const currentSchoolName =
     currentStudent?.escolaNome?.trim() ||
     (currentStudent ? ESCOLA_LABELS[currentStudent.escola] : "Colégio");
   const [selectedSlot, setSelectedSlot] = useState<SlotSelection | null>(null);
-  const [editingBlock, setEditingBlock] = useState<BlocoCronograma | null>(
-    null,
-  );
+  const [editingBlock, setEditingBlock] = useState<BlocoCronograma | null>(null);
+  const [viewMode, setViewMode] = useState<"kanban" | "timeline">("kanban");
 
   const handleSlotClick = (dia: DiaSemana, turno: Turno, slotIndex: number) => {
     setSelectedSlot({ dia, turno, slotIndex });
@@ -60,19 +86,27 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
-  async function fetchUser() {
-    try {
-      const user = await getCurrentUser();
-      setUser(user);
-      setIsChecking(false);
-    } catch {
-      console.error("Erro ao obter usuário");
-      setUser(null);
-    }
-  }
-
   useEffect(() => {
-    fetchUser();
+    let isMounted = true;
+
+    getCurrentUser()
+      .then((currentUser) => {
+        if (!isMounted) return;
+        setUser(currentUser);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        console.error("Erro ao obter usuário");
+        setUser(null);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setIsChecking(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   async function handleLoginSuccess() {
@@ -84,8 +118,12 @@ function AppContent() {
     }
   }
 
-  function handleLogout() {
-    setUser(null);
+  async function handleLogout() {
+    try {
+      await logout();
+    } finally {
+      setUser(null);
+    }
   }
 
   if (isChecking) {
@@ -150,7 +188,9 @@ function AppContent() {
                   <div className="h-4 w-px bg-[#e3e2e0]" />
                   <WeekSelector />
                   <div className="h-4 w-px bg-[#e3e2e0]" />
-                  <ShareDropdown />
+                  <Suspense fallback={<div className="h-8 w-24 rounded bg-[#f1f1ef]" />}>
+                    <ShareDropdown />
+                  </Suspense>
                   <HistoryDropdown />
                 </>
               )}
@@ -210,6 +250,9 @@ function AppContent() {
                 <StudentCard student={currentStudent} />
               </div>
 
+              {/* Lista de cronogramas salvos */}
+              <CronogramaHistoryList />
+
               {/* Divider com título - estilo Apple */}
               <div className="max-w-4xl mx-auto px-6">
                 <div className="flex items-center gap-4 py-4">
@@ -265,46 +308,80 @@ function AppContent() {
                         </p>
                       </div>
                     </div>
-                    <SimuladoAnalyzer matricula={currentStudent.matricula} />
+                    <Suspense fallback={<div className="h-8 w-40 rounded bg-[#f1f1ef]" />}>
+                      <SimuladoAnalyzer matricula={currentStudent.matricula} />
+                    </Suspense>
                   </div>
                 </div>
               </section>
 
-              {/* Kanban - estilo Apple */}
+              {/* Kanban / Timeline */}
               <section className="px-6">
                 <div className="max-w-7xl mx-auto">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#af52de] to-[#0071e3] flex items-center justify-center shadow-lg">
-                        <svg
-                          className="w-5 h-5 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </div>
                       <div>
-                        <h2 className="text-apple-title text-[#1d1d1f]">
-                          Cronograma Semanal
-                        </h2>
+                        <h2 className="text-apple-title text-[#1d1d1f]">Cronograma Semanal</h2>
                         <p className="text-sm text-[#86868b]">
-                          Clique em um horário para adicionar blocos de estudo
+                          {viewMode === "kanban"
+                            ? "Clique em um horário para adicionar blocos de estudo"
+                            : "Visualização por grade de horários"}
                         </p>
                       </div>
                     </div>
+
+                    {/* Toggle Kanban / Timeline */}
+                    <div className="flex items-center gap-1 p-1 bg-[#f1f1ef] rounded-lg">
+                      <button
+                        onClick={() => setViewMode("kanban")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                          viewMode === "kanban"
+                            ? "bg-white text-[#1d1d1f] shadow-sm"
+                            : "text-[#6b6b67] hover:text-[#1d1d1f]"
+                        }`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                        </svg>
+                        Kanban
+                      </button>
+                      <button
+                        onClick={() => setViewMode("timeline")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                          viewMode === "timeline"
+                            ? "bg-white text-[#1d1d1f] shadow-sm"
+                            : "text-[#6b6b67] hover:text-[#1d1d1f]"
+                        }`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                        </svg>
+                        Timeline
+                      </button>
+                    </div>
                   </div>
+
                   <div className="apple-card-elevated p-4">
-                    <KanbanBoard
-                      onSlotClick={handleSlotClick}
-                      onBlockEdit={handleBlockEdit}
-                    />
+                    {viewMode === "kanban" ? (
+                      <KanbanBoard
+                        onSlotClick={handleSlotClick}
+                        onBlockEdit={handleBlockEdit}
+                      />
+                    ) : (
+                      <TimelineView
+                        dayDates={dayDates}
+                        onSlotClick={handleSlotClick}
+                        onBlockEdit={handleBlockEdit}
+                      />
+                    )}
                   </div>
                 </div>
               </section>

@@ -66,6 +66,7 @@ type CronogramaState = {
   // Version management
   loadCronogramaVersions: (alunoId: string) => Promise<void>
   selectCronogramaVersion: (cronogramaId: string) => Promise<void>
+  deleteCronogramaVersion: (cronogramaId: string) => Promise<void>
 
   // Reset
   reset: () => void
@@ -312,6 +313,28 @@ export const useCronogramaStore = create<CronogramaState>()(
           const message =
             error instanceof Error ? error.message : 'Erro ao carregar versões'
           set({ isLoadingVersions: false, error: message })
+          throw error
+        }
+      },
+
+      deleteCronogramaVersion: async (cronogramaId) => {
+        set({ isSaving: true, error: null })
+        try {
+          const repo = getRepository()
+          await repo.cronogramas.deleteCronograma(cronogramaId)
+
+          const state = get()
+          // Se era o cronograma ativo, limpa o estado
+          const wasActive = state.cronograma?.id === cronogramaId
+          set((s) => ({
+            cronogramaVersions: s.cronogramaVersions.filter((v) => v.id !== cronogramaId),
+            cronograma: wasActive ? null : s.cronograma,
+            blocks: wasActive ? [] : s.blocks,
+            isSaving: false,
+          }))
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erro ao deletar cronograma'
+          set({ isSaving: false, error: message })
           throw error
         }
       },

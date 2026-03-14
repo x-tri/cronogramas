@@ -21,8 +21,8 @@ let idCounter = 1
 const generateId = () => `mock-${Date.now()}-${idCounter++}`
 
 // In-memory storage
-let cronogramasStore = new Map<string, Cronograma>()
-let blocosStore = new Map<string, BlocoCronograma[]>()
+const cronogramasStore = new Map<string, Cronograma>()
+const blocosStore = new Map<string, BlocoCronograma[]>()
 let isInitialized = false
 
 /** Inicializa o store com dados do localStorage */
@@ -256,8 +256,16 @@ export function createMockRepository(): DataRepository {
         
         persistState()
         logRepository('Cronograma atualizado', { id })
-        
+
         return delay(updated)
+      },
+
+      deleteCronograma: async (id) => {
+        cronogramasStore.delete(id)
+        blocosStore.delete(id)
+        persistState()
+        logRepository('Cronograma deletado', { id })
+        return delay(undefined)
       },
     },
 

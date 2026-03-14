@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Button } from '../ui/button'
-import { analyzeStudentSimulado, diagnoseStudentAnswers } from '../../services/simulado-analyzer'
 import type { SimuladoResult, WrongQuestion } from '../../types/supabase'
 import type { BlocoCronograma, DiaSemana, Turno } from '../../types/domain'
 import { useCronogramaStore } from '../../stores/cronograma-store'
@@ -25,11 +24,16 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
   const currentStudent = useCronogramaStore((state) => state.currentStudent)
   const createCronograma = useCronogramaStore((state) => state.createCronograma)
 
+  const preloadAnalyzer = () => {
+    void import('../../services/simulado-analyzer')
+  }
+
   const handleAnalyze = async () => {
     setIsLoading(true)
     setError(null)
 
     try {
+      const { analyzeStudentSimulado } = await import('../../services/simulado-analyzer')
       const data = await analyzeStudentSimulado(matricula)
       if (data) {
         setResult(data)
@@ -47,6 +51,7 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
   }
 
   const handleDiagnose = async () => {
+    const { diagnoseStudentAnswers } = await import('../../services/simulado-analyzer')
     console.log('Iniciando diagnóstico...')
     await diagnoseStudentAnswers(matricula)
     alert('Diagnóstico completo! Verifique o console do navegador (F12).')
@@ -200,6 +205,8 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
       <div className="flex items-center gap-3">
         <Button
           onClick={handleAnalyze}
+          onMouseEnter={preloadAnalyzer}
+          onFocus={preloadAnalyzer}
           isLoading={isLoading}
           variant="secondary"
           size="sm"
@@ -208,6 +215,8 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
         </Button>
         <Button
           onClick={handleDiagnose}
+          onMouseEnter={preloadAnalyzer}
+          onFocus={preloadAnalyzer}
           variant="outline"
           size="sm"
         >

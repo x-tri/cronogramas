@@ -68,12 +68,13 @@ export function useUpdateBlock() {
     mutationFn: async ({
       blockId,
       updates,
-      cronogramaId: _cronogramaId,
+      cronogramaId,
     }: {
       blockId: string
       updates: Partial<BlocoCronograma>
       cronogramaId: string
     }) => {
+      void cronogramaId // usado no onSuccess
       const result = await cronogramaService.updateBlock(blockId, updates)
       if (!result.success) {
         throw result.error
@@ -96,11 +97,12 @@ export function useDeleteBlock() {
   return useMutation({
     mutationFn: async ({
       blockId,
-      cronogramaId: _cronogramaId,
+      cronogramaId,
     }: {
       blockId: string
       cronogramaId: string
     }) => {
+      void cronogramaId // usado no onSuccess
       const result = await cronogramaService.removeBlock(blockId)
       if (!result.success) {
         throw result.error

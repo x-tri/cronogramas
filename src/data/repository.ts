@@ -26,6 +26,7 @@ export type CronogramaRepository = {
     id: string,
     updates: Partial<Cronograma>
   ) => Promise<Cronograma>
+  deleteCronograma: (id: string) => Promise<void>
 }
 
 export type BlocoRepository = {

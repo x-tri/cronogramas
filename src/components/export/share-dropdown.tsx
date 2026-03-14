@@ -1,10 +1,35 @@
-import { useState, useEffect } from 'react'
-import { pdf } from '@react-pdf/renderer'
+import { useState } from 'react'
 import { useCronogramaStore } from '../../stores/cronograma-store'
-import { getWeekBounds } from '../week-selector'
-import { SchedulePdfDocument } from '../pdf/schedule-pdf-document'
-import { analyzeStudentSimulado } from '../../services/simulado-analyzer'
+import { getWeekBounds } from '../week-utils'
 import type { SimuladoResult } from '../../types/supabase'
+
+type PdfDeps = [
+  typeof import('@react-pdf/renderer'),
+  typeof import('../pdf/schedule-pdf-document'),
+]
+
+let pdfDepsPromise: Promise<PdfDeps> | null = null
+let analyzerDepsPromise: Promise<typeof import('../../services/simulado-analyzer')> | null =
+  null
+
+function loadPdfDeps() {
+  if (!pdfDepsPromise) {
+    pdfDepsPromise = Promise.all([
+      import('@react-pdf/renderer'),
+      import('../pdf/schedule-pdf-document'),
+    ])
+  }
+
+  return pdfDepsPromise
+}
+
+function loadAnalyzerDeps() {
+  if (!analyzerDepsPromise) {
+    analyzerDepsPromise = import('../../services/simulado-analyzer')
+  }
+
+  return analyzerDepsPromise
+}
 
 export function ShareDropdown() {
   const [isOpen, setIsOpen] = useState(false)
@@ -16,28 +41,40 @@ export function ShareDropdown() {
   const blocks = useCronogramaStore((state) => state.blocks)
   const selectedWeek = useCronogramaStore((state) => state.selectedWeek)
 
-  // Buscar dados do simulado quando o componente montar
-  useEffect(() => {
-    if (currentStudent?.matricula) {
-      analyzeStudentSimulado(currentStudent.matricula).then((data) => {
-        if (data) {
-          setSimuladoData(data)
-        }
-      })
-    }
-  }, [currentStudent?.matricula])
-
   if (!currentStudent) return null
 
   const { start, end } = getWeekBounds(selectedWeek)
 
-  const generatePdfBlob = async () => {
-    const triScores = simuladoData?.studentAnswer ? {
-      tri_lc: simuladoData.studentAnswer.tri_lc,
-      tri_ch: simuladoData.studentAnswer.tri_ch,
-      tri_cn: simuladoData.studentAnswer.tri_cn,
-      tri_mt: simuladoData.studentAnswer.tri_mt,
-    } : null
+  const preloadShareAssets = () => {
+    void loadPdfDeps()
+    void loadAnalyzerDeps()
+  }
+
+  const ensureSimuladoData = async (): Promise<SimuladoResult | null> => {
+    if (simuladoData) return simuladoData
+    if (!currentStudent?.matricula) return null
+
+    const { analyzeStudentSimulado } = await loadAnalyzerDeps()
+    const data = await analyzeStudentSimulado(currentStudent.matricula)
+
+    if (data) {
+      setSimuladoData(data)
+    }
+
+    return data
+  }
+
+  const generatePdfBlob = async (simulado: SimuladoResult | null) => {
+    const [{ pdf }, { SchedulePdfDocument }] = await loadPdfDeps()
+
+    const triScores = simulado?.studentAnswer
+      ? {
+          tri_lc: simulado.studentAnswer.tri_lc,
+          tri_ch: simulado.studentAnswer.tri_ch,
+          tri_cn: simulado.studentAnswer.tri_cn,
+          tri_mt: simulado.studentAnswer.tri_mt,
+        }
+      : null
 
     const doc = (
       <SchedulePdfDocument
@@ -46,10 +83,11 @@ export function ShareDropdown() {
         weekEnd={end}
         officialSchedule={officialSchedule}
         blocks={blocks}
-        examTitle={simuladoData?.exam?.title}
+        examTitle={simulado?.exam?.title}
         triScores={triScores}
       />
     )
+
     return await pdf(doc).toBlob()
   }
 
@@ -73,8 +111,10 @@ export function ShareDropdown() {
 
   const handleDownloadPdf = async () => {
     setIsGenerating(true)
+
     try {
-      const blob = await generatePdfBlob()
+      const simulado = await ensureSimuladoData()
+      const blob = await generatePdfBlob(simulado)
       downloadBlob(blob, getFilename())
     } catch (error) {
       console.error('Erro ao gerar PDF:', error)
@@ -86,14 +126,16 @@ export function ShareDropdown() {
 
   const handleWhatsApp = async () => {
     setIsGenerating(true)
+
     try {
-      const blob = await generatePdfBlob()
+      const simulado = await ensureSimuladoData()
+      const blob = await generatePdfBlob(simulado)
       downloadBlob(blob, getFilename())
 
       // Incluir notas TRI na mensagem se disponíveis
       let triScoresText = ''
-      if (simuladoData?.studentAnswer) {
-        const { tri_lc, tri_ch, tri_cn, tri_mt } = simuladoData.studentAnswer
+      if (simulado?.studentAnswer) {
+        const { tri_lc, tri_ch, tri_cn, tri_mt } = simulado.studentAnswer
         if (tri_lc || tri_ch || tri_cn || tri_mt) {
           triScoresText = '\n\n*Notas TRI:*'
           if (tri_lc) triScoresText += `\nLC: ${tri_lc.toFixed(1)}`
@@ -103,7 +145,7 @@ export function ShareDropdown() {
         }
       }
 
-      const text = `*Cronograma de Estudos*${simuladoData?.exam?.title ? `\n*Simulado:* ${simuladoData.exam.title}` : ''}\n\nAluno: ${currentStudent.nome}\nMatrícula: ${currentStudent.matricula}\nTurma: ${currentStudent.turma}\nSemana: ${formatWeekStr()}${triScoresText}\n\n_PDF baixado - anexe na conversa_`
+      const text = `*Cronograma de Estudos*${simulado?.exam?.title ? `\n*Simulado:* ${simulado.exam.title}` : ''}\n\nAluno: ${currentStudent.nome}\nMatrícula: ${currentStudent.matricula}\nTurma: ${currentStudent.turma}\nSemana: ${formatWeekStr()}${triScoresText}\n\n_PDF baixado - anexe na conversa_`
 
       window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`)
     } catch (error) {
@@ -118,6 +160,8 @@ export function ShareDropdown() {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
+        onMouseEnter={preloadShareAssets}
+        onFocus={preloadShareAssets}
         disabled={isGenerating}
         className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
       >
