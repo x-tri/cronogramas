@@ -39,6 +39,7 @@ test.describe('Fluxo de Análise de Simulado', () => {
     const studentCard = page.locator('[data-testid="student-card"]').or(
       page.locator('text=Matrícula:').locator('..').filter({ hasText: TEST_MATRICULA })
     )
+    await expect(studentCard.first()).toBeVisible()
     
     // Verificar que não há erro
     const errorMessage = page.locator('text=Aluno não encontrado')
@@ -297,11 +298,7 @@ test.describe('Validações de edge cases', () => {
     await page.fill('input#matricula', 'abc123')
     await page.click('button:has-text("Buscar")')
     
-    // Verificar erro de validação
-    const validationError = page.locator('text=Matrícula deve conter apenas números').or(
-      page.locator('text=inválida')
-    )
-    // Pode ou não mostrar erro dependendo da implementação
+    // Pode ou não mostrar erro dependendo da implementação.
   })
 
   test('deve lidar com aluno não encontrado', async ({ page }) => {

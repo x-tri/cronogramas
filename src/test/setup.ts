@@ -40,8 +40,10 @@ const ResizeObserverMock = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 }))
 
-// @ts-ignore - mock global
-globalThis.ResizeObserver = ResizeObserverMock
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  value: ResizeObserverMock,
+  writable: true,
+})
 
 // Suppress console errors during tests (optional)
 // vi.spyOn(console, 'error').mockImplementation(() => {})

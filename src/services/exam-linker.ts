@@ -1,4 +1,32 @@
 import { supabase } from '../lib/supabase'
+import type { Exam } from '../types/supabase'
+
+type QuestionContentLike = {
+  questionNumber?: number
+  numero?: number
+  questao?: number
+  content?: string
+  conteudo?: string
+  topico?: string
+  topic?: string
+  answer?: string
+  resposta?: string
+  gabarito?: string
+}
+
+type NormalizedQuestionContent = {
+  questionNumber: number
+  content: string
+  answer: string
+}
+
+const normalizeQuestionContent = (
+  question: QuestionContentLike,
+): NormalizedQuestionContent => ({
+  questionNumber: question.questionNumber ?? question.numero ?? question.questao ?? 0,
+  content: question.content ?? question.conteudo ?? question.topico ?? question.topic ?? '',
+  answer: question.answer ?? question.resposta ?? question.gabarito ?? '',
+})
 
 /**
  * Diagnostica e busca o exam correto linkado com o projeto
@@ -6,7 +34,7 @@ import { supabase } from '../lib/supabase'
  */
 
 export async function findExamForProject(projetoId: string, projetoNome?: string): Promise<{
-  exam: any | null
+  exam: Exam | null
   method: string
   error?: string
 }> {
@@ -14,7 +42,7 @@ export async function findExamForProject(projetoId: string, projetoNome?: string
 
   // MÉTODO 1: Buscar por ID exato
   console.log('[findExamForProject] Método 1: Buscando por ID...')
-  const { data: examById, error: errorById } = await supabase
+  const { data: examById } = await supabase
     .from('exams')
     .select('*')
     .eq('id', projetoId)
@@ -22,13 +50,13 @@ export async function findExamForProject(projetoId: string, projetoNome?: string
 
   if (examById) {
     console.log('[findExamForProject] ✅ Encontrado por ID!')
-    return { exam: examById, method: 'id' }
+      return { exam: examById as Exam, method: 'id' }
   }
 
   // MÉTODO 2: Buscar por nome do projeto (simulado_nome)
   if (projetoNome) {
     console.log('[findExamForProject] Método 2: Buscando por nome:', projetoNome)
-    const { data: examsByName, error: errorByName } = await supabase
+    const { data: examsByName } = await supabase
       .from('exams')
       .select('*')
       .ilike('title', `%${projetoNome}%`)
@@ -36,7 +64,7 @@ export async function findExamForProject(projetoId: string, projetoNome?: string
 
     if (examsByName && examsByName.length > 0) {
       console.log('[findExamForProject] ✅ Encontrado por nome!')
-      return { exam: examsByName[0], method: 'name' }
+      return { exam: examsByName[0] as Exam, method: 'name' }
     }
 
     // MÉTODO 3: Buscar por similaridade (sem case sensitive)
@@ -63,7 +91,7 @@ export async function findExamForProject(projetoId: string, projetoNome?: string
 
         if (fullExam) {
           console.log('[findExamForProject] ✅ Encontrado por similaridade!')
-          return { exam: fullExam, method: 'similarity' }
+          return { exam: fullExam as Exam, method: 'similarity' }
         }
       }
     }
@@ -107,7 +135,7 @@ export async function findExamForProject(projetoId: string, projetoNome?: string
 
       if (linkedExam) {
         console.log(`[findExamForProject] ✅ Encontrado por campo ${field}!`)
-        return { exam: linkedExam, method: field }
+          return { exam: linkedExam as Exam, method: field }
       }
     }
   }
@@ -134,7 +162,7 @@ export async function findExamForProject(projetoId: string, projetoNome?: string
           .maybeSingle()
 
         if (linkedExam) {
-          return { exam: linkedExam, method: `relation_table:${tableName}` }
+          return { exam: linkedExam as Exam, method: `relation_table:${tableName}` }
         }
       }
     }
@@ -152,7 +180,7 @@ export async function findExamForProject(projetoId: string, projetoNome?: string
  * Suporta diferentes estruturas de dados
  */
 export async function getQuestionContents(examId: string): Promise<{
-  contents: Array<{questionNumber: number; content: string; answer: string}> | null
+  contents: NormalizedQuestionContent[] | null
   method: string
 }> {
   console.log('[getQuestionContents] Buscando conteúdos para exam:', examId)
@@ -174,11 +202,9 @@ export async function getQuestionContents(examId: string): Promise<{
   if (exam.question_contents && Array.isArray(exam.question_contents)) {
     console.log('[getQuestionContents] ✅ Usando question_contents')
     return { 
-      contents: exam.question_contents.map((q: any) => ({
-        questionNumber: q.questionNumber || q.numero || q.questao,
-        content: q.content || q.conteudo || q.topico || q.topic,
-        answer: q.answer || q.resposta || q.gabarito
-      })),
+      contents: exam.question_contents.map((q: QuestionContentLike) =>
+        normalizeQuestionContent(q)
+      ),
       method: 'question_contents'
     }
   }
@@ -187,11 +213,9 @@ export async function getQuestionContents(examId: string): Promise<{
   if (exam.contents && Array.isArray(exam.contents)) {
     console.log('[getQuestionContents] ✅ Usando contents')
     return { 
-      contents: exam.contents.map((q: any) => ({
-        questionNumber: q.questionNumber || q.numero || q.questao,
-        content: q.content || q.conteudo || q.topico || q.topic,
-        answer: q.answer || q.resposta || q.gabarito
-      })),
+      contents: exam.contents.map((q: QuestionContentLike) =>
+        normalizeQuestionContent(q)
+      ),
       method: 'contents'
     }
   }
@@ -210,11 +234,9 @@ export async function getQuestionContents(examId: string): Promise<{
     if (!questionsError && questions && questions.length > 0) {
       console.log(`[getQuestionContents] ✅ Encontrado na tabela ${tableName}!`)
       return {
-        contents: questions.map((q: any) => ({
-          questionNumber: q.question_number || q.numero || q.questao,
-          content: q.content || q.conteudo || q.topico || q.topic,
-          answer: q.answer || q.resposta || q.gabarito
-        })),
+        contents: questions.map((q: QuestionContentLike) =>
+          normalizeQuestionContent(q)
+        ),
         method: `table:${tableName}`
       }
     }

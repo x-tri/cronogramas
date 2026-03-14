@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test } from '@playwright/test'
 
 test('Testar funcionalidade de Drag and Drop', async ({ page }) => {
   // Abre a aplicação
