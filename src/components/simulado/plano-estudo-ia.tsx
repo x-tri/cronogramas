@@ -34,7 +34,8 @@ export function PlanoEstudoIA({ plano, nomeAluno, simuladoTitle = 'Simulado', on
       const { pdf } = await import('@react-pdf/renderer')
       const { PlanoEstudoPDF } = await import('../pdf/plano-estudo-pdf')
       const doc = createElement(PlanoEstudoPDF, { plano, nomeAluno, simuladoTitle })
-      const blob = await pdf(doc).toBlob()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blob = await pdf(doc as any).toBlob()
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url

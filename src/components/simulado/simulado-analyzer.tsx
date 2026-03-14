@@ -262,12 +262,14 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
     return (
       <PlanoEstudoIA
         plano={plano}
-        nomeAluno={currentStudent?.name ?? null}
-        simuladoTitle={plano.resumo ? 'Simulado' : 'Simulado'}
+        nomeAluno={currentStudent?.nome ?? null}
+        simuladoTitle="Simulado"
         onClose={() => setPlano(null)}
       />
     )
   }
+
+  if (!result) return null
 
   const totalQuestions = result.wrongQuestions.length
   const selectedCount = selectedQuestions.size
