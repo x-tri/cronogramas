@@ -414,9 +414,6 @@ function AppContent() {
                 <span className="text-sm font-medium text-[#1d1d1f]">
                   XTRI Cronogramas
                 </span>
-                <span className="text-sm text-[#86868b] ml-2">
-                  Colégio Marista de Natal
-                </span>
               </div>
             </div>
             <span className="text-xs text-[#a1a1a6] font-medium">
