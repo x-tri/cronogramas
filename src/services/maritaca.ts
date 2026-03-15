@@ -2,7 +2,7 @@ import type { SimuladoResult } from '../types/supabase'
 
 // Chamada via Edge Function do Supabase para evitar CORS (API key fica server-side)
 const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/maritaca-proxy`
-const MARITACA_MODEL = 'sabiazinho-3'
+const MARITACA_MODEL = 'sabia-3'
 
 export interface Atividade {
   horario: string       // ex: "08:00-09:30"
