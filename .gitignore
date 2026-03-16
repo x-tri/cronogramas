@@ -52,3 +52,5 @@ playwright-report/
 *.tsbuildinfo
 .playwright-mcp/
 dist-hostinger-*.zip
+horariodeestudos.zip
+supabase/.temp/
