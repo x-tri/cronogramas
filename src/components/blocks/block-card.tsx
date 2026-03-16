@@ -21,6 +21,7 @@ export function BlockCard({
   isDragging,
   dragHandleProps 
 }: BlockCardProps) {
+  const isBlockedSlot = block.tipo === 'bloqueio'
   const area = detectAreaFromTitle(block.titulo) || 'outros'
   
   const handleDelete = (e: React.MouseEvent) => {
@@ -46,11 +47,12 @@ export function BlockCard({
     humanas:    { bg: 'bg-[#fff7ed]', border: 'border-l-[3px] border-l-[#f97316]', dot: 'bg-[#f97316]' },
     outros:     { bg: 'bg-[#f5f3ff]', border: 'border-l-[3px] border-l-[#8b5cf6]', dot: 'bg-[#8b5cf6]' },
   }
-  const areaStyle = AREA_STYLES[area] ?? AREA_STYLES.outros
+  const blockedStyle = { bg: 'bg-[#fef2f2]', border: 'border-l-[3px] border-l-[#dc2626]', dot: 'bg-[#dc2626]' }
+  const areaStyle = isBlockedSlot ? blockedStyle : (AREA_STYLES[area] ?? AREA_STYLES.outros)
 
   // Badge de prioridade
   const getPriorityBadge = () => {
-    if (block.prioridade === 0) return null
+    if (isBlockedSlot || block.prioridade === 0) return null
     const styles = {
       1: 'text-[#92400e]',
       2: 'text-[#991b1b]'
@@ -71,7 +73,7 @@ export function BlockCard({
         ${areaStyle.bg}
         ${isDragging ? 'opacity-60 shadow-sm rotate-1' : 'hover:brightness-[0.97]'}
         ${areaStyle.border}
-        ${block.concluido ? 'opacity-60' : ''}
+        ${block.concluido && !isBlockedSlot ? 'opacity-60' : ''}
       `}
     >
       {/* Drag Handle */}
@@ -95,9 +97,15 @@ export function BlockCard({
       <div className={`p-2 pr-1 ${dragHandleProps ? 'pl-6' : ''}`}>
         {/* Título com dot de prioridade */}
         <div className="flex items-start gap-1.5 mb-1">
-          <span className={`mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full ${areaStyle.dot}`} />
+          {isBlockedSlot ? (
+            <svg className="mt-0.5 flex-shrink-0 w-3.5 h-3.5 text-[#dc2626]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+          ) : (
+            <span className={`mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full ${areaStyle.dot}`} />
+          )}
           <h4
-            className="text-[12px] font-semibold text-[#37352f] leading-snug line-clamp-2 break-words flex-1"
+            className={`text-[12px] font-semibold leading-snug line-clamp-2 break-words flex-1 ${isBlockedSlot ? 'text-[#991b1b]' : 'text-[#37352f]'}`}
             title={block.titulo}
           >
             {block.titulo}
@@ -112,7 +120,7 @@ export function BlockCard({
           </span>
           {/* Ações - container com min-w-0 para não estourar */}
           <div className="flex items-center gap-0.5 flex-shrink-0">
-            {onToggleComplete && (
+            {onToggleComplete && !isBlockedSlot && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -133,7 +141,7 @@ export function BlockCard({
               </button>
             )}
             
-            {onChangePriority && (
+            {onChangePriority && !isBlockedSlot && (
               <button
                 onClick={cyclePriority}
                 className="p-1 rounded text-[#c1c0bb] hover:text-[#37352f] transition-colors flex-shrink-0"
@@ -176,7 +184,7 @@ export function BlockCard({
       </div>
 
       {/* Overlay de concluído */}
-      {block.concluido && (
+      {block.concluido && !isBlockedSlot && (
         <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-md">
           <svg className="w-5 h-5 text-[#22c55e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />

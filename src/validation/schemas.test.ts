@@ -49,6 +49,20 @@ describe('Validation Schemas', () => {
       expect(result.success).toBe(true)
     })
 
+    it('should validate blocked slot data', () => {
+      const data = {
+        cronogramaId: 'cron-123',
+        diaSemana: 'segunda' as const,
+        turno: 'manha' as const,
+        slotIndex: 0,
+        tipo: 'bloqueio' as const,
+        titulo: 'Horário bloqueado',
+      }
+
+      const result = CreateBlockInputSchema.safeParse(data)
+      expect(result.success).toBe(true)
+    })
+
     it('should reject invalid diaSemana', () => {
       const data = {
         cronogramaId: 'cron-123',

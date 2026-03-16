@@ -52,6 +52,7 @@ export function BlockEditorModal({
 
   // Generate title automatically
   const generateTitle = () => {
+    if (tipo === 'bloqueio') return 'Horário bloqueado'
     if (disciplinaCodigo) {
       const disciplina = DISCIPLINAS_BY_CODE.get(disciplinaCodigo)
       if (disciplina) return disciplina.nome
@@ -98,7 +99,7 @@ export function BlockEditorModal({
         descricao: descricao.trim() || null,
         disciplinaCodigo,
         cor: null,
-        prioridade,
+        prioridade: tipo === 'bloqueio' ? 0 : prioridade,
         concluido: editingBlock?.concluido ?? false,
       }
 
@@ -174,32 +175,33 @@ export function BlockEditorModal({
           />
         </div>
 
-        {/* Priority */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Prioridade
-          </label>
-          <div className="flex gap-2">
-            {([0, 1, 2] as Prioridade[]).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPrioridade(p)}
-                className={`
-                  flex-1 py-2 px-3 rounded-lg border text-sm
-                  transition-all duration-150
-                  ${
-                    prioridade === p
-                      ? 'border-2 border-blue-500 bg-blue-50 font-medium'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }
-                `}
-              >
-                {PRIORIDADE_LABELS[p]}
-              </button>
-            ))}
+        {tipo !== 'bloqueio' && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Prioridade
+            </label>
+            <div className="flex gap-2">
+              {([0, 1, 2] as Prioridade[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPrioridade(p)}
+                  className={`
+                    flex-1 py-2 px-3 rounded-lg border text-sm
+                    transition-all duration-150
+                    ${
+                      prioridade === p
+                        ? 'border-2 border-blue-500 bg-blue-50 font-medium'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }
+                  `}
+                >
+                  {PRIORIDADE_LABELS[p]}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </form>
     </Modal>
   )
