@@ -115,10 +115,8 @@ xtri-cronogramas/
 ├── tsconfig.app.json        # Config TypeScript da aplicação
 ├── tsconfig.node.json       # Config TypeScript do Node/Vite
 ├── eslint.config.js
-├── vercel.json              # Configuração de deploy na Vercel
-├── Dockerfile               # Container Docker multi-stage
-├── docker-compose.yml       # Orquestração Docker
-└── nginx.conf               # Configuração Nginx para produção
+├── DEPLOY-HOSTINGER.md      # Guia de publicação manual na Hostinger
+└── README.md                # Visão geral do projeto
 ```
 
 ---
@@ -477,42 +475,35 @@ Detecção automática de área por palavras-chave no título do bloco. Ver `src
 
 ## Deploy
 
-### Frontend (Vercel)
+### Frontend (Hostinger)
 
-Configurado via `vercel.json`:
-- Build command: `npm run build`
-- Output directory: `dist`
-- Framework: Vite
-- SPA routing configurado (rewrites para index.html)
+O frontend é publicado como SPA estática por upload manual do build em `public_html`.
+
+Fluxo resumido:
 
 ```bash
-# Deploy manual
-vercel --prod
+pnpm build
 ```
 
-### Docker
+Depois do build:
+- enviar `index.html` e `assets/` para `public_html`
+- substituir os arquivos antigos
+- fazer hard refresh no navegador
 
-Configuração multi-stage:
-- **Stage 1**: Build com Node.js 20
-- **Stage 2**: Nginx Alpine para servir arquivos estáticos
+O passo a passo completo está em `DEPLOY-HOSTINGER.md`.
+
+### Edge Functions (Supabase)
+
+Quando houver mudança em funções server-side, publique primeiro no projeto Supabase:
 
 ```bash
-# Build e run com Docker Compose
-docker-compose up --build
+npx supabase functions deploy nome-da-funcao --project-ref axtmozyrnsrhqrnktshz
 ```
 
-### Variáveis de Ambiente na Vercel
-
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_KEY`
-
-### Configuração CORS no Supabase
-
-Adicione a URL da Vercel em: **Settings > API > URL Configuration > Allowed Origins**
-
-```
-https://seu-projeto.vercel.app
-```
+Observações:
+- `plano-estudo-generator` deve ser publicada com `--no-verify-jwt`
+- segredos como `MARITACA_KEY` ficam no Supabase
+- a URL em produção é `https://horariodeestudos.com`
 
 ---
 
