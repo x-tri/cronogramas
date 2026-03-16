@@ -6,6 +6,7 @@ import { styles } from './pdf-styles'
 import { PdfHeader } from './pdf-header'
 import { PdfBlockCell } from './pdf-block-cell'
 import { PdfLegend } from './pdf-legend'
+import { buildCronogramaPdfTitle } from '../../lib/pdf-filenames'
 
 type SchedulePdfDocumentProps = {
   student: Aluno
@@ -44,7 +45,13 @@ export function SchedulePdfDocument({
   const isWeekend = (dia: DiaSemana) => dia === 'sabado' || dia === 'domingo'
 
   return (
-    <Document>
+    <Document
+      author="XTRI Cronogramas"
+      creator="XTRI Cronogramas"
+      producer="XTRI Cronogramas"
+      subject={`Cronograma semanal de ${student.nome}`}
+      title={buildCronogramaPdfTitle(student, weekStart, weekEnd)}
+    >
       <Page size="A4" orientation="landscape" style={styles.page}>
         <PdfHeader 
           student={student} 

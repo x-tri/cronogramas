@@ -23,7 +23,8 @@ serve(async (req) => {
       })
     }
 
-    const body = await req.json()
+    const rawBody = await req.text()
+    const body = rawBody ? JSON.parse(rawBody) : {}
 
     const response = await fetch(MARITACA_API_URL, {
       method: 'POST',

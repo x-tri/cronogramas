@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { getWeekBounds } from '../week-utils'
 import type { SimuladoResult } from '../../types/supabase'
+import { downloadBlob } from '../../lib/download'
+import { buildCronogramaPdfFilename } from '../../lib/pdf-filenames'
 
 type PdfDeps = [
   typeof import('@react-pdf/renderer'),
@@ -91,20 +93,6 @@ export function ShareDropdown() {
     return await pdf(doc).toBlob()
   }
 
-  const downloadBlob = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const getFilename = () => {
-    const dateStr = start.toISOString().split('T')[0]
-    return `cronograma_${currentStudent.matricula}_${dateStr}.pdf`
-  }
-
   const formatWeekStr = () => {
     return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`
   }
@@ -115,7 +103,7 @@ export function ShareDropdown() {
     try {
       const simulado = await ensureSimuladoData()
       const blob = await generatePdfBlob(simulado)
-      downloadBlob(blob, getFilename())
+      downloadBlob(blob, buildCronogramaPdfFilename(currentStudent, start))
     } catch (error) {
       console.error('Erro ao gerar PDF:', error)
     } finally {
@@ -130,7 +118,7 @@ export function ShareDropdown() {
     try {
       const simulado = await ensureSimuladoData()
       const blob = await generatePdfBlob(simulado)
-      downloadBlob(blob, getFilename())
+      downloadBlob(blob, buildCronogramaPdfFilename(currentStudent, start))
 
       // Incluir notas TRI na mensagem se disponíveis
       let triScoresText = ''

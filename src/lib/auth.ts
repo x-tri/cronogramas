@@ -18,6 +18,14 @@ const AUTH_EMAIL_COLUMN = import.meta.env.VITE_AUTH_EMAIL_COLUMN ?? "email";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
+async function clearStaleSession(): Promise<void> {
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    // Ignora falhas ao limpar sessão inválida.
+  }
+}
+
 function toStringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
@@ -149,7 +157,7 @@ export function login(_user: User): void {
 
 export async function logout(): Promise<void> {
   if (!isSupabaseConfigured()) return;
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
 }
 
 export async function getCurrentUser(): Promise<User | null> {
@@ -161,7 +169,10 @@ export async function getCurrentUser(): Promise<User | null> {
       error,
     } = await supabase.auth.getUser();
 
-    if (error || !user) return null;
+    if (error || !user) {
+      await clearStaleSession();
+      return null;
+    }
 
     const {
       data: { session },
@@ -169,6 +180,7 @@ export async function getCurrentUser(): Promise<User | null> {
 
     return mapSupabaseUser(user, session?.access_token ?? "");
   } catch {
+    await clearStaleSession();
     return null;
   }
 }

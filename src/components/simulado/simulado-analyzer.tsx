@@ -79,7 +79,11 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
       setPlano(planoGerado)
     } catch (err) {
       console.error('Erro ao gerar plano:', err)
-      setError('Erro ao gerar plano de estudos. Verifique a chave da API.')
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Erro ao gerar plano de estudos.'
+      )
     } finally {
       setIsGeneratingPlan(false)
     }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { PlanoEstudo } from '../../services/maritaca'
+import { downloadBlob } from '../../lib/download'
 
 interface PlanoEstudoIAProps {
   plano: PlanoEstudo
@@ -25,10 +26,12 @@ const PRIO_STYLES: Record<string, { text: string; bg: string }> = {
 
 export function PlanoEstudoIA({ plano, nomeAluno, simuladoTitle = 'Simulado', onClose }: PlanoEstudoIAProps) {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   const handleDownloadPdf = async () => {
     setIsGeneratingPdf(true)
+    setPdfError(null)
     try {
       const { createElement } = await import('react')
       const { pdf } = await import('@react-pdf/renderer')
@@ -36,14 +39,13 @@ export function PlanoEstudoIA({ plano, nomeAluno, simuladoTitle = 'Simulado', on
       const doc = createElement(PlanoEstudoPDF, { plano, nomeAluno, simuladoTitle })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const blob = await pdf(doc as any).toBlob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `plano-estudos-${(nomeAluno ?? 'aluno').toLowerCase().replace(/\s+/g, '-')}.pdf`
-      link.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(
+        blob,
+        `plano-estudos-${(nomeAluno ?? 'aluno').toLowerCase().replace(/\s+/g, '-')}.pdf`,
+      )
     } catch (err) {
       console.error('Erro ao gerar PDF:', err)
+      setPdfError('Não foi possível gerar o PDF agora. Tente novamente em alguns instantes.')
     } finally {
       setIsGeneratingPdf(false)
     }
@@ -179,6 +181,10 @@ export function PlanoEstudoIA({ plano, nomeAluno, simuladoTitle = 'Simulado', on
         <p className="text-[10px] text-[#c1c0bb] text-center pb-1">
           Gerado automaticamente pela IA do XTRI · Plano personalizado com base nos seus resultados de simulado.
         </p>
+
+        {pdfError && (
+          <p className="text-[11px] text-red-600 text-center">{pdfError}</p>
+        )}
       </div>
     </div>
   )

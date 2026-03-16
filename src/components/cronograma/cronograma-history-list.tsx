@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { getRepository } from '../../data/factory'
 import type { Cronograma } from '../../types/domain'
+import { downloadBlob } from '../../lib/download'
+import { buildCronogramaPdfFilename } from '../../lib/pdf-filenames'
 
 type PdfDeps = [
   typeof import('@react-pdf/renderer'),
@@ -62,7 +64,7 @@ export function CronogramaHistoryList() {
 
   if (!currentStudent) return null
 
-  async function handleOpenPdf(version: Cronograma) {
+  async function handleDownloadPdf(version: Cronograma) {
     if (!currentStudent) return
     setGeneratingPdf(version.id)
 
@@ -86,10 +88,7 @@ export function CronogramaHistoryList() {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const blob = await pdf(doc as any).toBlob()
-      const url = URL.createObjectURL(blob)
-      window.open(url, '_blank')
-      // Libera o objeto URL após 60s
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      downloadBlob(blob, buildCronogramaPdfFilename(currentStudent, version.semanaInicio))
     } catch (err) {
       console.error('Erro ao gerar PDF:', err)
     } finally {
@@ -292,11 +291,11 @@ export function CronogramaHistoryList() {
                       </button>
                     )}
 
-                    {/* Abrir PDF */}
+                    {/* Baixar PDF */}
                     {!isConfirming && <button
-                      onClick={() => handleOpenPdf(version)}
+                      onClick={() => handleDownloadPdf(version)}
                       disabled={isGenerating || !!generatingPdf}
-                      title="Abrir PDF"
+                      title="Baixar PDF"
                       className="h-8 px-3 text-xs font-medium text-white bg-[#1d1d1f] hover:bg-[#3a3a3c] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                     >
                       {isGenerating ? (
@@ -313,7 +312,7 @@ export function CronogramaHistoryList() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
-                          PDF
+                          Baixar PDF
                         </>
                       )}
                     </button>}

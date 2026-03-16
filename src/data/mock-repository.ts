@@ -180,8 +180,8 @@ export function createMockRepository(): DataRepository {
           createdAt: new Date(),
         }
         
-        // Mock mode: persiste no localStorage
-        // Em produção (Supabase), vai para a tabela alunos_xtris
+        // Persiste localmente para manter o fluxo de alunos avulsos
+        // também quando o app estiver em modo Supabase.
         const alunosXTRI = JSON.parse(localStorage.getItem('xtri-alunos-xtris') || '[]')
         alunosXTRI.push({
           ...aluno,

@@ -9,10 +9,7 @@ import {
   cronogramaToRow,
   blocoFromRow,
   blocoToRow,
-  alunoXTRIFromRow,
-  alunoXTRIToRow,
 } from '../types/supabase'
-import type { AlunoXTRIRow } from '../types/supabase'
 import { ALL_STUDENTS } from './mock-data/students'
 import { DISCIPLINAS, DISCIPLINAS_BY_CODE } from './mock-data/subjects'
 import { getHorariosPorTurma } from './mock-data/schedules'
@@ -20,6 +17,38 @@ import { logRepository } from '../config/repository-config'
 import { supabase } from '../lib/supabase'
 
 // Supabase client é inicializado lazy no próprio módulo supabase.ts
+const XTRI_STUDENTS_STORAGE_KEY = 'xtri-alunos-xtris'
+
+type PersistedAlunoXTRI = Omit<Aluno, 'createdAt'> & {
+  createdAt: string
+}
+
+function loadPersistedXTRIStudents(): PersistedAlunoXTRI[] {
+  try {
+    const raw = localStorage.getItem(XTRI_STUDENTS_STORAGE_KEY)
+    if (!raw) return []
+
+    return JSON.parse(raw) as PersistedAlunoXTRI[]
+  } catch (error) {
+    console.error('[Supabase] Erro ao carregar alunos XTRI do localStorage:', error)
+    return []
+  }
+}
+
+function savePersistedXTRIStudents(students: PersistedAlunoXTRI[]): void {
+  try {
+    localStorage.setItem(XTRI_STUDENTS_STORAGE_KEY, JSON.stringify(students))
+  } catch (error) {
+    console.error('[Supabase] Erro ao salvar alunos XTRI no localStorage:', error)
+  }
+}
+
+function mapPersistedXTRIStudent(student: PersistedAlunoXTRI): Aluno {
+  return {
+    ...student,
+    createdAt: new Date(student.createdAt),
+  }
+}
 
 export function createSupabaseRepository(): DataRepository {
   logRepository('Inicializando Supabase repository')
@@ -53,20 +82,11 @@ export function createSupabaseRepository(): DataRepository {
           return aluno
         }
         
-        // Busca nos alunos XTRI (Supabase)
-        const { data, error } = await supabase
-          .from('alunos_xtris')
-          .select('*')
-          .eq('matricula', matricula)
-          .maybeSingle()
-        
-        if (error) {
-          console.error('Erro ao buscar aluno XTRI:', error)
-          return null
-        }
-        
-        if (data) {
-          return alunoXTRIFromRow(data as AlunoXTRIRow)
+        // Busca nos alunos XTRI persistidos localmente.
+        const persistedStudents = loadPersistedXTRIStudents()
+        const foundXTRI = persistedStudents.find((student) => student.matricula === matricula)
+        if (foundXTRI) {
+          return mapPersistedXTRIStudent(foundXTRI)
         }
         
         return null
@@ -88,25 +108,31 @@ export function createSupabaseRepository(): DataRepository {
       },
 
       createAlunoXTRI: async (data) => {
-        const row = alunoXTRIToRow(data)
-        
-        const { data: result, error } = await supabase
-          .from('alunos_xtris')
-          .insert(row)
-          .select()
-          .single()
-        
-        if (error) {
-          throw new Error(`Failed to create aluno XTRI: ${error.message}`)
+        const aluno: Aluno = {
+          id: crypto.randomUUID(),
+          matricula: data.matricula,
+          nome: data.nome,
+          turma: data.turma,
+          email: data.email,
+          fotoFilename: data.fotoFilename,
+          escola: 'XTRI',
+          createdAt: new Date(),
         }
-        
-        logRepository('Aluno XTRI criado no Supabase', { 
-          id: result.id,
-          matricula: result.matricula, 
-          nome: result.nome 
+
+        const persistedStudents = loadPersistedXTRIStudents()
+        persistedStudents.push({
+          ...aluno,
+          createdAt: aluno.createdAt.toISOString(),
         })
-        
-        return alunoXTRIFromRow(result as AlunoXTRIRow)
+        savePersistedXTRIStudents(persistedStudents)
+
+        logRepository('Aluno XTRI criado localmente (modo Supabase)', {
+          id: aluno.id,
+          matricula: aluno.matricula,
+          nome: aluno.nome,
+        })
+
+        return aluno
       },
     },
 
