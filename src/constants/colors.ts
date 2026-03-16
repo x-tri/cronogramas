@@ -13,7 +13,6 @@ export const CORES_TIPOS: Record<TipoBloco, string> = {
   estudo: '#3B82F6', // Azul
   simulado: '#EF4444', // Vermelho
   revisao: '#F59E0B', // Amarelo
-  bloqueio: '#DC2626', // Vermelho forte - Horário bloqueado
   descanso: '#10B981', // Verde
   rotina: '#8B5CF6', // Roxo
   foco: '#EC4899', // Rosa - Foco especial

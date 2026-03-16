@@ -2,6 +2,7 @@ import { View, Text } from '@react-pdf/renderer'
 import type { BlocoCronograma, HorarioOficial } from '../../types/domain'
 import { TIPO_BLOCO_LABELS } from '../../types/domain'
 import { getBlockColorWithAutoDetect } from '../../constants/colors'
+import { getBlockDisplayLabel } from '../../lib/blocked-slot'
 import { styles } from './pdf-styles'
 
 type PdfBlockCellProps = {
@@ -34,7 +35,7 @@ export function PdfBlockCell({ official, block }: PdfBlockCellProps) {
     return (
       <View style={[styles.blockCard, { backgroundColor }]}>
         <Text style={styles.blockTitle}>{block.titulo}</Text>
-        <Text style={styles.blockSubtitle}>{TIPO_BLOCO_LABELS[block.tipo]}</Text>
+        <Text style={styles.blockSubtitle}>{getBlockDisplayLabel(block, TIPO_BLOCO_LABELS[block.tipo])}</Text>
       </View>
     )
   }

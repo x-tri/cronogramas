@@ -7,6 +7,7 @@ import type {
   Turno,
 } from '../../types/domain'
 import { DraggableBlockCard } from '../blocks/draggable-block-card'
+import { isBlockedSlotBlock } from '../../lib/blocked-slot'
 
 interface TimeSlotProps {
   slot: TimeSlotType
@@ -18,6 +19,7 @@ interface TimeSlotProps {
   isDropTarget?: boolean
   dropMode?: 'swap' | 'move' | 'blocked'
   onClick?: () => void
+  onBlockSlotClick?: () => void
   onBlockEdit?: (block: BlocoCronograma) => void
   onBlockDelete?: (blockId: string) => void
   onBlockChangePriority?: (blockId: string, newPriority: 0 | 1 | 2) => void
@@ -34,12 +36,14 @@ export function TimeSlot({
   isDropTarget,
   dropMode,
   onClick,
+  onBlockSlotClick,
   onBlockEdit,
   onBlockDelete,
   onBlockChangePriority,
   onBlockToggleComplete,
 }: TimeSlotProps) {
   const isOccupied = !!officialClass || !!customBlock
+  const isBlockedBlock = customBlock ? isBlockedSlotBlock(customBlock) : false
 
   const { setNodeRef, isOver } = useDroppable({
     id: `${dia}-${turno}-${slotIndex}`,
@@ -91,12 +95,37 @@ export function TimeSlot({
           {slot.inicio}
         </span>
         {isEmpty && !isOver && (
-          <svg
-            className="w-3 h-3 text-[#d1d0cb] group-hover:text-[#2383e2] transition-colors"
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onBlockSlotClick?.()
+              }}
+              className="rounded p-0.5 text-[#e5a3a3] hover:text-[#dc2626] hover:bg-[#fef2f2] transition-colors"
+              title="Bloquear horário"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onClick?.()
+              }}
+              className="rounded p-0.5 text-[#d1d0cb] group-hover:text-[#2383e2] hover:bg-[#eff6ff] transition-colors"
+              title="Adicionar bloco"
+            >
+              <svg
+                className="w-3 h-3"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
 
@@ -115,18 +144,19 @@ export function TimeSlot({
         <div className="mt-1.5">
           <DraggableBlockCard
             block={customBlock}
-            onEdit={onBlockEdit ? () => onBlockEdit(customBlock) : undefined}
+            onEdit={isBlockedBlock ? undefined : onBlockEdit ? () => onBlockEdit(customBlock) : undefined}
             onDelete={onBlockDelete ? () => onBlockDelete(customBlock.id) : undefined}
             onChangePriority={
-              onBlockChangePriority
+              !isBlockedBlock && onBlockChangePriority
                 ? (newPriority) => onBlockChangePriority(customBlock.id, newPriority)
                 : undefined
             }
             onToggleComplete={
-              onBlockToggleComplete
+              !isBlockedBlock && onBlockToggleComplete
                 ? () => onBlockToggleComplete(customBlock.id)
                 : undefined
             }
+            disableDrag={isBlockedBlock}
           />
         </div>
       )}

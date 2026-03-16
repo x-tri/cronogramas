@@ -11,7 +11,6 @@ const DROPDOWN_OPTIONS: { value: TipoBloco; label: string }[] = [
   { value: 'estudo', label: 'Estudar' },
   { value: 'revisao', label: 'Revisar' },
   { value: 'simulado', label: 'Corrigir' },
-  { value: 'bloqueio', label: 'Bloquear horário' },
 ]
 
 export function BlockTypeSelector({

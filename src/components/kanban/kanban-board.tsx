@@ -10,10 +10,11 @@ import { getWeekBounds } from '../week-utils'
 
 type KanbanBoardProps = {
   onSlotClick?: (dia: DiaSemana, turno: Turno, slotIndex: number) => void
+  onBlockSlotClick?: (dia: DiaSemana, turno: Turno, slotIndex: number) => void
   onBlockEdit?: (block: BlocoCronograma) => void
 }
 
-export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
+export function KanbanBoard({ onSlotClick, onBlockSlotClick, onBlockEdit }: KanbanBoardProps) {
   const officialSchedule = useCronogramaStore((state) => state.officialSchedule)
   const isLoadingSchedule = useCronogramaStore((state) => state.isLoadingSchedule)
   const blocks = useCronogramaStore((state) => state.blocks)
@@ -255,6 +256,9 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
               dropMode={dropMode}
               onSlotClick={(turno, slotIndex) =>
                 onSlotClick?.(dia, turno, slotIndex)
+              }
+              onBlockSlotClick={(turno, slotIndex) =>
+                onBlockSlotClick?.(dia, turno, slotIndex)
               }
               onBlockEdit={onBlockEdit}
               onBlockDelete={handleBlockDelete}

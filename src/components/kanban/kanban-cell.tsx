@@ -11,6 +11,7 @@ interface KanbanCellProps {
   dropSlotIndex?: number
   dropMode?: 'swap' | 'move' | 'blocked'
   onSlotClick?: (slotIndex: number) => void
+  onBlockSlotClick?: (slotIndex: number) => void
   onBlockEdit?: (block: BlocoCronograma) => void
   onBlockDelete?: (blockId: string) => void
   onBlockChangePriority?: (blockId: string, newPriority: 0 | 1 | 2) => void
@@ -25,6 +26,7 @@ export function KanbanCell({
   dropSlotIndex,
   dropMode,
   onSlotClick,
+  onBlockSlotClick,
   onBlockEdit,
   onBlockDelete,
   onBlockChangePriority,
@@ -65,6 +67,7 @@ export function KanbanCell({
             isDropTarget={isTargetSlot}
             dropMode={isTargetSlot ? dropMode : undefined}
             onClick={() => onSlotClick?.(index)}
+            onBlockSlotClick={() => onBlockSlotClick?.(index)}
             onBlockEdit={onBlockEdit}
             onBlockDelete={onBlockDelete}
             onBlockChangePriority={onBlockChangePriority}

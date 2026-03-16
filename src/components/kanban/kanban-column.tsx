@@ -11,6 +11,7 @@ interface KanbanColumnProps {
   dropTarget?: { dia: DiaSemana; turno: Turno; slotIndex: number } | null
   dropMode?: 'swap' | 'move' | 'blocked'
   onSlotClick?: (turno: Turno, slotIndex: number) => void
+  onBlockSlotClick?: (turno: Turno, slotIndex: number) => void
   onBlockEdit?: (block: BlocoCronograma) => void
   onBlockDelete?: (blockId: string) => void
   onBlockChangePriority?: (blockId: string, newPriority: 0 | 1 | 2) => void
@@ -25,6 +26,7 @@ export function KanbanColumn({
   dropTarget,
   dropMode,
   onSlotClick,
+  onBlockSlotClick,
   onBlockEdit,
   onBlockDelete,
   onBlockChangePriority,
@@ -133,6 +135,7 @@ export function KanbanColumn({
               dropSlotIndex={dropTarget?.dia === dia && dropTarget?.turno === turno ? dropTarget?.slotIndex : undefined}
               dropMode={dropMode}
               onSlotClick={(slotIndex) => onSlotClick?.(turno, slotIndex)}
+              onBlockSlotClick={(slotIndex) => onBlockSlotClick?.(turno, slotIndex)}
               onBlockEdit={onBlockEdit}
               onBlockDelete={onBlockDelete}
               onBlockChangePriority={onBlockChangePriority}

@@ -9,6 +9,7 @@ type DraggableBlockCardProps = {
   onDelete?: () => void
   onChangePriority?: (newPriority: 0 | 1 | 2) => void
   onToggleComplete?: () => void
+  disableDrag?: boolean
 }
 
 export function DraggableBlockCard({
@@ -17,9 +18,11 @@ export function DraggableBlockCard({
   onDelete,
   onChangePriority,
   onToggleComplete,
+  disableDrag = false,
 }: DraggableBlockCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: block.id,
+    disabled: disableDrag,
   })
 
   const style = transform
@@ -37,7 +40,7 @@ export function DraggableBlockCard({
         onChangePriority={onChangePriority}
         onToggleComplete={onToggleComplete}
         isDragging={isDragging}
-        dragHandleProps={{ ...listeners, ...attributes }}
+        dragHandleProps={disableDrag ? undefined : { ...listeners, ...attributes }}
       />
     </div>
   )

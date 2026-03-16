@@ -1,6 +1,7 @@
 import type { BlocoCronograma } from '../../types/domain'
 import { TIPO_BLOCO_LABELS } from '../../types/domain'
 import { detectAreaFromTitle } from '../../constants/colors'
+import { getBlockDisplayLabel, isBlockedSlotBlock } from '../../lib/blocked-slot'
 
 interface BlockCardProps {
   block: BlocoCronograma
@@ -21,7 +22,7 @@ export function BlockCard({
   isDragging,
   dragHandleProps 
 }: BlockCardProps) {
-  const isBlockedSlot = block.tipo === 'bloqueio'
+  const isBlockedSlot = isBlockedSlotBlock(block)
   const area = detectAreaFromTitle(block.titulo) || 'outros'
   
   const handleDelete = (e: React.MouseEvent) => {
@@ -116,7 +117,7 @@ export function BlockCard({
         {/* Meta info e ações */}
         <div className="flex items-center justify-between mt-1 min-w-0">
           <span className="text-[10px] text-[#9ca3af] truncate">
-            {TIPO_BLOCO_LABELS[block.tipo]}
+            {getBlockDisplayLabel(block, TIPO_BLOCO_LABELS[block.tipo])}
           </span>
           {/* Ações - container com min-w-0 para não estourar */}
           <div className="flex items-center gap-0.5 flex-shrink-0">

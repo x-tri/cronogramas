@@ -10,12 +10,13 @@ import { ResetButton } from "./components/cronograma/reset-button";
 import { useCronogramaStore } from "./stores/cronograma-store";
 import type { BlocoCronograma, DiaSemana, Turno } from "./types/domain";
 import { ESCOLA_LABELS } from "./types/domain";
-import { TURNOS_CONFIG } from "./constants/time-slots";
+import { TURNOS_CONFIG, getSlotByIndex } from "./constants/time-slots";
 import { getWeekBounds } from "./components/week-utils";
 import { getCurrentUser, logout, type User } from "./lib/auth";
 import { LoginForm } from "./components/login-form";
 import { CronogramaHistoryList } from "./components/cronograma/cronograma-history-list";
 import { TimelineView } from "./components/kanban/timeline-view";
+import { BLOCKED_SLOT_COLOR, BLOCKED_SLOT_TITLE } from "./lib/blocked-slot";
 
 const ShareDropdown = lazy(() =>
   import("./components/export/share-dropdown").then((mod) => ({
@@ -38,6 +39,9 @@ type SlotSelection = {
 function AppContent() {
   const currentStudent = useCronogramaStore((state) => state.currentStudent);
   const selectedWeek = useCronogramaStore((state) => state.selectedWeek);
+  const cronograma = useCronogramaStore((state) => state.cronograma);
+  const addBlock = useCronogramaStore((state) => state.addBlock);
+  const createCronograma = useCronogramaStore((state) => state.createCronograma);
 
   const dayDates = useMemo(() => {
     const { start } = getWeekBounds(selectedWeek);
@@ -75,6 +79,51 @@ function AppContent() {
         slotIndex,
       });
       setEditingBlock(block);
+    }
+  };
+
+  const ensureCronogramaId = async () => {
+    if (!currentStudent) {
+      throw new Error("Selecione um aluno primeiro");
+    }
+
+    if (cronograma?.id) {
+      return cronograma.id;
+    }
+
+    const { start, end } = getWeekBounds(selectedWeek);
+    const created = await createCronograma(currentStudent.id, start, end);
+    return created.id;
+  };
+
+  const handleBlockSlotClick = async (
+    dia: DiaSemana,
+    turno: Turno,
+    slotIndex: number,
+  ) => {
+    if (!currentStudent) return;
+
+    const slot = getSlotByIndex(turno, slotIndex);
+    if (!slot) return;
+
+    try {
+      const cronogramaId = await ensureCronogramaId();
+      await addBlock({
+        cronogramaId,
+        diaSemana: dia,
+        turno,
+        horarioInicio: slot.inicio,
+        horarioFim: slot.fim,
+        tipo: "descanso",
+        titulo: BLOCKED_SLOT_TITLE,
+        descricao: null,
+        disciplinaCodigo: null,
+        cor: BLOCKED_SLOT_COLOR,
+        prioridade: 0,
+        concluido: false,
+      });
+    } catch (error) {
+      console.error("Failed to block slot:", error);
     }
   };
 
@@ -373,6 +422,7 @@ function AppContent() {
                     {viewMode === "kanban" ? (
                       <KanbanBoard
                         onSlotClick={handleSlotClick}
+                        onBlockSlotClick={handleBlockSlotClick}
                         onBlockEdit={handleBlockEdit}
                       />
                     ) : (
