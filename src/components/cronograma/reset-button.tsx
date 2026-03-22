@@ -27,7 +27,7 @@ export function ResetButton() {
     <>
       <button
         onClick={() => setIsModalOpen(true)}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#64748b] hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
         title="Refazer cronograma - apaga todos os blocos atuais"
       >
         <svg

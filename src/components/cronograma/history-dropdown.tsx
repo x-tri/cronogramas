@@ -50,31 +50,23 @@ export function HistoryDropdown() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors border
-          ${isOpen 
-            ? 'bg-blue-50 text-blue-700 border-blue-300' 
-            : 'text-gray-600 bg-gray-50 hover:bg-gray-100 border-gray-200'
+          inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md transition-colors
+          ${isOpen
+            ? 'bg-[#e0f2fe] text-[#2563eb]'
+            : 'text-[#64748b] hover:text-[#1d1d1f] hover:bg-[#f1f1ef]'
           }
         `}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span className="hidden sm:inline">
-          {currentVersion 
+          {currentVersion
             ? `${formatDateShort(currentVersion.semanaInicio)} - ${formatDateShort(currentVersion.semanaFim)}`
             : 'Histórico'
           }
         </span>
         <span className="sm:hidden">Histórico</span>
-        <svg 
-          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
       </button>
 
       {isOpen && (

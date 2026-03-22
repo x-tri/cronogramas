@@ -25,6 +25,9 @@ serve(async (req) => {
 
     const body = await req.json()
 
+    // Força modelo correto — sobrescreve o que vier do frontend
+    body.model = 'sabia-3'
+
     const response = await fetch(MARITACA_API_URL, {
       method: 'POST',
       headers: {

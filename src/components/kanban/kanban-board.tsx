@@ -2,15 +2,21 @@ import { DndContext, DragOverlay, pointerWithin, useSensor, useSensors, PointerS
 import type { DragEndEvent, DragStartEvent, DragOverEvent, DropAnimation } from '@dnd-kit/core'
 import { useState, useCallback, useMemo } from 'react'
 import { useCronogramaStore } from '../../stores/cronograma-store'
-import { DIAS_SEMANA, type BlocoCronograma, type DiaSemana, type Turno } from '../../types/domain'
-import { getSlotByIndex } from '../../constants/time-slots'
-import { KanbanColumn } from './kanban-column'
-import { BlockCard } from '../blocks/block-card'
+import { DIAS_SEMANA, DIAS_SEMANA_LABELS, TURNOS, TURNO_LABELS, type BlocoCronograma, type DiaSemana, type Turno } from '../../types/domain'
+import { TURNOS_CONFIG, getSlotByIndex } from '../../constants/time-slots'
 import { getWeekBounds } from '../week-utils'
+import { detectAreaFromTitle } from '../../constants/colors'
+import { KanbanSlot } from './kanban-slot'
 
 type KanbanBoardProps = {
   onSlotClick?: (dia: DiaSemana, turno: Turno, slotIndex: number) => void
   onBlockEdit?: (block: BlocoCronograma) => void
+}
+
+const TURNO_BANNER: Record<Turno, { bg: string; icon: string }> = {
+  manha: { bg: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)', icon: '\u2600\uFE0F' },
+  tarde: { bg: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)', icon: '\uD83C\uDF24\uFE0F' },
+  noite: { bg: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)', icon: '\uD83C\uDF19' },
 }
 
 export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
@@ -18,190 +24,109 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
   const isLoadingSchedule = useCronogramaStore((state) => state.isLoadingSchedule)
   const blocks = useCronogramaStore((state) => state.blocks)
   const selectedWeek = useCronogramaStore((state) => state.selectedWeek)
-
-  // Mapa dia → data real da semana selecionada
-  const dayDates = useMemo(() => {
-    const { start } = getWeekBounds(selectedWeek)
-    const map: Record<DiaSemana, Date> = {
-      segunda: new Date(start),
-      terca:   new Date(new Date(start).setDate(start.getDate() + 1)),
-      quarta:  new Date(new Date(start).setDate(start.getDate() + 2)),
-      quinta:  new Date(new Date(start).setDate(start.getDate() + 3)),
-      sexta:   new Date(new Date(start).setDate(start.getDate() + 4)),
-      sabado:  new Date(new Date(start).setDate(start.getDate() + 5)),
-      domingo: new Date(new Date(start).setDate(start.getDate() + 6)),
-    }
-    return map
-  }, [selectedWeek])
   const removeBlock = useCronogramaStore((state) => state.removeBlock)
   const updateBlock = useCronogramaStore((state) => state.updateBlock)
   const moveBlock = useCronogramaStore((state) => state.moveBlock)
   const swapBlocks = useCronogramaStore((state) => state.swapBlocks)
 
+  const dayDates = useMemo(() => {
+    const { start } = getWeekBounds(selectedWeek)
+    return {
+      segunda: new Date(start),
+      terca: new Date(new Date(start).setDate(start.getDate() + 1)),
+      quarta: new Date(new Date(start).setDate(start.getDate() + 2)),
+      quinta: new Date(new Date(start).setDate(start.getDate() + 3)),
+      sexta: new Date(new Date(start).setDate(start.getDate() + 4)),
+      sabado: new Date(new Date(start).setDate(start.getDate() + 5)),
+      domingo: new Date(new Date(start).setDate(start.getDate() + 6)),
+    } as Record<DiaSemana, Date>
+  }, [selectedWeek])
 
   const [activeBlock, setActiveBlock] = useState<BlocoCronograma | null>(null)
   const [dropTarget, setDropTarget] = useState<{ dia: DiaSemana; turno: Turno; slotIndex: number } | null>(null)
   const [dropMode, setDropMode] = useState<'swap' | 'move' | 'blocked'>('blocked')
 
-  // Configuração dos sensores para melhorar a detecção de drag
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // Mínimo de 8px de movimento para iniciar o drag
-      },
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
 
-  const handleBlockDelete = async (blockId: string) => {
-    try {
-      await removeBlock(blockId)
-    } catch (err) {
-      console.error('Failed to delete block:', err)
-    }
+  const isToday = (date: Date) => new Date().toDateString() === date.toDateString()
+
+  function getOfficial(dia: DiaSemana, turno: Turno, slotInicio: string) {
+    return officialSchedule.find(
+      (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slotInicio
+    )
   }
 
-  const handleBlockChangePriority = async (blockId: string, newPriority: 0 | 1 | 2) => {
-    try {
-      await updateBlock(blockId, { prioridade: newPriority })
-    } catch (err) {
-      console.error('Failed to update priority:', err)
-    }
+  function getBlock(dia: DiaSemana, turno: Turno, slotInicio: string) {
+    return blocks.find(
+      (b) => b.diaSemana === dia && b.turno === turno && b.horarioInicio === slotInicio
+    )
   }
 
-  const handleBlockToggleComplete = async (blockId: string) => {
-    const block = blocks.find((b) => b.id === blockId)
-    if (!block) return
-    try {
-      await updateBlock(blockId, { concluido: !block.concluido })
-    } catch (err) {
-      console.error('Failed to toggle complete:', err)
-    }
+  async function handleUnblock(block: BlocoCronograma, e: React.MouseEvent) {
+    e.stopPropagation()
+    try { await removeBlock(block.id) } catch (err) { console.error('Failed to unblock:', err) }
   }
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const blockId = event.active.id as string
-    const block = blocks.find((b) => b.id === blockId)
-    if (block) {
-      setActiveBlock(block)
-    }
+    const block = blocks.find((b) => b.id === event.active.id)
+    if (block) setActiveBlock(block)
   }, [blocks])
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const { over } = event
-    if (!over) {
-      setDropTarget(null)
-      return
-    }
-
-    const dropData = over.data.current as {
-      dia: DiaSemana
-      turno: Turno
-      slotIndex: number
-    } | undefined
-
-    if (!dropData) {
-      setDropTarget(null)
-      return
-    }
-
+    if (!over) { setDropTarget(null); return }
+    const dropData = over.data.current as { dia: DiaSemana; turno: Turno; slotIndex: number } | undefined
+    if (!dropData) { setDropTarget(null); return }
     const { dia, turno, slotIndex } = dropData
     const slot = getSlotByIndex(turno, slotIndex)
-    if (!slot) {
-      setDropTarget(null)
-      return
-    }
-
-    // Check if slot is occupied by official class
+    if (!slot) { setDropTarget(null); return }
     const isOccupiedByOfficial = officialSchedule.some(
       (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slot.inicio
     )
-
-    if (isOccupiedByOfficial) {
-      setDropTarget({ dia, turno, slotIndex })
-      setDropMode('blocked')
-      return
-    }
-
-    // Check if slot is occupied by another block
+    if (isOccupiedByOfficial) { setDropTarget({ dia, turno, slotIndex }); setDropMode('blocked'); return }
     const occupyingBlock = blocks.find(
       (b) => b.diaSemana === dia && b.turno === turno && b.horarioInicio === slot.inicio
     )
-
     setDropTarget({ dia, turno, slotIndex })
-    
-    if (occupyingBlock && occupyingBlock.id !== activeBlock?.id) {
-      // Slot is occupied by another block - show swap mode
-      setDropMode('swap')
-    } else {
-      // Slot is empty - allow move
-      setDropMode('move')
-    }
+    setDropMode(occupyingBlock && occupyingBlock.id !== activeBlock?.id ? 'swap' : 'move')
   }, [blocks, officialSchedule, activeBlock])
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveBlock(null)
     setDropTarget(null)
-
     const { active, over } = event
     if (!over) return
-
     const blockId = active.id as string
-    const dropData = over.data.current as {
-      dia: DiaSemana
-      turno: Turno
-      slotIndex: number
-    } | undefined
-
+    const dropData = over.data.current as { dia: DiaSemana; turno: Turno; slotIndex: number } | undefined
     if (!dropData) return
-
     const { dia, turno, slotIndex } = dropData
     const slot = getSlotByIndex(turno, slotIndex)
     if (!slot) return
-
-    // Check if slot is occupied by official class
     const isOccupiedByOfficial = officialSchedule.some(
       (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slot.inicio
     )
     if (isOccupiedByOfficial) return
-
-    // Find if there's a block in the target slot
     const targetBlock = blocks.find(
       (b) => b.diaSemana === dia && b.turno === turno && b.horarioInicio === slot.inicio && b.id !== blockId
     )
-
     try {
-      if (targetBlock) {
-        // Swap the blocks
-        await swapBlocks(blockId, targetBlock.id)
-      } else {
-        // Simple move to empty slot
-        await moveBlock(blockId, dia, turno, slotIndex)
-      }
-    } catch (err) {
-      console.error('Failed to move/swap block:', err)
-    }
+      if (targetBlock) await swapBlocks(blockId, targetBlock.id)
+      else await moveBlock(blockId, dia, turno, slotIndex)
+    } catch (err) { console.error('Failed to move/swap block:', err) }
   }, [blocks, officialSchedule, moveBlock, swapBlocks])
 
   const dropAnimation: DropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({
-      styles: {
-        active: {
-          opacity: '0.5',
-        },
-      },
-    }),
+    sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }),
   }
 
   if (isLoadingSchedule) {
     return (
-      <div className="bg-[#f7f6f3] rounded-lg p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-[#e3e2e0] rounded w-1/4 mx-auto" />
-          <div className="grid grid-cols-7 gap-3">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="h-64 bg-[#e3e2e0] rounded" />
-            ))}
-          </div>
+      <div className="animate-pulse space-y-4 p-4">
+        <div className="h-4 bg-gray-200 rounded w-1/4 mx-auto" />
+        <div className="grid grid-cols-7 gap-3">
+          {Array.from({ length: 7 }).map((_, i) => <div key={i} className="h-64 bg-gray-200 rounded" />)}
         </div>
       </div>
     )
@@ -215,62 +140,123 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="bg-[#f7f6f3] rounded-lg p-5 w-full">
-        {/* Header do Kanban */}
-        <div className="flex items-center justify-between mb-4 px-1">
-          <div className="flex items-center gap-5 text-sm text-[#6b6b67]">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-[#9ca3af] rounded-sm" />
-              <span>Aula Oficial</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-[#37352f] rounded-sm" />
-              <span>Estudo</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 border-2 border-[#37352f] rounded-sm" />
-              <span>Revisão</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-[#9ca3af]">
-            <span className="flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-              <span>Solte sobre um bloco para trocar</span>
-            </span>
-          </div>
-        </div>
+      <div className="w-full overflow-x-auto">
+        <div className="min-w-[900px]">
 
-        {/* Grid do Kanban - ocupa 100% da largura */}
-        <div className="grid grid-cols-7 gap-4 w-full">
-          {DIAS_SEMANA.map((dia) => (
-            <KanbanColumn
-              key={dia}
-              dia={dia}
-              date={dayDates[dia]}
-              officialSchedule={officialSchedule}
-              blocks={blocks}
-              dropTarget={dropTarget}
-              dropMode={dropMode}
-              onSlotClick={(turno, slotIndex) =>
-                onSlotClick?.(dia, turno, slotIndex)
-              }
-              onBlockEdit={onBlockEdit}
-              onBlockDelete={handleBlockDelete}
-              onBlockChangePriority={handleBlockChangePriority}
-              onBlockToggleComplete={handleBlockToggleComplete}
-            />
-          ))}
+          {/* Legend — same as timeline */}
+          <div className="timetable-legend" style={{ borderRadius: '10px', marginBottom: 0, borderBottom: 'none' }}>
+            <div className="timetable-legend-item">
+              <div className="legend-dot" style={{ background: '#e5e7eb' }} /><span>Aula Oficial</span>
+            </div>
+            <div className="timetable-legend-item">
+              <div className="legend-dot" style={{ background: '#3b82f6' }} /><span>Estudo</span>
+            </div>
+            <div className="timetable-legend-item">
+              <div className="legend-dot" style={{ background: '#f59e0b' }} /><span>Revisão</span>
+            </div>
+            <div className="timetable-legend-item">
+              <div className="legend-dot blocked-dot" /><span>Bloqueado</span>
+            </div>
+            <div className="timetable-legend-item" style={{ marginLeft: 'auto', color: '#94a3b8' }}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              <span>Arraste blocos para trocar</span>
+            </div>
+          </div>
+
+          {TURNOS.map((turno) => {
+            const config = TURNOS_CONFIG[turno]
+            const banner = TURNO_BANNER[turno]
+
+            return (
+              <div key={turno} className="mb-1">
+                {/* Turno Banner */}
+                <div className="turno-banner" style={{ background: banner.bg }}>
+                  <span className="turno-banner-icon">{banner.icon}</span>
+                  <span className="turno-banner-label">{TURNO_LABELS[turno].toUpperCase()}</span>
+                  <span className="turno-banner-time">{config.inicio} – {config.fim}</span>
+                </div>
+
+                {/* Day headers */}
+                <div className="timetable-grid timetable-header">
+                  <div className="timetable-time-col">HORÁRIO</div>
+                  {DIAS_SEMANA.map((dia) => {
+                    const date = dayDates[dia]
+                    const today = isToday(date)
+                    const isWeekend = dia === 'sabado' || dia === 'domingo'
+                    return (
+                      <div key={dia} className={`timetable-day-header ${today ? 'today' : ''} ${isWeekend ? 'weekend' : ''}`}>
+                        <span className="day-label">{DIAS_SEMANA_LABELS[dia].slice(0, 3).toUpperCase()}</span>
+                        {date && (
+                          <span className="day-date">
+                            {date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Slot rows */}
+                {config.slots.map((slot, slotIndex) => (
+                  <div key={slot.inicio} className="timetable-grid timetable-row">
+                    <div className="timetable-time-cell">{slot.inicio}</div>
+
+                    {DIAS_SEMANA.map((dia) => {
+                      const official = getOfficial(dia, turno, slot.inicio)
+                      const block = getBlock(dia, turno, slot.inicio)
+                      const isWeekend = dia === 'sabado' || dia === 'domingo'
+                      const today = isToday(dayDates[dia])
+                      const isTarget = dropTarget?.dia === dia && dropTarget?.turno === turno && dropTarget?.slotIndex === slotIndex
+
+                      return (
+                        <KanbanSlot
+                          key={dia}
+                          dia={dia}
+                          turno={turno}
+                          slotIndex={slotIndex}
+                          slot={slot}
+                          official={official}
+                          block={block}
+                          isWeekend={isWeekend}
+                          today={today}
+                          isDropTarget={isTarget}
+                          dropMode={isTarget ? dropMode : undefined}
+                          onSlotClick={() => onSlotClick?.(dia, turno, slotIndex)}
+                          onBlockEdit={onBlockEdit}
+                          onUnblock={handleUnblock}
+                        />
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            )
+          })}
         </div>
       </div>
 
       <DragOverlay dropAnimation={dropAnimation}>
-        {activeBlock && (
-          <div className="w-52 opacity-90 rotate-1 shadow-2xl">
-            <BlockCard block={activeBlock} isDragging />
-          </div>
-        )}
+        {activeBlock && (() => {
+          const area = detectAreaFromTitle(activeBlock.titulo) || 'outros'
+          const AREA_STYLES: Record<string, { bg: string; border: string; text: string }> = {
+            natureza:   { bg: '#f0fdf4', border: '#10b981', text: '#065f46' },
+            matematica: { bg: '#fef2f2', border: '#ef4444', text: '#991b1b' },
+            linguagens: { bg: '#eff6ff', border: '#3b82f6', text: '#1e3a5f' },
+            humanas:    { bg: '#fff7ed', border: '#f97316', text: '#7c2d12' },
+            outros:     { bg: '#f5f3ff', border: '#8b5cf6', text: '#4c1d95' },
+          }
+          const style = AREA_STYLES[area] ?? AREA_STYLES.outros
+          return (
+            <div
+              className="opacity-90 rotate-1 shadow-2xl rounded-md px-2 py-1.5"
+              style={{ backgroundColor: style.bg, borderLeft: `3px solid ${style.border}`, minWidth: 120 }}
+            >
+              <span style={{ color: style.text, fontSize: 12, fontWeight: 700 }}>{activeBlock.titulo}</span>
+            </div>
+          )
+        })()}
       </DragOverlay>
     </DndContext>
   )

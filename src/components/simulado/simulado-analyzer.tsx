@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '../ui/button'
 import type { SimuladoResult, WrongQuestion } from '../../types/supabase'
 import type { BlocoCronograma, DiaSemana, Turno } from '../../types/domain'
@@ -229,221 +230,204 @@ export function SimuladoAnalyzer({ matricula }: SimuladoAnalyzerProps) {
     await addBlock(blockData)
   }
 
-  if (!result && !plano) {
-    return (
-      <div className="flex items-center gap-3">
-        <Button
-          onClick={handleAnalyze}
-          onMouseEnter={preloadAnalyzer}
-          onFocus={preloadAnalyzer}
-          isLoading={isLoading}
-          variant="secondary"
-          size="sm"
-        >
-          Analisar Simulado
-        </Button>
-        <Button
-          onClick={handleGerarPlano}
-          onMouseEnter={preloadAnalyzer}
-          onFocus={preloadAnalyzer}
-          isLoading={isGeneratingPlan}
-          variant="outline"
-          size="sm"
-        >
-          ✨ Plano IA
-        </Button>
-        {error && <span className="text-sm text-red-600">{error}</span>}
-      </div>
-    )
-  }
+  // --- Overlay modal for expanded content (result card / plano IA) ---
+  const renderModal = () => {
+    // Plano IA only (no result open)
+    if (plano && !result) {
+      return createPortal(
+        <div className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-sm flex items-start justify-center pt-16 px-4" onClick={() => setPlano(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto animate-apple-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="p-5">
+              <PlanoEstudoIA
+                plano={plano}
+                nomeAluno={currentStudent?.nome ?? null}
+                simuladoTitle="Simulado"
+                onClose={() => setPlano(null)}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )
+    }
 
-  // Exibe apenas o plano IA (sem ter aberto o simulado completo)
-  if (plano && !result) {
-    return (
-      <PlanoEstudoIA
-        plano={plano}
-        nomeAluno={currentStudent?.nome ?? null}
-        simuladoTitle="Simulado"
-        onClose={() => setPlano(null)}
-      />
-    )
-  }
+    // Full result card
+    if (!result) return null
 
-  if (!result) return null
+    const totalQuestions = result.wrongQuestions.length
+    const selectedCount = selectedQuestions.size
+    const canDistribute = selectedCount > 0
 
-  const totalQuestions = result.wrongQuestions.length
-  const selectedCount = selectedQuestions.size
-  const canDistribute = selectedCount > 0
+    return createPortal(
+      <div className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-sm flex items-start justify-center pt-16 px-4" onClick={handleCloseResult}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto animate-apple-scale-in" onClick={e => e.stopPropagation()}>
+          <div className="p-5 space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900">{result.exam.title}</h3>
+                <p className="text-sm text-gray-500">
+                  {result.studentAnswer.correct_answers} acertos •{' '}
+                  {result.studentAnswer.wrong_answers} erros •{' '}
+                  {result.studentAnswer.blank_answers} em branco
+                </p>
+                <div className="flex items-center gap-3 mt-2 text-xs">
+                  {result.studentAnswer.tri_lc != null && (
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-[#3B82F6]"></span>
+                      <span className="text-gray-600">LC:</span>
+                      <span className="font-semibold text-gray-900">{result.studentAnswer.tri_lc.toFixed(1)}</span>
+                    </span>
+                  )}
+                  {result.studentAnswer.tri_ch != null && (
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-[#F97316]"></span>
+                      <span className="text-gray-600">CH:</span>
+                      <span className="font-semibold text-gray-900">{result.studentAnswer.tri_ch.toFixed(1)}</span>
+                    </span>
+                  )}
+                  {result.studentAnswer.tri_cn != null && (
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-[#10B981]"></span>
+                      <span className="text-gray-600">CN:</span>
+                      <span className="font-semibold text-gray-900">{result.studentAnswer.tri_cn.toFixed(1)}</span>
+                    </span>
+                  )}
+                  {result.studentAnswer.tri_mt != null && (
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-[#EF4444]"></span>
+                      <span className="text-gray-600">MT:</span>
+                      <span className="font-semibold text-gray-900">{result.studentAnswer.tri_mt.toFixed(1)}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleCloseResult}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Fechar"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-semibold text-gray-900">{result.exam.title}</h3>
-          <p className="text-sm text-gray-500">
-            {result.studentAnswer.correct_answers} acertos •{' '}
-            {result.studentAnswer.wrong_answers} erros •{' '}
-            {result.studentAnswer.blank_answers} em branco
-          </p>
-          {/* Notas TRI por área - Cores padronizadas do sistema */}
-          <div className="flex items-center gap-3 mt-2 text-xs">
-            {result.studentAnswer.tri_lc != null && (
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#3B82F6]"></span>
-                <span className="text-gray-600">LC:</span>
-                <span className="font-semibold text-gray-900">{result.studentAnswer.tri_lc.toFixed(1)}</span>
+            {/* Score bars */}
+            <div className="grid grid-cols-4 gap-2">
+              <ScoreBar label="LC" value={result.studentAnswer.tri_lc} />
+              <ScoreBar label="CH" value={result.studentAnswer.tri_ch} />
+              <ScoreBar label="CN" value={result.studentAnswer.tri_cn} />
+              <ScoreBar label="MT" value={result.studentAnswer.tri_mt} />
+            </div>
+
+            {/* Questions selection */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-gray-700">
+                  Selecione as questões erradas para revisar
+                </h4>
+                <span className="text-xs text-gray-500">
+                  {selectedCount} de {totalQuestions} selecionadas
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={selectAll} className="text-xs text-blue-600 hover:text-blue-700 font-medium" type="button">
+                  Selecionar todas
+                </button>
+                <span className="text-gray-300">|</span>
+                <button onClick={deselectAll} className="text-xs text-gray-500 hover:text-gray-700" type="button">
+                  Limpar seleção
+                </button>
+              </div>
+
+              <div className="max-h-64 overflow-y-auto space-y-2 border rounded-lg p-2 bg-gray-50">
+                {renderQuestionGroup(result.wrongQuestions.filter(q => q.questionNumber >= 1 && q.questionNumber <= 45), 'Linguagens', 'bg-blue-50', selectedQuestions, toggleQuestion)}
+                {renderQuestionGroup(result.wrongQuestions.filter(q => q.questionNumber >= 46 && q.questionNumber <= 90), 'Humanas', 'bg-orange-50', selectedQuestions, toggleQuestion)}
+                {renderQuestionGroup(result.wrongQuestions.filter(q => q.questionNumber >= 91 && q.questionNumber <= 135), 'Natureza', 'bg-green-50', selectedQuestions, toggleQuestion)}
+                {renderQuestionGroup(result.wrongQuestions.filter(q => q.questionNumber >= 136 && q.questionNumber <= 180), 'Matemática', 'bg-red-50', selectedQuestions, toggleQuestion)}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <span className={`text-sm ${canDistribute ? 'text-gray-600' : 'text-red-500'}`}>
+                {canDistribute
+                  ? `${selectedCount} questão${selectedCount > 1 ? 's' : ''} serão adicionadas`
+                  : 'Selecione pelo menos uma questão'}
               </span>
-            )}
-            {result.studentAnswer.tri_ch != null && (
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#F97316]"></span>
-                <span className="text-gray-600">CH:</span>
-                <span className="font-semibold text-gray-900">{result.studentAnswer.tri_ch.toFixed(1)}</span>
-              </span>
-            )}
-            {result.studentAnswer.tri_cn != null && (
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#10B981]"></span>
-                <span className="text-gray-600">CN:</span>
-                <span className="font-semibold text-gray-900">{result.studentAnswer.tri_cn.toFixed(1)}</span>
-              </span>
-            )}
-            {result.studentAnswer.tri_mt != null && (
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#EF4444]"></span>
-                <span className="text-gray-600">MT:</span>
-                <span className="font-semibold text-gray-900">{result.studentAnswer.tri_mt.toFixed(1)}</span>
-              </span>
+              <div className="flex gap-3">
+                <Button variant="outline" size="sm" onClick={handleGerarPlano} isLoading={isGeneratingPlan}>
+                  ✨ Plano IA
+                </Button>
+                <Button variant="secondary" onClick={handleCloseResult}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleDistribute} disabled={!canDistribute}>
+                  Distribuir {selectedCount > 0 ? `(${selectedCount})` : ''}
+                </Button>
+              </div>
+            </div>
+
+            {/* Plano IA inside result modal */}
+            {plano && (
+              <div className="pt-2 border-t border-gray-100">
+                <PlanoEstudoIA
+                  plano={plano}
+                  nomeAluno={result.studentAnswer.student_name}
+                  simuladoTitle={result.exam.title}
+                  onClose={() => setPlano(null)}
+                />
+              </div>
             )}
           </div>
         </div>
+      </div>,
+      document.body
+    )
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-1">
         <button
-          onClick={handleCloseResult}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-          aria-label="Fechar"
+          onClick={handleAnalyze}
+          onMouseEnter={preloadAnalyzer}
+          onFocus={preloadAnalyzer}
+          disabled={isLoading}
+          className="px-2 py-1 text-xs font-medium text-[#64748b] hover:text-[#1d1d1f] hover:bg-[#f1f1ef] rounded-md transition-colors disabled:opacity-50"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          {isLoading ? (
+            <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          ) : 'Simulado'}
+        </button>
+        <button
+          onClick={handleGerarPlano}
+          onMouseEnter={preloadAnalyzer}
+          onFocus={preloadAnalyzer}
+          disabled={isGeneratingPlan}
+          className="px-2 py-1 text-xs font-medium text-[#64748b] hover:text-[#1d1d1f] hover:bg-[#f1f1ef] rounded-md transition-colors disabled:opacity-50"
+        >
+          {isGeneratingPlan ? (
+            <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          ) : 'Plano IA'}
         </button>
       </div>
-
-      {/* Score bars */}
-      <div className="grid grid-cols-4 gap-2">
-        <ScoreBar label="LC" value={result.studentAnswer.tri_lc} />
-        <ScoreBar label="CH" value={result.studentAnswer.tri_ch} />
-        <ScoreBar label="CN" value={result.studentAnswer.tri_cn} />
-        <ScoreBar label="MT" value={result.studentAnswer.tri_mt} />
-      </div>
-
-      {/* Questions selection */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-gray-700">
-            Selecione as questões erradas para revisar
-          </h4>
-          <span className="text-xs text-gray-500">
-            {selectedCount} de {totalQuestions} selecionadas
-          </span>
-        </div>
-
-        {/* Select/Deselect all */}
-        <div className="flex gap-2">
-          <button
-            onClick={selectAll}
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-            type="button"
-          >
-            Selecionar todas
-          </button>
-          <span className="text-gray-300">|</span>
-          <button
-            onClick={deselectAll}
-            className="text-xs text-gray-500 hover:text-gray-700"
-            type="button"
-          >
-            Limpar seleção
-          </button>
-        </div>
-
-        {/* Questions list - grouped by area */}
-        <div className="max-h-64 overflow-y-auto space-y-2 border rounded-lg p-2 bg-gray-50">
-          {/* Linguagens */}
-          {renderQuestionGroup(
-            result.wrongQuestions.filter(q => q.questionNumber >= 1 && q.questionNumber <= 45),
-            'Linguagens',
-            'bg-blue-50',
-            selectedQuestions,
-            toggleQuestion
-          )}
-          
-          {/* Humanas */}
-          {renderQuestionGroup(
-            result.wrongQuestions.filter(q => q.questionNumber >= 46 && q.questionNumber <= 90),
-            'Humanas',
-            'bg-orange-50',
-            selectedQuestions,
-            toggleQuestion
-          )}
-          
-          {/* Natureza */}
-          {renderQuestionGroup(
-            result.wrongQuestions.filter(q => q.questionNumber >= 91 && q.questionNumber <= 135),
-            'Natureza',
-            'bg-green-50',
-            selectedQuestions,
-            toggleQuestion
-          )}
-          
-          {/* Matemática */}
-          {renderQuestionGroup(
-            result.wrongQuestions.filter(q => q.questionNumber >= 136 && q.questionNumber <= 180),
-            'Matemática',
-            'bg-red-50',
-            selectedQuestions,
-            toggleQuestion
-          )}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-        <span className={`text-sm ${canDistribute ? 'text-gray-600' : 'text-red-500'}`}>
-          {canDistribute
-            ? `${selectedCount} questão${selectedCount > 1 ? 's' : ''} serão adicionadas`
-            : 'Selecione pelo menos uma questão'}
-        </span>
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleGerarPlano}
-            isLoading={isGeneratingPlan}
-          >
-            ✨ Plano IA
-          </Button>
-          <Button variant="secondary" onClick={handleCloseResult}>
-            Cancelar
-          </Button>
-          <Button onClick={handleDistribute} disabled={!canDistribute}>
-            Distribuir {selectedCount > 0 ? `(${selectedCount})` : ''}
-          </Button>
-        </div>
-      </div>
-
-      {/* Plano IA (exibido dentro do card quando gerado com simulado aberto) */}
-      {plano && (
-        <div className="pt-2 border-t border-gray-100">
-          <PlanoEstudoIA
-            plano={plano}
-            nomeAluno={result.studentAnswer.student_name}
-            simuladoTitle={result.exam.title}
-            onClose={() => setPlano(null)}
-          />
-        </div>
+      {error && createPortal(
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[80] bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-2 rounded-lg shadow-lg">
+          {error}
+        </div>,
+        document.body
       )}
-    </div>
+      {renderModal()}
+    </>
   )
 }
 

@@ -163,7 +163,7 @@ export function ShareDropdown() {
         onMouseEnter={preloadShareAssets}
         onFocus={preloadShareAssets}
         disabled={isGenerating}
-        className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+        className="px-2 py-1 text-xs font-medium text-[#64748b] hover:text-[#1d1d1f] hover:bg-[#f1f1ef] rounded-md flex items-center gap-1 transition-colors disabled:opacity-50"
       >
         {isGenerating ? (
           <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">

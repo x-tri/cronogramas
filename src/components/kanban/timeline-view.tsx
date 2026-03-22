@@ -10,17 +10,24 @@ type TimelineViewProps = {
   onBlockEdit?: (block: BlocoCronograma) => void
 }
 
-const AREA_STYLES: Record<string, { bg: string; border: string; text: string; dot: string }> = {
-  natureza:   { bg: 'bg-[#f0fdf4]', border: 'border-l-2 border-l-[#10b981]', text: 'text-[#047857]', dot: 'bg-[#10b981]' },
-  matematica: { bg: 'bg-[#fef2f2]', border: 'border-l-2 border-l-[#ef4444]', text: 'text-[#b91c1c]', dot: 'bg-[#ef4444]' },
-  linguagens: { bg: 'bg-[#eff6ff]', border: 'border-l-2 border-l-[#3b82f6]', text: 'text-[#1d4ed8]', dot: 'bg-[#3b82f6]' },
-  humanas:    { bg: 'bg-[#fff7ed]', border: 'border-l-2 border-l-[#f97316]', text: 'text-[#c2410c]', dot: 'bg-[#f97316]' },
-  outros:     { bg: 'bg-[#f5f3ff]', border: 'border-l-2 border-l-[#8b5cf6]', text: 'text-[#7c3aed]', dot: 'bg-[#8b5cf6]' },
+const AREA_STYLES: Record<string, { bg: string; border: string; text: string; sub: string }> = {
+  natureza:   { bg: '#f0fdf4', border: '#10b981', text: '#065f46', sub: '#047857' },
+  matematica: { bg: '#fef2f2', border: '#ef4444', text: '#991b1b', sub: '#b91c1c' },
+  linguagens: { bg: '#eff6ff', border: '#3b82f6', text: '#1e3a5f', sub: '#1d4ed8' },
+  humanas:    { bg: '#fff7ed', border: '#f97316', text: '#7c2d12', sub: '#c2410c' },
+  outros:     { bg: '#f5f3ff', border: '#8b5cf6', text: '#4c1d95', sub: '#7c3aed' },
+}
+
+const TURNO_BANNER: Record<Turno, { bg: string; icon: string }> = {
+  manha: { bg: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)', icon: '☀️' },
+  tarde: { bg: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)', icon: '🌤️' },
+  noite: { bg: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)', icon: '🌙' },
 }
 
 export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineViewProps) {
   const officialSchedule = useCronogramaStore((s) => s.officialSchedule)
   const blocks = useCronogramaStore((s) => s.blocks)
+  const removeBlock = useCronogramaStore((s) => s.removeBlock)
 
   const isToday = (date: Date) => new Date().toDateString() === date.toDateString()
 
@@ -36,147 +43,173 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
     )
   }
 
-  return (
-    <div className="w-full overflow-x-auto">
-      <div className="min-w-[700px]">
+  async function handleUnblock(block: BlocoCronograma, e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      await removeBlock(block.id)
+    } catch (err) {
+      console.error('Failed to unblock:', err)
+    }
+  }
 
-        {/* Header — dias */}
-        <div className="grid grid-cols-[64px_repeat(7,1fr)] gap-px bg-[#e3e2e0] rounded-t-lg overflow-hidden">
-          {/* Canto vazio */}
-          <div className="bg-[#f7f6f3] px-2 py-3" />
-          {DIAS_SEMANA.map((dia) => {
-            const date = dayDates[dia]
-            const today = isToday(date)
-            const isWeekend = dia === 'sabado' || dia === 'domingo'
-            return (
-              <div
-                key={dia}
-                className={`px-2 py-3 text-center ${
-                  today ? 'bg-[#0071e3]' : isWeekend ? 'bg-[#f0fdf4]' : 'bg-[#f7f6f3]'
-                }`}
-              >
-                <p className={`text-[11px] font-bold uppercase tracking-wider ${
-                  today ? 'text-white/80' : isWeekend ? 'text-[#047857]' : 'text-[#9ca3af]'
-                }`}>
-                  {DIAS_SEMANA_LABELS[dia].slice(0, 3)}
-                </p>
-                <p className={`text-[13px] font-semibold tabular-nums mt-0.5 ${
-                  today ? 'text-white' : isWeekend ? 'text-[#047857]' : 'text-[#1d1d1f]'
-                }`}>
-                  {date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                </p>
-              </div>
-            )
-          })}
+  return (
+    <div className="w-full overflow-x-auto timetable-container">
+      <div className="min-w-[900px]">
+
+        {/* ===== LEGEND ===== */}
+        <div className="timetable-legend" style={{ borderRadius: '10px', marginBottom: 0, borderBottom: 'none' }}>
+          <div className="timetable-legend-item">
+            <div className="legend-dot" style={{ background: '#e5e7eb' }} />
+            <span>Aula Oficial</span>
+          </div>
+          <div className="timetable-legend-item">
+            <div className="legend-dot" style={{ background: '#3b82f6' }} />
+            <span>Estudo</span>
+          </div>
+          <div className="timetable-legend-item">
+            <div className="legend-dot" style={{ background: '#f59e0b' }} />
+            <span>Revisão</span>
+          </div>
+          <div className="timetable-legend-item">
+            <div className="legend-dot blocked-dot" />
+            <span>Bloqueado</span>
+          </div>
+          <div className="timetable-legend-item" style={{ marginLeft: 'auto', color: '#94a3b8' }}>
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>Clique em slot vazio para adicionar</span>
+          </div>
         </div>
 
-        {/* Body — turnos e slots */}
-        <div className="border border-t-0 border-[#e3e2e0] rounded-b-lg overflow-hidden">
-          {TURNOS.map((turno, turnoIdx) => (
-            <div key={turno}>
-              {/* Separador de turno */}
-              <div className={`grid grid-cols-[64px_repeat(7,1fr)] gap-px bg-[#e3e2e0] ${turnoIdx > 0 ? 'border-t-2 border-t-[#d1d0cb]' : ''}`}>
-                <div className="bg-[#f1f1ef] col-span-8 px-3 py-1.5 flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#9ca3af]">
-                    {TURNO_LABELS[turno]}
-                  </span>
-                  <span className="text-[10px] text-[#c1c0bb]">
-                    {TURNOS_CONFIG[turno].inicio} – {TURNOS_CONFIG[turno].fim}
-                  </span>
-                </div>
+        {TURNOS.map((turno) => {
+          const config = TURNOS_CONFIG[turno]
+          const banner = TURNO_BANNER[turno]
+
+          return (
+            <div key={turno} className="mb-1">
+              {/* ===== TURNO BANNER ===== */}
+              <div
+                className="turno-banner"
+                style={{ background: banner.bg }}
+              >
+                <span className="turno-banner-icon">{banner.icon}</span>
+                <span className="turno-banner-label">{TURNO_LABELS[turno].toUpperCase()}</span>
+                <span className="turno-banner-time">{config.inicio} – {config.fim}</span>
               </div>
 
-              {/* Slots do turno */}
-              {TURNOS_CONFIG[turno].slots.map((slot, slotIndex) => (
-                <div
-                  key={slot.inicio}
-                  className="grid grid-cols-[64px_repeat(7,1fr)] gap-px bg-[#e3e2e0]"
-                >
-                  {/* Hora */}
-                  <div className="bg-[#f7f6f3] flex items-center justify-end pr-2.5 py-1.5">
-                    <span className="text-[11px] font-medium text-[#9ca3af] tabular-nums">
-                      {slot.inicio}
-                    </span>
+              {/* ===== HEADER DOS DIAS ===== */}
+              <div className="timetable-grid timetable-header">
+                <div className="timetable-time-col">HORARIO</div>
+                {DIAS_SEMANA.map((dia) => {
+                  const date = dayDates[dia]
+                  const today = isToday(date)
+                  const isWeekend = dia === 'sabado' || dia === 'domingo'
+                  return (
+                    <div
+                      key={dia}
+                      className={`timetable-day-header ${today ? 'today' : ''} ${isWeekend ? 'weekend' : ''}`}
+                    >
+                      <span className="day-label">{DIAS_SEMANA_LABELS[dia].slice(0, 3).toUpperCase()}</span>
+                      {date && (
+                        <span className="day-date">
+                          {date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* ===== SLOT ROWS ===== */}
+              {config.slots.map((slot, slotIndex) => (
+                <div key={slot.inicio} className="timetable-grid timetable-row">
+                  {/* Time cell */}
+                  <div className="timetable-time-cell">
+                    {slot.inicio}
                   </div>
 
-                  {/* Células por dia */}
+                  {/* Day cells */}
                   {DIAS_SEMANA.map((dia) => {
                     const official = getOfficial(dia, turno, slot.inicio)
                     const block = getBlock(dia, turno, slot.inicio)
                     const isWeekend = dia === 'sabado' || dia === 'domingo'
                     const today = isToday(dayDates[dia])
 
-                    if (official) {
+                    // ---- BLOCKED SLOT ----
+                    // Detects blocks with titulo 'Bloqueado' (stored as tipo='rotina' in DB for constraint compatibility)
+                    if (block?.titulo === 'Bloqueado') {
                       return (
                         <div
                           key={dia}
-                          className="bg-[#f1f1ef] px-2 py-1.5 min-h-[44px] flex items-center"
-                          title={`${official.disciplina}${official.professor ? ` — ${official.professor}` : ''}`}
+                          className="timetable-cell blocked"
+                          onClick={(e) => handleUnblock(block, e)}
+                          title="Clique para desbloquear"
                         >
-                          <div className="w-full">
-                            <p className="text-[11px] font-semibold text-[#6b7280] line-clamp-1 leading-tight">
-                              {official.disciplina}
-                            </p>
-                            {official.professor && (
-                              <p className="text-[10px] text-[#9ca3af] line-clamp-1 mt-0.5">
-                                {official.professor}
-                              </p>
-                            )}
-                          </div>
+                          <svg className="blocked-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                          </svg>
                         </div>
                       )
                     }
 
+                    // ---- OFFICIAL CLASS ----
+                    if (official) {
+                      return (
+                        <div
+                          key={dia}
+                          className="timetable-cell official"
+                          title={`${official.disciplina}${official.professor ? ` — ${official.professor}` : ''}`}
+                        >
+                          <span className="official-title">{official.disciplina}</span>
+                          {official.professor && (
+                            <span className="official-sub">{official.professor}</span>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    // ---- STUDY BLOCK ----
                     if (block) {
                       const area = detectAreaFromTitle(block.titulo) || 'outros'
                       const style = AREA_STYLES[area] ?? AREA_STYLES.outros
                       return (
                         <div
                           key={dia}
+                          className={`timetable-cell study-block ${block.concluido ? 'completed' : ''}`}
+                          style={{
+                            backgroundColor: style.bg,
+                            borderLeftColor: style.border,
+                          }}
                           onClick={() => onBlockEdit?.(block)}
-                          className={`
-                            ${style.bg} ${style.border}
-                            px-2 py-1.5 min-h-[44px] flex items-center cursor-pointer
-                            hover:brightness-95 transition-all
-                            ${block.concluido ? 'opacity-60' : ''}
-                          `}
+                          title={block.titulo}
                         >
-                          <div className="w-full">
-                            <div className="flex items-start gap-1">
-                              <span className={`mt-[3px] flex-shrink-0 w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                              <p className={`text-[11px] font-semibold line-clamp-2 leading-tight ${style.text}`}>
-                                {block.titulo}
-                              </p>
-                            </div>
-                            {block.concluido && (
-                              <p className="text-[10px] text-[#22c55e] mt-0.5">✓ Concluído</p>
-                            )}
-                          </div>
+                          <span className="block-title" style={{ color: style.text }}>
+                            {block.titulo}
+                          </span>
+                          <span className="block-sub" style={{ color: style.sub }}>
+                            {block.descricao || (detectAreaFromTitle(block.titulo) ? block.titulo.split('(')[0]?.trim() : '')}
+                          </span>
+                          <span className="block-time">
+                            {slot.inicio} – {slot.fim}
+                          </span>
+                          {block.concluido && (
+                            <span className="block-done">✓</span>
+                          )}
                         </div>
                       )
                     }
 
-                    // Slot vazio
+                    // ---- EMPTY SLOT ----
                     return (
                       <div
                         key={dia}
+                        className={`timetable-cell empty ${today ? 'today' : ''} ${isWeekend ? 'weekend' : ''}`}
                         onClick={() => onSlotClick?.(dia, turno, slotIndex)}
-                        className={`
-                          group min-h-[44px] px-2 py-1.5 flex items-center cursor-pointer
-                          transition-colors duration-100
-                          ${today
-                            ? 'bg-[#f0f7ff] hover:bg-[#dbeafe]'
-                            : isWeekend
-                            ? 'bg-[#f9fefb] hover:bg-[#dcfce7]'
-                            : 'bg-white hover:bg-[#f0f7ff]'
-                          }
-                        `}
                       >
-                        <svg
-                          className="w-3 h-3 text-[#e3e2e0] group-hover:text-[#93c5fd] transition-colors mx-auto"
-                          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                        <svg className="empty-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <path d="M12 5v14M5 12h14" />
                         </svg>
                       </div>
                     )
@@ -184,9 +217,8 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
                 </div>
               ))}
             </div>
-          ))}
-        </div>
-
+          )
+        })}
       </div>
     </div>
   )

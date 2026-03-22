@@ -3,6 +3,7 @@ import { Modal } from '../ui/modal'
 import { Button } from '../ui/button'
 import { BlockTypeSelector } from './block-type-selector'
 import { DisciplinaSelector } from './disciplina-selector'
+import { EnemContentSelector } from './enem-content-selector'
 import type {
   BlocoCronograma,
   DiaSemana,
@@ -45,18 +46,74 @@ export function BlockEditorModal({
   const [disciplinaCodigo, setDisciplinaCodigo] = useState<string | null>(
     editingBlock?.disciplinaCodigo ?? null
   )
+  const [enemContent, setEnemContent] = useState<string | null>(null)
   const [prioridade, setPrioridade] = useState<Prioridade>(
     editingBlock?.prioridade ?? 0
   )
   const [error, setError] = useState<string | null>(null)
 
-  // Generate title automatically
+  // Generate title automatically — ENEM content takes priority over disciplina
   const generateTitle = () => {
+    if (enemContent) {
+      // If we also have a disciplina, combine: "Disciplina — Conteúdo"
+      if (disciplinaCodigo) {
+        const disciplina = DISCIPLINAS_BY_CODE.get(disciplinaCodigo)
+        if (disciplina) return `${disciplina.nome} — ${enemContent}`
+      }
+      return enemContent
+    }
     if (disciplinaCodigo) {
       const disciplina = DISCIPLINAS_BY_CODE.get(disciplinaCodigo)
       if (disciplina) return disciplina.nome
     }
     return TIPO_BLOCO_LABELS[tipo]
+  }
+
+  const ensureCronogramaId = async (): Promise<string> => {
+    if (cronograma?.id) return cronograma.id
+    if (!currentStudent) throw new Error('Selecione um aluno primeiro')
+
+    const today = new Date()
+    const weekStart = new Date(today)
+    weekStart.setDate(today.getDate() - today.getDay() + 1)
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+
+    const newCronograma = await createCronograma(
+      currentStudent.id,
+      weekStart,
+      weekEnd
+    )
+    return newCronograma.id
+  }
+
+  const handleBlock = async () => {
+    if (!slot || !currentStudent) {
+      setError('Selecione um aluno primeiro')
+      return
+    }
+    setError(null)
+    try {
+      const cronogramaId = await ensureCronogramaId()
+      await addBlock({
+        cronogramaId,
+        diaSemana: dia,
+        turno,
+        horarioInicio: slot.inicio,
+        horarioFim: slot.fim,
+        tipo: 'rotina',       // Uses 'rotina' in DB (constraint-safe), detected as blocked by title
+        titulo: 'Bloqueado',
+        descricao: null,
+        disciplinaCodigo: null,
+        cor: null,
+        prioridade: 0,
+        concluido: false,
+      })
+      onClose()
+    } catch (err) {
+      console.error('Failed to block slot:', err)
+      setError(err instanceof Error ? err.message : 'Erro ao bloquear horário')
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,22 +127,7 @@ export function BlockEditorModal({
     setError(null)
 
     try {
-      // Create cronograma if it doesn't exist
-      let cronogramaId = cronograma?.id
-      if (!cronogramaId) {
-        const today = new Date()
-        const weekStart = new Date(today)
-        weekStart.setDate(today.getDate() - today.getDay() + 1) // Monday
-        const weekEnd = new Date(weekStart)
-        weekEnd.setDate(weekStart.getDate() + 6) // Sunday
-
-        const newCronograma = await createCronograma(
-          currentStudent.id,
-          weekStart,
-          weekEnd
-        )
-        cronogramaId = newCronograma.id
-      }
+      const cronogramaId = await ensureCronogramaId()
 
       const blockData: Omit<BlocoCronograma, 'id' | 'createdAt'> = {
         cronogramaId,
@@ -149,6 +191,22 @@ export function BlockEditorModal({
           </div>
         </div>
 
+        {/* Quick block button - only when creating, not editing */}
+        {!editingBlock && (
+          <button
+            type="button"
+            onClick={handleBlock}
+            disabled={isSaving}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-medium text-sm rounded-lg border border-red-200 transition-colors disabled:opacity-50"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            </svg>
+            Bloquear este horário
+          </button>
+        )}
+
         {/* Block type */}
         <BlockTypeSelector value={tipo} onChange={setTipo} />
 
@@ -157,6 +215,14 @@ export function BlockEditorModal({
           <DisciplinaSelector
             value={disciplinaCodigo}
             onChange={setDisciplinaCodigo}
+          />
+        )}
+
+        {/* Conteúdo ENEM (only for study/review types) */}
+        {(tipo === 'estudo' || tipo === 'revisao') && (
+          <EnemContentSelector
+            value={enemContent}
+            onChange={setEnemContent}
           />
         )}
 

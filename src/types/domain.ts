@@ -48,6 +48,7 @@ export const TIPOS_BLOCO = [
   'descanso',
   'rotina',
   'foco',
+  'bloqueado',
 ] as const
 export type TipoBloco = (typeof TIPOS_BLOCO)[number]
 
@@ -59,6 +60,7 @@ export const TIPO_BLOCO_LABELS: Record<TipoBloco, string> = {
   descanso: 'Descanso',
   rotina: 'Rotina',
   foco: 'Foco',
+  bloqueado: 'Bloqueado',
 }
 
 export const PRIORIDADES = [0, 1, 2] as const

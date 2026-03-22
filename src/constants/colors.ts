@@ -16,6 +16,7 @@ export const CORES_TIPOS: Record<TipoBloco, string> = {
   descanso: '#10B981', // Verde
   rotina: '#8B5CF6', // Roxo
   foco: '#EC4899', // Rosa - Foco especial
+  bloqueado: '#DC2626', // Vermelho - Bloqueado
 }
 
 export const CORES_PRIORIDADE: Record<number, string> = {
