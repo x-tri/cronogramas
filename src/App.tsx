@@ -106,12 +106,13 @@ function AppContent() {
         if (!isMounted) return;
         setUser(currentUser);
         if (currentUser) {
-          const { data: profile } = await supabase
-            .from("profiles")
+          const { data: projectUser } = await supabase
+            .from("project_users")
             .select("role")
-            .eq("id", currentUser.id)
+            .eq("auth_uid", currentUser.id)
+            .eq("is_active", true)
             .single();
-          if (isMounted) setUserRole(profile?.role ?? null);
+          if (isMounted) setUserRole(projectUser?.role ?? null);
         }
       } catch {
         if (!isMounted) return;
