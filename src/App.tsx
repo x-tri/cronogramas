@@ -46,6 +46,12 @@ const AdminControle = lazy(() =>
   })),
 );
 
+const AdminPdfs = lazy(() =>
+  import("./components/admin/admin-pdfs").then((mod) => ({
+    default: mod.AdminPdfs,
+  })),
+);
+
 type SlotSelection = {
   dia: DiaSemana;
   turno: Turno;
@@ -108,7 +114,7 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [adminView, setAdminView] = useState<"" | "coordenadores" | "horarios" | "controle">("");
+  const [adminView, setAdminView] = useState<"" | "coordenadores" | "horarios" | "controle" | "pdfs">("");
 
   useEffect(() => {
     let isMounted = true;
@@ -192,6 +198,13 @@ function AppContent() {
         </Suspense>
       );
     }
+    if (adminView === "pdfs") {
+      return (
+        <Suspense fallback={fallback}>
+          <AdminPdfs onBack={() => setAdminView("")} />
+        </Suspense>
+      );
+    }
   }
 
   return (
@@ -261,9 +274,15 @@ function AppContent() {
                     </button>
                     <button
                       onClick={() => setAdminView("controle")}
-                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9] rounded-b-lg"
+                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9]"
                     >
                       Controle Cronogramas
+                    </button>
+                    <button
+                      onClick={() => setAdminView("pdfs")}
+                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9] rounded-b-lg"
+                    >
+                      Historico PDFs
                     </button>
                   </div>
                 </div>

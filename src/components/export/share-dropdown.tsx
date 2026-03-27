@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { getWeekBounds } from '../week-utils'
 import type { SimuladoResult } from '../../types/supabase'
+import { uploadPdf } from '../../services/pdf-storage'
 
 type PdfDeps = [
   typeof import('@react-pdf/renderer'),
@@ -109,13 +110,34 @@ export function ShareDropdown() {
     return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`
   }
 
+  const savePdfToStorage = async (blob: Blob, filename: string) => {
+    if (!currentStudent) return
+    try {
+      await uploadPdf({
+        blob,
+        filename,
+        schoolId: currentStudent.escola ?? '',
+        alunoId: currentStudent.id,
+        alunoNome: currentStudent.nome,
+        turma: currentStudent.turma,
+        matricula: currentStudent.matricula,
+        tipo: 'cronograma',
+      })
+    } catch (err) {
+      console.warn('[share-dropdown] Falha ao salvar PDF no storage:', err)
+    }
+  }
+
   const handleDownloadPdf = async () => {
     setIsGenerating(true)
 
     try {
       const simulado = await ensureSimuladoData()
       const blob = await generatePdfBlob(simulado)
-      downloadBlob(blob, getFilename())
+      const filename = getFilename()
+      downloadBlob(blob, filename)
+      // Save to storage in background
+      void savePdfToStorage(blob, filename)
     } catch (error) {
       console.error('Erro ao gerar PDF:', error)
     } finally {
@@ -130,7 +152,9 @@ export function ShareDropdown() {
     try {
       const simulado = await ensureSimuladoData()
       const blob = await generatePdfBlob(simulado)
-      downloadBlob(blob, getFilename())
+      const filename = getFilename()
+      downloadBlob(blob, filename)
+      void savePdfToStorage(blob, filename)
 
       // Incluir notas TRI na mensagem se disponíveis
       let triScoresText = ''
