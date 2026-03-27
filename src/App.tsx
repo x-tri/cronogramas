@@ -13,6 +13,7 @@ import { TURNOS_CONFIG } from "./constants/time-slots";
 import { getWeekBounds } from "./components/week-utils";
 import { getCurrentUser, logout, type User } from "./lib/auth";
 import { LoginForm } from "./components/login-form";
+import { ChangePasswordForm } from "./components/change-password-form";
 import { TimelineView } from "./components/kanban/timeline-view";
 import { supabase } from "./lib/supabase";
 
@@ -114,6 +115,7 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [adminView, setAdminView] = useState<"" | "coordenadores" | "horarios" | "controle" | "pdfs">("");
 
   useEffect(() => {
@@ -126,11 +128,14 @@ function AppContent() {
         if (currentUser) {
           const { data: projectUser } = await supabase
             .from("project_users")
-            .select("role")
+            .select("role, must_change_password")
             .eq("auth_uid", currentUser.id)
             .eq("is_active", true)
             .single();
-          if (isMounted) setUserRole(projectUser?.role ?? null);
+          if (isMounted) {
+            setUserRole(projectUser?.role ?? null);
+            setMustChangePassword(projectUser?.must_change_password ?? false);
+          }
         }
       } catch {
         if (!isMounted) return;
@@ -146,8 +151,18 @@ function AppContent() {
 
   async function handleLoginSuccess() {
     try {
-      const user = await getCurrentUser();
-      setUser(user);
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
+      if (currentUser) {
+        const { data: projectUser } = await supabase
+          .from("project_users")
+          .select("role, must_change_password")
+          .eq("auth_uid", currentUser.id)
+          .eq("is_active", true)
+          .single();
+        setUserRole(projectUser?.role ?? null);
+        setMustChangePassword(projectUser?.must_change_password ?? false);
+      }
     } catch {
       console.error("Erro ao obter usuario apos login");
     }
@@ -170,6 +185,15 @@ function AppContent() {
   }
 
   if (!user) return <LoginForm onLoginSuccess={handleLoginSuccess} />;
+
+  if (mustChangePassword) {
+    return (
+      <ChangePasswordForm
+        userName={user.name}
+        onSuccess={() => setMustChangePassword(false)}
+      />
+    );
+  }
 
   if (adminView && userRole === "super_admin") {
     const fallback = (
