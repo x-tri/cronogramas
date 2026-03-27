@@ -14,6 +14,7 @@ import { getWeekBounds } from "./components/week-utils";
 import { getCurrentUser, logout, type User } from "./lib/auth";
 import { LoginForm } from "./components/login-form";
 import { TimelineView } from "./components/kanban/timeline-view";
+import { supabase } from "./lib/supabase";
 
 const ShareDropdown = lazy(() =>
   import("./components/export/share-dropdown").then((mod) => ({
@@ -24,6 +25,12 @@ const ShareDropdown = lazy(() =>
 const SimuladoAnalyzer = lazy(() =>
   import("./components/simulado/simulado-analyzer").then((mod) => ({
     default: mod.SimuladoAnalyzer,
+  })),
+);
+
+const AdminCoordinadores = lazy(() =>
+  import("./components/admin/admin-coordenadores").then((mod) => ({
+    default: mod.AdminCoordinadores,
   })),
 );
 
@@ -88,22 +95,31 @@ function AppContent() {
 
   const [user, setUser] = useState<User | null>(null);
   const [isChecking, setIsChecking] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
-    getCurrentUser()
-      .then((currentUser) => {
+    (async () => {
+      try {
+        const currentUser = await getCurrentUser();
         if (!isMounted) return;
         setUser(currentUser);
-      })
-      .catch(() => {
+        if (currentUser) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", currentUser.id)
+            .single();
+          if (isMounted) setUserRole(profile?.role ?? null);
+        }
+      } catch {
         if (!isMounted) return;
         setUser(null);
-      })
-      .finally(() => {
-        if (!isMounted) return;
-        setIsChecking(false);
-      });
+      } finally {
+        if (isMounted) setIsChecking(false);
+      }
+    })();
     return () => {
       isMounted = false;
     };
@@ -135,6 +151,20 @@ function AppContent() {
   }
 
   if (!user) return <LoginForm onLoginSuccess={handleLoginSuccess} />;
+
+  if (showAdmin && userRole === "super_admin") {
+    return (
+      <Suspense
+        fallback={
+          <main className="flex min-h-svh items-center justify-center bg-[#fafafa]">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent" />
+          </main>
+        }
+      >
+        <AdminCoordinadores onBack={() => setShowAdmin(false)} />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f5f7]">
@@ -183,6 +213,14 @@ function AppContent() {
             <div className="w-px h-5 bg-[#e5e7eb]" />
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#94a3b8] hidden sm:inline">{user.name}</span>
+              {userRole === "super_admin" && (
+                <button
+                  onClick={() => setShowAdmin(true)}
+                  className="px-2.5 py-1 text-xs font-medium text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md transition-colors"
+                >
+                  Admin
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="px-2 py-1 text-xs font-medium text-[#64748b] hover:text-[#1d1d1f] hover:bg-[#f1f1ef] rounded-md transition-colors"

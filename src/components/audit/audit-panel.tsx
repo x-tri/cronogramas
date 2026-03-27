@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { isSupabaseConfigured } from '../../config/repository-config'
-import { ALL_STUDENTS } from '../../data/mock-data/students'
 
 type AuditRecord = {
   alunoId: string
@@ -59,8 +58,7 @@ export function AuditPanel() {
     setError(null)
 
     try {
-      // Query cronogramas with student data
-      // Join cronogramas → alunos_xtris (via aluno_id)
+      // 1. Buscar todos os cronogramas
       const { data: cronogramas, error: cronError } = await supabase
         .from('cronogramas')
         .select('aluno_id, created_at')
@@ -73,7 +71,7 @@ export function AuditPanel() {
         return
       }
 
-      // Group by aluno_id: latest date + count
+      // 2. Agrupar por aluno_id: última data + contagem
       const alunoMap = new Map<string, { lastDate: string; count: number }>()
       for (const c of cronogramas) {
         const existing = alunoMap.get(c.aluno_id)
@@ -84,74 +82,40 @@ export function AuditPanel() {
         }
       }
 
-      // Fetch student details from multiple sources
-      const alunoIds = Array.from(alunoMap.keys())
-
-      // Build mock student lookup (matricula → student data, all are Marista)
-      const mockLookup = new Map<string, { nome: string; turma: string }>()
-      for (const s of ALL_STUDENTS) {
-        mockLookup.set(s.matricula, { nome: s.nome, turma: s.turma })
-      }
-
-      // Separate UUIDs from non-UUIDs (matriculas used as aluno_id by mock students)
+      // 3. Separar UUIDs de matrículas
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const alunoIds = Array.from(alunoMap.keys())
       const uuidIds = alunoIds.filter(id => uuidRegex.test(id))
-      const nonUuidIds = alunoIds.filter(id => !uuidRegex.test(id))
+      const matriculaIds = alunoIds.filter(id => !uuidRegex.test(id))
 
-      // Source 1: students table by UUID id
-      type StudentRow = {
-        id: string; name: string; matricula: string; turma: string; school_id: string
-        school: { id: string; name: string } | { id: string; name: string }[] | null
-      }
-      let mainStudents: StudentRow[] | null = null
-      if (uuidIds.length > 0) {
-        const { data, error: studErr } = await supabase
-          .from('students')
-          .select('id, name, matricula, turma, school_id')
-          .in('id', uuidIds)
-        if (studErr) console.warn('[Audit] students by id error:', studErr.message)
-        mainStudents = (data || []).map(s => ({ ...s, school: null })) as StudentRow[]
+      // Helper: normalizar turma — A-E → 3A-3E (3ª série)
+      const normalizeTurma = (turma: string): string => {
+        if (/^[A-E]$/i.test(turma)) return `3${turma.toUpperCase()}`
+        return turma
       }
 
-      // Source 2: alunos_xtris table (XTRI-specific, may not exist)
-      let xtriStudents: Array<{ id: string; nome: string; matricula: string; turma: string; email: string | null; escola_nome: string | null; school_id: string | null }> | null = null
-      if (uuidIds.length > 0) {
-        const { data } = await supabase
-          .from('alunos_xtris')
-          .select('id, nome, matricula, turma, email, escola_nome, school_id')
-          .in('id', uuidIds)
-        xtriStudents = data  // null if table doesn't exist
-      }
+      type StudentRow = { id: string; name: string; matricula: string; turma: string; school_id: string }
 
-      // Source 3: Try matching by matricula for students not found by UUID
-      const unresolvedIds = [
-        ...nonUuidIds.filter(id => !mockLookup.has(id)), // skip mock students
-        ...uuidIds.filter(id => !mainStudents?.some(s => s.id === id) && !xtriStudents?.some(s => s.id === id)),
-      ]
+      // 4. Buscar alunos de ambas as fontes em paralelo
+      const [byUuidResult, byMatriculaResult] = await Promise.all([
+        uuidIds.length > 0
+          ? supabase.from('students').select('id, name, matricula, turma, school_id').in('id', uuidIds)
+          : Promise.resolve({ data: null }),
+        matriculaIds.length > 0
+          ? supabase.from('students').select('id, name, matricula, turma, school_id').in('matricula', matriculaIds)
+          : Promise.resolve({ data: null }),
+      ])
 
-      let matriculaStudents: StudentRow[] | null = null
-      if (unresolvedIds.length > 0) {
-        const { data } = await supabase
-          .from('students')
-          .select('id, name, matricula, turma, school_id')
-          .in('matricula', unresolvedIds)
-        matriculaStudents = (data || []).map(s => ({ ...s, school: null })) as StudentRow[]
-      }
+      const studentsById = (byUuidResult.data || []) as StudentRow[]
+      const studentsByMatricula = (byMatriculaResult.data || []) as StudentRow[]
 
-      // Resolve school names from school_ids
+      // 5. Coletar school_ids e resolver nomes via RPC (bypassa RLS)
       const allSchoolIds = new Set<string>()
-      for (const s of (mainStudents || [])) { if (s.school_id) allSchoolIds.add(s.school_id) }
-      for (const s of (matriculaStudents || [])) { if (s.school_id) allSchoolIds.add(s.school_id) }
-
-      // Known school_id → name mapping (fallback when RLS blocks schools table)
-      const KNOWN_SCHOOLS: Record<string, string> = {
-        '50c6894c-f97d-482f-b208-c8c35d3adea3': 'Colégio Marista de Natal',
-      }
+      for (const s of studentsById) { if (s.school_id) allSchoolIds.add(s.school_id) }
+      for (const s of studentsByMatricula) { if (s.school_id) allSchoolIds.add(s.school_id) }
 
       const schoolNameMap = new Map<string, string>()
-
       if (allSchoolIds.size > 0) {
-        // Try RPC function first (SECURITY DEFINER, bypasses RLS)
         const { data: rpcSchools, error: rpcErr } = await supabase
           .rpc('get_school_names', { school_ids: Array.from(allSchoolIds) })
 
@@ -160,135 +124,100 @@ export function AuditPanel() {
             schoolNameMap.set(s.id, s.name)
           }
         } else {
-          console.warn('[Audit] RPC get_school_names not available, using known schools:', rpcErr?.message)
+          console.warn('[Audit] RPC get_school_names error:', rpcErr?.message)
         }
+      }
 
-        // Fill any unresolved with known schools
-        for (const sid of allSchoolIds) {
-          if (!schoolNameMap.has(sid) && KNOWN_SCHOOLS[sid]) {
-            schoolNameMap.set(sid, KNOWN_SCHOOLS[sid])
-          }
-        }
+      const getSchoolName = (schoolId: string | null): string => {
+        if (schoolId && schoolNameMap.has(schoolId)) return schoolNameMap.get(schoolId)!
+        return 'Sem escola'
       }
 
       const auditRecords: AuditRecord[] = []
       const resolved = new Set<string>()
 
-      // Helper: get school name for a student row
-      const getSchoolName = (s: StudentRow): string => {
-        if (s.school_id && schoolNameMap.has(s.school_id)) return schoolNameMap.get(s.school_id)!
-        if (s.school) {
-          const school = Array.isArray(s.school) ? s.school[0] : s.school
-          if (school?.name) return school.name
-        }
-        if (s.school_id) return `Escola (${s.school_id.slice(0, 8)})`
-        return 'Sem escola'
-      }
-
-      // Helper: normalize turma — single letters A-E → 3A-3E (3ª série Marista)
-      const normalizeTurma = (turma: string): string => {
-        if (/^[A-E]$/i.test(turma)) return `3${turma.toUpperCase()}`
-        return turma
-      }
-
-      // Pass 0: mock students (ALL_STUDENTS — all Marista, ID = matricula)
-      for (const alunoId of nonUuidIds) {
-        const mock = mockLookup.get(alunoId)
-        if (!mock) continue
-        const info = alunoMap.get(alunoId)
+      // 6. Resolver alunos por UUID
+      for (const s of studentsById) {
+        const info = alunoMap.get(s.id)
         if (!info) continue
-        resolved.add(alunoId)
+        resolved.add(s.id)
         auditRecords.push({
-          alunoId,
-          nome: mock.nome,
-          matricula: alunoId,
-          turma: normalizeTurma(mock.turma),
+          alunoId: s.id,
+          nome: s.name || 'Sem nome',
+          matricula: s.matricula || s.id,
+          turma: normalizeTurma(s.turma || '-'),
           email: null,
-          escola: 'Colégio Marista de Natal',
-          schoolId: null,
+          escola: getSchoolName(s.school_id),
+          schoolId: s.school_id || null,
           lastCronogramaDate: new Date(info.lastDate),
           totalCronogramas: info.count,
         })
       }
 
-      // Pass 1: students table matched by UUID id
-      if (mainStudents) {
-        for (const s of mainStudents) {
-          const info = alunoMap.get(s.id)
-          if (!info) continue
-          resolved.add(s.id)
-          auditRecords.push({
-            alunoId: s.id,
-            nome: s.name || 'Sem nome',
-            matricula: s.matricula || s.id,
-            turma: normalizeTurma(s.turma || '-'),
-            email: null,
-            escola: getSchoolName(s),
-            schoolId: s.school_id || null,
-            lastCronogramaDate: new Date(info.lastDate),
-            totalCronogramas: info.count,
-          })
+      // 7. Resolver alunos por matrícula (aluno_id = matrícula, ex: Marista 2141xxxxx)
+      for (const s of studentsByMatricula) {
+        const info = alunoMap.get(s.matricula)
+        if (!info || resolved.has(s.matricula)) continue
+        resolved.add(s.matricula)
+        auditRecords.push({
+          alunoId: s.matricula,
+          nome: s.name || 'Sem nome',
+          matricula: s.matricula,
+          turma: normalizeTurma(s.turma || '-'),
+          email: null,
+          escola: getSchoolName(s.school_id),
+          schoolId: s.school_id || null,
+          lastCronogramaDate: new Date(info.lastDate),
+          totalCronogramas: info.count,
+        })
+      }
+
+      // 8. Resolver UUIDs restantes via alunos_avulsos_cronograma
+      const unresolvedUuids = uuidIds.filter(id => !resolved.has(id))
+      if (unresolvedUuids.length > 0) {
+        const { data: avulsos } = await supabase
+          .from('alunos_avulsos_cronograma')
+          .select('id, nome, matricula, turma, email')
+          .in('id', unresolvedUuids)
+
+        if (avulsos) {
+          for (const s of avulsos) {
+            const info = alunoMap.get(s.id)
+            if (!info) continue
+            resolved.add(s.id)
+            auditRecords.push({
+              alunoId: s.id,
+              nome: s.nome || 'Sem nome',
+              matricula: s.matricula || s.id,
+              turma: s.turma || '-',
+              email: s.email || null,
+              escola: 'Aluno Avulso',
+              schoolId: null,
+              lastCronogramaDate: new Date(info.lastDate),
+              totalCronogramas: info.count,
+            })
+          }
         }
       }
 
-      // Pass 2: students matched by matricula
-      if (matriculaStudents) {
-        for (const s of matriculaStudents) {
-          const info = alunoMap.get(s.matricula)
-          if (!info || resolved.has(s.matricula)) continue
-          resolved.add(s.matricula)
-          auditRecords.push({
-            alunoId: s.matricula,
-            nome: s.name || 'Sem nome',
-            matricula: s.matricula,
-            turma: normalizeTurma(s.turma || '-'),
-            email: null,
-            escola: getSchoolName(s),
-            schoolId: s.school_id || null,
-            lastCronogramaDate: new Date(info.lastDate),
-            totalCronogramas: info.count,
-          })
-        }
-      }
-
-      // Pass 3: alunos_xtris (for any not found in students)
-      if (xtriStudents) {
-        for (const s of xtriStudents) {
-          if (resolved.has(s.id)) continue
-          const info = alunoMap.get(s.id)
-          if (!info) continue
-          resolved.add(s.id)
-          auditRecords.push({
-            alunoId: s.id,
-            nome: s.nome || 'Sem nome',
-            matricula: s.matricula || s.id,
-            turma: s.turma || '-',
-            email: s.email || null,
-            escola: s.escola_nome || 'XTRI',
-            schoolId: s.school_id || null,
-            lastCronogramaDate: new Date(info.lastDate),
-            totalCronogramas: info.count,
-          })
-        }
-      }
-
-      // Pass 4: any remaining (not found in any table)
+      // 9. Alunos não encontrados em nenhuma tabela
       for (const [alunoId, info] of alunoMap) {
         if (resolved.has(alunoId)) continue
+        const isUuid = uuidRegex.test(alunoId)
         auditRecords.push({
           alunoId,
-          nome: `Aluno ${alunoId.slice(0, 8)}`,
-          matricula: alunoId,
+          nome: isUuid ? `Sem cadastro (${alunoId.slice(0, 8)}…)` : `Sem cadastro`,
+          matricula: isUuid ? alunoId.slice(0, 13) + '…' : alunoId,
           turma: '-',
           email: null,
-          escola: 'Desconhecido',
+          escola: 'Sem cadastro',
           schoolId: null,
           lastCronogramaDate: new Date(info.lastDate),
           totalCronogramas: info.count,
         })
       }
 
-      // Deduplicate by matricula — merge cronograma counts and keep most recent date
+      // 10. Deduplicar por matrícula — mesclar contagens e manter data mais recente
       const deduped = new Map<string, AuditRecord>()
       for (const r of auditRecords) {
         const key = r.matricula
@@ -300,8 +229,8 @@ export function AuditPanel() {
           if (r.lastCronogramaDate > existing.lastCronogramaDate) {
             existing.lastCronogramaDate = r.lastCronogramaDate
           }
-          // Keep the version with more info
-          if (existing.nome.startsWith('Aluno ') && !r.nome.startsWith('Aluno ')) {
+          // Manter a versão com mais informação
+          if (existing.nome.startsWith('Sem cadastro') && !r.nome.startsWith('Sem cadastro')) {
             existing.nome = r.nome
             existing.turma = r.turma
             existing.email = r.email || existing.email

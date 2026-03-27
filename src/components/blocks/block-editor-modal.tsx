@@ -36,10 +36,12 @@ export function BlockEditorModal({
   const slot = getSlotByIndex(turno, slotIndex)
   const addBlock = useCronogramaStore((state) => state.addBlock)
   const updateBlock = useCronogramaStore((state) => state.updateBlock)
+  const removeBlock = useCronogramaStore((state) => state.removeBlock)
   const cronograma = useCronogramaStore((state) => state.cronograma)
   const currentStudent = useCronogramaStore((state) => state.currentStudent)
   const createCronograma = useCronogramaStore((state) => state.createCronograma)
   const isSaving = useCronogramaStore((state) => state.isSaving)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const [tipo, setTipo] = useState<TipoBloco>(editingBlock?.tipo ?? 'estudo')
   const [descricao, setDescricao] = useState(editingBlock?.descricao ?? '')
@@ -116,6 +118,18 @@ export function BlockEditorModal({
     }
   }
 
+  const handleDelete = async () => {
+    if (!editingBlock) return
+    setError(null)
+    try {
+      await removeBlock(editingBlock.id)
+      onClose()
+    } catch (err) {
+      console.error('Failed to delete block:', err)
+      setError(err instanceof Error ? err.message : 'Erro ao excluir bloco')
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!slot) return
@@ -169,14 +183,51 @@ export function BlockEditorModal({
           {error && (
             <div className="text-sm text-red-600 text-right">{error}</div>
           )}
-          <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={onClose} disabled={isSaving}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} isLoading={isSaving}>
-              {editingBlock ? 'Salvar' : 'Adicionar'}
-            </Button>
-          </div>
+          {/* Delete confirmation inline */}
+          {showDeleteConfirm ? (
+            <div className="flex items-center justify-between gap-3 p-2.5 bg-red-50 border border-red-200 rounded-lg">
+              <span className="text-sm text-red-700 font-medium">Excluir este bloco?</span>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)} disabled={isSaving}>
+                  Não
+                </Button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? 'Excluindo...' : 'Sim, excluir'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-between gap-3">
+              {/* Delete button — only when editing an existing block */}
+              {editingBlock ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Excluir
+                </button>
+              ) : (
+                <div />
+              )}
+              <div className="flex gap-3">
+                <Button variant="secondary" onClick={onClose} disabled={isSaving}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSubmit} isLoading={isSaving}>
+                  {editingBlock ? 'Salvar' : 'Adicionar'}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       }
     >
