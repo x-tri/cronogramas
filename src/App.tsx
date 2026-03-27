@@ -34,6 +34,12 @@ const AdminCoordinadores = lazy(() =>
   })),
 );
 
+const AdminHorarios = lazy(() =>
+  import("./components/admin/admin-horarios").then((mod) => ({
+    default: mod.AdminHorarios,
+  })),
+);
+
 type SlotSelection = {
   dia: DiaSemana;
   turno: Turno;
@@ -96,7 +102,7 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [showAdmin, setShowAdmin] = useState(false);
+  const [adminView, setAdminView] = useState<"" | "coordenadores" | "horarios">("");
 
   useEffect(() => {
     let isMounted = true;
@@ -153,18 +159,26 @@ function AppContent() {
 
   if (!user) return <LoginForm onLoginSuccess={handleLoginSuccess} />;
 
-  if (showAdmin && userRole === "super_admin") {
-    return (
-      <Suspense
-        fallback={
-          <main className="flex min-h-svh items-center justify-center bg-[#fafafa]">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent" />
-          </main>
-        }
-      >
-        <AdminCoordinadores onBack={() => setShowAdmin(false)} />
-      </Suspense>
+  if (adminView && userRole === "super_admin") {
+    const fallback = (
+      <main className="flex min-h-svh items-center justify-center bg-[#fafafa]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent" />
+      </main>
     );
+    if (adminView === "coordenadores") {
+      return (
+        <Suspense fallback={fallback}>
+          <AdminCoordinadores onBack={() => setAdminView("")} />
+        </Suspense>
+      );
+    }
+    if (adminView === "horarios") {
+      return (
+        <Suspense fallback={fallback}>
+          <AdminHorarios onBack={() => setAdminView("")} />
+        </Suspense>
+      );
+    }
   }
 
   return (
@@ -215,12 +229,25 @@ function AppContent() {
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#94a3b8] hidden sm:inline">{user.name}</span>
               {userRole === "super_admin" && (
-                <button
-                  onClick={() => setShowAdmin(true)}
-                  className="px-2.5 py-1 text-xs font-medium text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md transition-colors"
-                >
-                  Admin
-                </button>
+                <div className="relative group">
+                  <button className="px-2.5 py-1 text-xs font-medium text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md transition-colors">
+                    Admin
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-[#e5e7eb] bg-white shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    <button
+                      onClick={() => setAdminView("coordenadores")}
+                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9] rounded-t-lg"
+                    >
+                      Coordenadores
+                    </button>
+                    <button
+                      onClick={() => setAdminView("horarios")}
+                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9] rounded-b-lg"
+                    >
+                      Horarios de Aula
+                    </button>
+                  </div>
+                </div>
               )}
               <button
                 onClick={handleLogout}
