@@ -40,6 +40,12 @@ const AdminHorarios = lazy(() =>
   })),
 );
 
+const AdminControle = lazy(() =>
+  import("./components/admin/admin-controle").then((mod) => ({
+    default: mod.AdminControle,
+  })),
+);
+
 type SlotSelection = {
   dia: DiaSemana;
   turno: Turno;
@@ -102,7 +108,7 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [adminView, setAdminView] = useState<"" | "coordenadores" | "horarios">("");
+  const [adminView, setAdminView] = useState<"" | "coordenadores" | "horarios" | "controle">("");
 
   useEffect(() => {
     let isMounted = true;
@@ -179,6 +185,13 @@ function AppContent() {
         </Suspense>
       );
     }
+    if (adminView === "controle") {
+      return (
+        <Suspense fallback={fallback}>
+          <AdminControle onBack={() => setAdminView("")} />
+        </Suspense>
+      );
+    }
   }
 
   return (
@@ -242,9 +255,15 @@ function AppContent() {
                     </button>
                     <button
                       onClick={() => setAdminView("horarios")}
-                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9] rounded-b-lg"
+                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9]"
                     >
                       Horarios de Aula
+                    </button>
+                    <button
+                      onClick={() => setAdminView("controle")}
+                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9] rounded-b-lg"
+                    >
+                      Controle Cronogramas
                     </button>
                   </div>
                 </div>
