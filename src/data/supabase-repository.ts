@@ -37,10 +37,51 @@ export function createSupabaseRepository(): DataRepository {
   const repo: DataRepository = {
     students: {
       findByMatricula: async (matricula) => {
-        // Busca nos alunos MARISTA (mock)
+        // 1. Busca no Supabase (students) — fonte de verdade
+        const { data: student } = await supabase
+          .from('students')
+          .select('id, matricula, name, turma, school_id')
+          .eq('matricula', matricula)
+          .maybeSingle()
+
+        if (student) {
+          // Resolver nome da escola
+          let escolaNome = 'Sem escola'
+          if (student.school_id) {
+            const { data: school } = await supabase
+              .from('schools')
+              .select('name')
+              .eq('id', student.school_id)
+              .maybeSingle()
+            if (school) escolaNome = school.name
+          }
+          return {
+            id: student.matricula,
+            matricula: student.matricula,
+            nome: student.name || 'Sem nome',
+            turma: student.turma || '-',
+            email: null,
+            fotoFilename: `${student.matricula}.jpg`,
+            escola: escolaNome,
+            createdAt: new Date(),
+          }
+        }
+
+        // 2. Fallback: alunos_avulsos_cronograma
+        const { data: avulso } = await supabase
+          .from('alunos_avulsos_cronograma')
+          .select('*')
+          .eq('matricula', matricula)
+          .maybeSingle()
+
+        if (avulso) {
+          return alunoXTRIFromRow(avulso as AlunoXTRIRow)
+        }
+
+        // 3. Fallback: mock (legado, sera removido)
         const found = ALL_STUDENTS.find((s) => s.matricula === matricula)
         if (found) {
-          const aluno: Aluno = {
+          return {
             id: found.matricula,
             matricula: found.matricula,
             nome: found.nome,
@@ -50,30 +91,32 @@ export function createSupabaseRepository(): DataRepository {
             escola: 'MARISTA',
             createdAt: new Date(),
           }
-          return aluno
         }
-        
-        // Busca nos alunos XTRI (Supabase)
-        const { data, error } = await supabase
-          .from('alunos_xtris')
-          .select('*')
-          .eq('matricula', matricula)
-          .maybeSingle()
-        
-        if (error) {
-          console.error('Erro ao buscar aluno XTRI:', error)
-          return null
-        }
-        
-        if (data) {
-          return alunoXTRIFromRow(data as AlunoXTRIRow)
-        }
-        
+
         return null
       },
 
       findByTurma: async (turma) => {
-        // TODO: Migrar para Supabase quando tabela existir
+        // Busca no Supabase primeiro
+        const { data: dbStudents } = await supabase
+          .from('students')
+          .select('matricula, name, turma, school_id')
+          .eq('turma', turma)
+
+        if (dbStudents && dbStudents.length > 0) {
+          return dbStudents.map((s) => ({
+            id: s.matricula,
+            matricula: s.matricula,
+            nome: s.name || 'Sem nome',
+            turma: s.turma || '-',
+            email: null,
+            fotoFilename: `${s.matricula}.jpg`,
+            escola: 'Supabase' as const,
+            createdAt: new Date(),
+          }))
+        }
+
+        // Fallback: mock (legado)
         const students = ALL_STUDENTS.filter((s) => s.turma === turma)
         return students.map((s) => ({
           id: s.matricula,
