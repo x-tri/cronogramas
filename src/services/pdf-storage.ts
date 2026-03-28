@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { logAudit } from "./audit";
 
 const BUCKET = "cronogramas-pdf";
 
@@ -61,6 +62,8 @@ export async function uploadPdf({
     file_size: blob.size,
   });
 
+  logAudit("generate_pdf", "pdf", filename, { aluno: alunoNome, turma, schoolId });
+
   return { url: urlData.publicUrl, path: storagePath };
 }
 
@@ -70,6 +73,9 @@ export async function uploadPdf({
 export async function deletePdf(id: string, storagePath: string): Promise<boolean> {
   await supabase.storage.from(BUCKET).remove([storagePath]);
   const { error } = await supabase.from("pdf_history").delete().eq("id", id);
+  if (!error) {
+    logAudit("delete_pdf", "pdf", id, { storagePath });
+  }
   return !error;
 }
 
@@ -93,6 +99,8 @@ export async function deleteAllSchoolPdfs(schoolId: string): Promise<number> {
 
   // Delete from history
   await supabase.from("pdf_history").delete().eq("school_id", schoolId);
+
+  logAudit("delete_pdf", "pdf_batch", schoolId, { count: records.length });
 
   return records.length;
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { logAudit } from "../../services/audit";
 
 interface School {
   id: string;
@@ -22,9 +23,10 @@ interface ProjectUser {
 
 interface AdminCoordinadoresProps {
   onBack: () => void;
+  embedded?: boolean;
 }
 
-export function AdminCoordinadores({ onBack }: AdminCoordinadoresProps) {
+export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps) {
   const [users, setUsers] = useState<ProjectUser[]>([]);
   const [pendingInvites, setPendingInvites] = useState<ProjectUser[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
@@ -74,6 +76,7 @@ export function AdminCoordinadores({ onBack }: AdminCoordinadoresProps) {
       alert("Erro: " + error.message);
       return;
     }
+    logAudit("remove_coordinator", "coordinator", email);
     alert(String(data));
     loadData();
   }
@@ -87,8 +90,9 @@ export function AdminCoordinadores({ onBack }: AdminCoordinadoresProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
+    <div className={embedded ? "" : "min-h-screen bg-[#f5f5f7]"}>
       {/* Header */}
+      {!embedded && (
       <header className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-white/80 backdrop-blur-xl">
         <div className="mx-auto max-w-5xl px-6">
           <div className="flex h-12 items-center justify-between">
@@ -116,8 +120,9 @@ export function AdminCoordinadores({ onBack }: AdminCoordinadoresProps) {
           </div>
         </div>
       </header>
+      )}
 
-      <main className="mx-auto max-w-5xl px-6 py-8 space-y-6">
+      <main className={embedded ? "px-6 py-4 space-y-6" : "mx-auto max-w-5xl px-6 py-8 space-y-6"}>
         {/* Stats */}
         <div className="flex items-center gap-4">
           <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
@@ -361,6 +366,8 @@ function AddUserModal({
     setSubmitting(false);
 
     if (res.success) {
+      const selectedSchool = schools.find((s) => s.id === schoolId);
+      logAudit("add_coordinator", "coordinator", email, { schoolId, schoolName: selectedSchool?.name });
       setTimeout(onSuccess, 1500);
     }
   }

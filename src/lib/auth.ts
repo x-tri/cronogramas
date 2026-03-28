@@ -1,5 +1,6 @@
 import type { User as SupabaseAuthUser } from "@supabase/supabase-js";
 import { isSupabaseConfigured } from "../config/repository-config";
+import { logAudit } from "../services/audit";
 import { supabase } from "./supabase";
 
 export interface User {
@@ -132,6 +133,7 @@ export async function authenticate(
         password,
       });
       if (!error && data.user && data.session) {
+        logAudit("login", "user", data.user.id, { email });
         return mapSupabaseUser(data.user, data.session.access_token);
       }
     }

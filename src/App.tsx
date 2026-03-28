@@ -29,27 +29,9 @@ const SimuladoAnalyzer = lazy(() =>
   })),
 );
 
-const AdminCoordinadores = lazy(() =>
-  import("./components/admin/admin-coordenadores").then((mod) => ({
-    default: mod.AdminCoordinadores,
-  })),
-);
-
-const AdminHorarios = lazy(() =>
-  import("./components/admin/admin-horarios").then((mod) => ({
-    default: mod.AdminHorarios,
-  })),
-);
-
-const AdminControle = lazy(() =>
-  import("./components/admin/admin-controle").then((mod) => ({
-    default: mod.AdminControle,
-  })),
-);
-
-const AdminPdfs = lazy(() =>
-  import("./components/admin/admin-pdfs").then((mod) => ({
-    default: mod.AdminPdfs,
+const AdminDashboard = lazy(() =>
+  import("./components/admin/admin-dashboard").then((mod) => ({
+    default: mod.AdminDashboard,
   })),
 );
 
@@ -116,7 +98,6 @@ function AppContent() {
   const [isChecking, setIsChecking] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
-  const [adminView, setAdminView] = useState<"" | "coordenadores" | "horarios" | "controle" | "pdfs">("");
 
   useEffect(() => {
     let isMounted = true;
@@ -195,40 +176,16 @@ function AppContent() {
     );
   }
 
-  if (adminView && userRole === "super_admin") {
-    const fallback = (
-      <main className="flex min-h-svh items-center justify-center bg-[#fafafa]">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent" />
-      </main>
+  if (userRole === "super_admin") {
+    return (
+      <Suspense fallback={
+        <main className="flex min-h-svh items-center justify-center bg-[#fafafa]">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent" />
+        </main>
+      }>
+        <AdminDashboard user={user} onLogout={handleLogout} />
+      </Suspense>
     );
-    if (adminView === "coordenadores") {
-      return (
-        <Suspense fallback={fallback}>
-          <AdminCoordinadores onBack={() => setAdminView("")} />
-        </Suspense>
-      );
-    }
-    if (adminView === "horarios") {
-      return (
-        <Suspense fallback={fallback}>
-          <AdminHorarios onBack={() => setAdminView("")} />
-        </Suspense>
-      );
-    }
-    if (adminView === "controle") {
-      return (
-        <Suspense fallback={fallback}>
-          <AdminControle onBack={() => setAdminView("")} />
-        </Suspense>
-      );
-    }
-    if (adminView === "pdfs") {
-      return (
-        <Suspense fallback={fallback}>
-          <AdminPdfs onBack={() => setAdminView("")} />
-        </Suspense>
-      );
-    }
   }
 
   return (
@@ -278,39 +235,6 @@ function AppContent() {
             <div className="w-px h-5 bg-[#e5e7eb]" />
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#94a3b8] hidden sm:inline">{user.name}</span>
-              {userRole === "super_admin" && (
-                <div className="relative group">
-                  <button className="px-2.5 py-1 text-xs font-medium text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md transition-colors">
-                    Admin
-                  </button>
-                  <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-[#e5e7eb] bg-white shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                    <button
-                      onClick={() => setAdminView("coordenadores")}
-                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9] rounded-t-lg"
-                    >
-                      Coordenadores
-                    </button>
-                    <button
-                      onClick={() => setAdminView("horarios")}
-                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9]"
-                    >
-                      Horarios de Aula
-                    </button>
-                    <button
-                      onClick={() => setAdminView("controle")}
-                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9]"
-                    >
-                      Controle Cronogramas
-                    </button>
-                    <button
-                      onClick={() => setAdminView("pdfs")}
-                      className="w-full px-3 py-2 text-left text-xs text-[#374151] hover:bg-[#f1f5f9] rounded-b-lg"
-                    >
-                      Historico PDFs
-                    </button>
-                  </div>
-                </div>
-              )}
               <button
                 onClick={handleLogout}
                 className="px-2 py-1 text-xs font-medium text-[#64748b] hover:text-[#1d1d1f] hover:bg-[#f1f1ef] rounded-md transition-colors"

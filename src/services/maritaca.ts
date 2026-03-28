@@ -1,4 +1,5 @@
 import type { SimuladoResult } from '../types/supabase'
+import { logAudit, logApiUsage } from './audit'
 
 // Chamada via Edge Function do Supabase para evitar CORS (API key fica server-side)
 const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/maritaca-proxy`
@@ -110,6 +111,7 @@ Gere entre 8 e 12 atividades cobrindo o dia inteiro (08:00-22:00), incluindo 2-3
 export async function gerarPlanoEstudo(result: SimuladoResult): Promise<PlanoEstudo> {
   const prompt = buildPrompt(result)
 
+  const startTime = Date.now()
   const response = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -128,7 +130,19 @@ export async function gerarPlanoEstudo(result: SimuladoResult): Promise<PlanoEst
 
   const data = await response.json() as {
     choices: { message: { content: string } }[]
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
   }
+
+  logApiUsage({
+    endpoint: "maritaca-proxy",
+    model: "sabia-3",
+    tokens_in: data?.usage?.prompt_tokens ?? 0,
+    tokens_out: data?.usage?.completion_tokens ?? 0,
+    status: response.status,
+    duration_ms: Date.now() - startTime,
+    error: response.ok ? null : "error",
+  })
+  logAudit("generate_ai_plan", "plano_estudo", undefined, { model: "sabia-3" })
 
   const content = data.choices[0]?.message?.content ?? ''
   const jsonMatch = content.match(/\{[\s\S]*\}/)

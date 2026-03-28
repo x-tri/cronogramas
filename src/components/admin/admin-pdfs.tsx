@@ -24,6 +24,7 @@ interface PdfRecord {
 
 interface AdminPdfsProps {
   onBack: () => void;
+  embedded?: boolean;
 }
 
 const BUCKET_URL_BASE = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/cronogramas-pdf`;
@@ -35,7 +36,7 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function AdminPdfs({ onBack }: AdminPdfsProps) {
+export function AdminPdfs({ onBack, embedded }: AdminPdfsProps) {
   const [records, setRecords] = useState<PdfRecord[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState("");
@@ -117,38 +118,39 @@ export function AdminPdfs({ onBack }: AdminPdfsProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="flex h-12 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-sm text-[#2563eb] hover:text-[#1d4ed8] transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Voltar
-              </button>
-              <div className="h-4 w-px bg-[#e5e7eb]" />
-              <h1 className="text-sm font-medium text-[#1d1d1f]">Historico de PDFs</h1>
+    <div className={embedded ? "" : "min-h-screen bg-[#f5f5f7]"}>
+      {!embedded && (
+        <header className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-white/80 backdrop-blur-xl">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex h-12 items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onBack}
+                  className="flex items-center gap-1 text-sm text-[#2563eb] hover:text-[#1d4ed8] transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Voltar
+                </button>
+                <div className="h-4 w-px bg-[#e5e7eb]" />
+                <h1 className="text-sm font-medium text-[#1d1d1f]">Historico de PDFs</h1>
+              </div>
+              {filtered.length > 0 && (
+                <button
+                  onClick={handleDeleteAll}
+                  disabled={deleting}
+                  className="rounded-lg bg-[#dc2626] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#b91c1c] disabled:opacity-50"
+                >
+                  {deleting ? "Apagando..." : "Apagar todos"}
+                </button>
+              )}
             </div>
-            {filtered.length > 0 && (
-              <button
-                onClick={handleDeleteAll}
-                disabled={deleting}
-                className="rounded-lg bg-[#dc2626] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#b91c1c] disabled:opacity-50"
-              >
-                {deleting ? "Apagando..." : "Apagar todos"}
-              </button>
-            )}
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <main className="mx-auto max-w-6xl px-6 py-6 space-y-4">
+      <main className={embedded ? "px-6 py-4 space-y-6" : "mx-auto max-w-6xl px-6 py-6 space-y-4"}>
         {/* Stats */}
         <div className="flex items-center gap-4">
           <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">

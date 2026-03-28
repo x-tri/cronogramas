@@ -20,9 +20,10 @@ interface AlunoControle {
 
 interface AdminControleProps {
   onBack: () => void;
+  embedded?: boolean;
 }
 
-export function AdminControle({ onBack }: AdminControleProps) {
+export function AdminControle({ onBack, embedded }: AdminControleProps) {
   const [alunos, setAlunos] = useState<AlunoControle[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState("");
@@ -197,36 +198,37 @@ export function AdminControle({ onBack }: AdminControleProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="flex h-12 items-center justify-between">
-            <div className="flex items-center gap-3">
+    <div className={embedded ? "" : "min-h-screen bg-[#f5f5f7]"}>
+      {!embedded && (
+        <header className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-white/80 backdrop-blur-xl">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex h-12 items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onBack}
+                  className="flex items-center gap-1 text-sm text-[#2563eb] hover:text-[#1d4ed8] transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Voltar
+                </button>
+                <div className="h-4 w-px bg-[#e5e7eb]" />
+                <h1 className="text-sm font-medium text-[#1d1d1f]">Controle de Cronogramas</h1>
+              </div>
               <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-sm text-[#2563eb] hover:text-[#1d4ed8] transition-colors"
+                onClick={exportCSV}
+                disabled={sorted.length === 0}
+                className="rounded-lg bg-[#15803d] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#166534] disabled:opacity-50"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Voltar
+                Exportar Excel (.csv)
               </button>
-              <div className="h-4 w-px bg-[#e5e7eb]" />
-              <h1 className="text-sm font-medium text-[#1d1d1f]">Controle de Cronogramas</h1>
             </div>
-            <button
-              onClick={exportCSV}
-              disabled={sorted.length === 0}
-              className="rounded-lg bg-[#15803d] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#166534] disabled:opacity-50"
-            >
-              Exportar Excel (.csv)
-            </button>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <main className="mx-auto max-w-6xl px-6 py-6 space-y-4">
+      <main className={embedded ? "px-6 py-4 space-y-6" : "mx-auto max-w-6xl px-6 py-6 space-y-4"}>
         {/* Stats */}
         <div className="flex items-center gap-4">
           <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">

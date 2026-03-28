@@ -21,6 +21,7 @@ interface ScheduleEntry {
 
 interface AdminHorariosProps {
   onBack: () => void;
+  embedded?: boolean;
 }
 
 const DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado"] as const;
@@ -33,7 +34,7 @@ const DIA_LABELS: Record<string, string> = {
   sabado: "Sáb",
 };
 
-export function AdminHorarios({ onBack }: AdminHorariosProps) {
+export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState("");
   const [turmas, setTurmas] = useState<string[]>([]);
@@ -130,45 +131,46 @@ export function AdminHorarios({ onBack }: AdminHorariosProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="flex h-12 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-sm text-[#2563eb] hover:text-[#1d4ed8] transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Voltar
-              </button>
-              <div className="h-4 w-px bg-[#e5e7eb]" />
-              <h1 className="text-sm font-medium text-[#1d1d1f]">Horarios de Aula</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              {selectedTurma && (
+    <div className={embedded ? "" : "min-h-screen bg-[#f5f5f7]"}>
+      {!embedded && (
+        <header className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-white/80 backdrop-blur-xl">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex h-12 items-center justify-between">
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={handleDuplicateTurma}
-                  className="rounded-lg border border-[#e5e7eb] px-3 py-1.5 text-xs font-medium text-[#64748b] transition-colors hover:bg-[#f1f5f9]"
+                  onClick={onBack}
+                  className="flex items-center gap-1 text-sm text-[#2563eb] hover:text-[#1d4ed8] transition-colors"
                 >
-                  Duplicar turma
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Voltar
                 </button>
-              )}
-              <button
-                onClick={() => { setEditingEntry(null); setShowAddModal(true); }}
-                className="rounded-lg bg-[#2563eb] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#1d4ed8]"
-              >
-                + Adicionar aula
-              </button>
+                <div className="h-4 w-px bg-[#e5e7eb]" />
+                <h1 className="text-sm font-medium text-[#1d1d1f]">Horarios de Aula</h1>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedTurma && (
+                  <button
+                    onClick={handleDuplicateTurma}
+                    className="rounded-lg border border-[#e5e7eb] px-3 py-1.5 text-xs font-medium text-[#64748b] transition-colors hover:bg-[#f1f5f9]"
+                  >
+                    Duplicar turma
+                  </button>
+                )}
+                <button
+                  onClick={() => { setEditingEntry(null); setShowAddModal(true); }}
+                  className="rounded-lg bg-[#2563eb] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#1d4ed8]"
+                >
+                  + Adicionar aula
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <main className="mx-auto max-w-6xl px-6 py-6 space-y-4">
+      <main className={embedded ? "px-6 py-4 space-y-6" : "mx-auto max-w-6xl px-6 py-6 space-y-4"}>
         {/* Filters */}
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
