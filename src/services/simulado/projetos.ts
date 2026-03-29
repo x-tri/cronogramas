@@ -1,119 +1,15 @@
-import { supabase } from '../../lib/supabase'
-import type { SimuladoResult, WrongQuestion } from '../../types/supabase'
+import { simuladoSupabase as supabase } from '../../lib/simulado-supabase'
+import type {
+  ProjetoSimuladoHistoryItem,
+  SimuladoResult,
+  WrongQuestion,
+} from '../../types/supabase'
+import { simuladoLog } from './logger'
 import {
   distributeErrorsInArea,
   getDetailedTopicByQuestionNumber,
   groupByTopic,
 } from './helpers'
-
-/**
- * Busca o resultado do simulado na tabela 'projetos'
- * A coluna 'students' é um array JSONB com os dados dos alunos
- */
-export async function getSimuladoFromProjetos(
-  matricula: string,
-): Promise<SimuladoResult | null> {
-  console.log('[getSimuladoFromProjetos] Buscando projetos para matrícula:', matricula)
-
-  // Buscar projetos que contêm o aluno com a matrícula especificada
-  // Incluir campos tri_scores e tri_scores_by_area se existirem
-  const { data, error } = await supabase
-    .from('projetos')
-    .select(
-      'id, nome, answer_key, question_contents, students, created_at, tri_scores, tri_scores_by_area',
-    )
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('[getSimuladoFromProjetos] Error fetching from projetos:', error)
-    return null
-  }
-
-  console.log(
-    '[getSimuladoFromProjetos] Total de projetos retornados:',
-    data?.length || 0,
-  )
-
-  if (!data || data.length === 0) {
-    console.log('[getSimuladoFromProjetos] Nenhum projeto encontrado')
-    return null
-  }
-
-  // Procurar o aluno dentro da coluna students (JSONB) de cada projeto
-  for (const projeto of data) {
-    const studentsArray = projeto.students as ProjetoStudent[] | null
-    console.log(
-      `[getSimuladoFromProjetos] Projeto ${projeto.id}: ${studentsArray?.length || 0} alunos`,
-    )
-
-    if (!studentsArray || !Array.isArray(studentsArray)) {
-      console.log(
-        `[getSimuladoFromProjetos] Projeto ${projeto.id}: students não é array válido`,
-      )
-      continue
-    }
-
-    // Log do primeiro aluno para verificar formato
-    if (studentsArray.length > 0) {
-      const firstStudent = studentsArray[0]
-      console.log(
-        `[getSimuladoFromProjetos] Exemplo de aluno no projeto - TODOS OS CAMPOS:`,
-        Object.keys(firstStudent).reduce((acc, key) => {
-          acc[key] = firstStudent[key as keyof ProjetoStudent]
-          return acc
-        }, {} as Record<string, unknown>),
-      )
-    }
-
-    // Busca flexível - converte para string e compara
-    const matriculaStr = String(matricula).trim()
-    const matriculaNormalized = matriculaStr.replace(/^0+/, '') || '0'
-
-    const studentData = studentsArray.find((s) => {
-      const sMatricula = String(s.matricula ?? '').trim()
-      const sStudentNumber = String(s.student_number ?? '').trim()
-      const sId = String(s.id ?? '').trim()
-
-      // Extrair matrícula do id no formato "merged-{matricula}-{timestamp}"
-      const idMatch = sId.match(/merged-(\d+)-\d+$/)
-      const matriculaFromId = idMatch ? idMatch[1] : ''
-
-      // Remove zeros à esquerda para comparação
-      const sMatriculaNormalized = sMatricula.replace(/^0+/, '') || '0'
-      const sStudentNumberNormalized = sStudentNumber.replace(/^0+/, '') || '0'
-      const matriculaFromIdNormalized = matriculaFromId.replace(/^0+/, '') || '0'
-
-      return (
-        sMatricula === matriculaStr ||
-        sStudentNumber === matriculaStr ||
-        sMatriculaNormalized === matriculaNormalized ||
-        sStudentNumberNormalized === matriculaNormalized ||
-        matriculaFromId === matriculaStr ||
-        matriculaFromIdNormalized === matriculaNormalized
-      )
-    })
-
-    if (studentData) {
-      console.log('[getSimuladoFromProjetos] Aluno encontrado no projeto:', projeto.id)
-      console.log('[getSimuladoFromProjetos] === DADOS BRUTOS COMPLETOS ===')
-      console.log(JSON.stringify(studentData, null, 2))
-      console.log('[getSimuladoFromProjetos] === FIM DOS DADOS BRUTOS ===')
-      console.log(
-        '[getSimuladoFromProjetos] Campos disponíveis:',
-        Object.keys(studentData).join(', '),
-      )
-      const result = await convertProjetoStudentToResult(studentData, projeto)
-      console.log(
-        '[getSimuladoFromProjetos] Resultado convertido com sucesso:',
-        !!result,
-      )
-      return result
-    }
-  }
-
-  console.log('[getSimuladoFromProjetos] Aluno não encontrado em nenhum projeto')
-  return null
-}
 
 // Tipo para os dados do aluno dentro da coluna students JSONB
 type ProjetoStudent = {
@@ -198,11 +94,189 @@ type Projeto = {
   }
 }
 
+function normalizeMatricula(value: string): string {
+  return value.trim().replace(/^0+/, '') || '0'
+}
+
+function extractStudentNumber(student: ProjetoStudent): string | null {
+  const idMatch = student.id?.match(/merged-(\d+)-\d+$/)
+  return (
+    student.studentNumber ??
+    student.student_number ??
+    student.matricula ??
+    idMatch?.[1] ??
+    null
+  )
+}
+
+function isMatchingStudent(student: ProjetoStudent, matricula: string): boolean {
+  const target = matricula.trim()
+  const normalizedTarget = normalizeMatricula(target)
+  const candidates = [
+    student.matricula,
+    student.student_number,
+    student.studentNumber,
+    extractStudentNumber(student),
+  ]
+    .filter(Boolean)
+    .map(value => String(value).trim())
+
+  return candidates.some(candidate => {
+    return (
+      candidate === target || normalizeMatricula(candidate) === normalizedTarget
+    )
+  })
+}
+
+function findProjetoStudent(
+  projeto: Projeto,
+  matricula: string,
+): ProjetoStudent | null {
+  const studentsArray = projeto.students as ProjetoStudent[] | null
+  simuladoLog(
+    `[findProjetoStudent] Projeto ${projeto.id}: ${studentsArray?.length || 0} alunos`,
+  )
+
+  if (!studentsArray || !Array.isArray(studentsArray)) {
+    return null
+  }
+
+  return (
+    studentsArray.find((student) => isMatchingStudent(student, matricula)) ?? null
+  )
+}
+
+async function fetchProjetos(): Promise<Projeto[]> {
+  const { data, error } = await supabase
+    .from('projetos')
+    .select(
+      'id, nome, answer_key, question_contents, students, created_at, tri_scores, tri_scores_by_area',
+    )
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('[projetos] Error fetching from projetos:', error)
+    return []
+  }
+
+  return (data as Projeto[] | null) ?? []
+}
+
+function buildProjetoHistoryItem(
+  projeto: Projeto,
+  studentData: ProjetoStudent,
+  index: number,
+): ProjetoSimuladoHistoryItem {
+  return {
+    id: `projetos:${projeto.id}:${studentData.id ?? extractStudentNumber(studentData) ?? index}`,
+    source: 'projetos',
+    title:
+      projeto.simulado_nome ||
+      projeto.nome ||
+      projeto.title ||
+      'Simulado sem nome',
+    date: projeto.created_at,
+    isLatest: index === 0,
+    projectId: projeto.id,
+    projectStudentId: studentData.id ?? null,
+    studentNumber: extractStudentNumber(studentData),
+  }
+}
+
+export async function listProjetosSimulados(
+  matricula: string,
+): Promise<ProjetoSimuladoHistoryItem[]> {
+  simuladoLog('[listProjetosSimulados] Buscando projetos para matrícula:', matricula)
+  const projetos = await fetchProjetos()
+
+  if (projetos.length === 0) {
+    simuladoLog('[listProjetosSimulados] Nenhum projeto encontrado')
+    return []
+  }
+
+  const history = projetos
+    .map((projeto) => {
+      const studentData = findProjetoStudent(projeto, matricula)
+      return studentData ? { projeto, studentData } : null
+    })
+    .filter(
+      (
+        entry,
+      ): entry is {
+        projeto: Projeto
+        studentData: ProjetoStudent
+      } => entry !== null,
+    )
+    .map(({ projeto, studentData }, index) =>
+      buildProjetoHistoryItem(projeto, studentData, index),
+    )
+
+  return history
+}
+
+export async function getProjetoSimuladoResult(
+  item: ProjetoSimuladoHistoryItem,
+): Promise<SimuladoResult | null> {
+  const { data, error } = await supabase
+    .from('projetos')
+    .select(
+      'id, nome, answer_key, question_contents, students, created_at, tri_scores, tri_scores_by_area',
+    )
+    .eq('id', item.projectId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[getProjetoSimuladoResult] Error fetching projeto:', error)
+    return null
+  }
+
+  const projeto = data as Projeto | null
+  if (!projeto) return null
+
+  const studentsArray = projeto.students as ProjetoStudent[] | null
+  if (!studentsArray || !Array.isArray(studentsArray)) {
+    return null
+  }
+
+  const studentData =
+    studentsArray.find((student) => {
+      if (item.projectStudentId && student.id === item.projectStudentId) {
+        return true
+      }
+
+      const studentNumber = extractStudentNumber(student)
+      return item.studentNumber != null && studentNumber === item.studentNumber
+    }) ?? null
+
+  if (!studentData) {
+    return null
+  }
+
+  return convertProjetoStudentToResult(studentData, projeto)
+}
+
+/**
+ * Busca o resultado mais recente do simulado na tabela 'projetos'
+ */
+export async function getSimuladoFromProjetos(
+  matricula: string,
+): Promise<SimuladoResult | null> {
+  const history = await listProjetosSimulados(matricula)
+  const latest = history[0]
+
+  if (!latest) {
+    simuladoLog('[getSimuladoFromProjetos] Aluno não encontrado em nenhum projeto')
+    return null
+  }
+
+  return getProjetoSimuladoResult(latest)
+}
+
 async function convertProjetoStudentToResult(
   studentData: ProjetoStudent,
   projeto: Projeto,
 ): Promise<SimuladoResult> {
-  console.log('[convertProjetoStudentToResult] Convertendo dados do aluno...')
+  simuladoLog('[convertProjetoStudentToResult] Convertendo dados do aluno...')
 
   // Extrair matrícula do id no formato "merged-{matricula}-{timestamp}" ou usar campos disponíveis
   const idMatch = studentData.id?.match(/merged-(\d+)-\d+$/)
@@ -218,13 +292,13 @@ async function convertProjetoStudentToResult(
   const studentName =
     studentData.studentName ?? studentData.name ?? studentData.nome ?? null
 
-  console.log(
+  simuladoLog(
     '[convertProjetoStudentToResult] Matrícula:',
     studentMatricula,
     'Nome:',
     studentName,
   )
-  console.log(
+  simuladoLog(
     '[convertProjetoStudentToResult] Respostas disponíveis:',
     studentData.answers?.length || 0,
   )
@@ -237,7 +311,7 @@ async function convertProjetoStudentToResult(
     studentData.wrong_questions ?? studentData.questoes_erradas
 
   if (detailedWrongQuestions && detailedWrongQuestions.length > 0) {
-    console.log(
+    simuladoLog(
       '[convertProjetoStudentToResult] Usando lista detalhada de questões erradas:',
       detailedWrongQuestions.length,
     )
@@ -249,7 +323,7 @@ async function convertProjetoStudentToResult(
     )
   } else if (studentData.answers && studentData.answers.length > 0) {
     // NOVO: Buscar erros reais comparando com gabarito da tabela exams
-    console.log(
+    simuladoLog(
       '[convertProjetoStudentToResult] Buscando erros reais na tabela exams...',
     )
     wrongQuestions = await getRealWrongQuestionsFromExam(studentData.answers, projeto.id)
@@ -257,7 +331,7 @@ async function convertProjetoStudentToResult(
 
   // Se não conseguiu buscar os erros reais, usar fallback
   if (wrongQuestions.length === 0) {
-    console.log(
+    simuladoLog(
       '[convertProjetoStudentToResult] Gerando questões individuais do resumo por área (fallback)',
     )
     const areaCorrect = studentData.areaCorrectAnswers
@@ -292,7 +366,7 @@ async function convertProjetoStudentToResult(
     }
   }
 
-  console.log(
+  simuladoLog(
     `[convertProjetoStudentToResult] ${wrongQuestions.length} questões erradas processadas`,
   )
 
@@ -333,17 +407,17 @@ async function convertProjetoStudentToResult(
 
   // ========== NOVO: Buscar notas TRI nos campos do projeto ==========
   if (!triLC && !triCH && !triCN && !triMT) {
-    console.log(
+    simuladoLog(
       '[convertProjetoStudentToResult] Buscando notas TRI nos campos do projeto...',
     )
-    console.log('[convertProjetoStudentToResult] ID do aluno:', studentData.id)
+    simuladoLog('[convertProjetoStudentToResult] ID do aluno:', studentData.id)
 
     // Verificar tri_scores (pode ser objeto com notas indexadas pelo ID do aluno)
     const triScores = (projeto as Record<string, unknown>).tri_scores
     const triScoresByArea = (projeto as Record<string, unknown>).tri_scores_by_area
 
-    console.log('[convertProjetoStudentToResult] tri_scores:', triScores)
-    console.log('[convertProjetoStudentToResult] tri_scores_by_area:', triScoresByArea)
+    simuladoLog('[convertProjetoStudentToResult] tri_scores:', triScores)
+    simuladoLog('[convertProjetoStudentToResult] tri_scores_by_area:', triScoresByArea)
 
     // Buscar pelo ID do aluno (formato: merged-{matricula}-{timestamp})
     const studentId = studentData.id
@@ -401,7 +475,7 @@ async function convertProjetoStudentToResult(
       }
     }
 
-    console.log('[convertProjetoStudentToResult] Notas TRI extraídas:', {
+    simuladoLog('[convertProjetoStudentToResult] Notas TRI extraídas:', {
       triLC,
       triCH,
       triCN,
@@ -451,7 +525,7 @@ async function convertProjetoStudentToResult(
     topicsSummary,
   }
 
-  console.log('[convertProjetoStudentToResult] Notas finais:', {
+  simuladoLog('[convertProjetoStudentToResult] Notas finais:', {
     triLC,
     triCH,
     triCN,
@@ -460,7 +534,7 @@ async function convertProjetoStudentToResult(
     tri_lc: studentData.tri_lc,
     score: studentData.score,
   })
-  console.log('[convertProjetoStudentToResult] Resultado:', {
+  simuladoLog('[convertProjetoStudentToResult] Resultado:', {
     examTitle: result.exam.title,
     studentName: result.studentAnswer.student_name,
     totalWrongQuestions: result.wrongQuestions.length,
@@ -479,7 +553,7 @@ async function getWrongQuestionsWithContents(
     | { questao: number; topico?: string }[],
   examId: string,
 ): Promise<WrongQuestion[]> {
-  console.log(
+  simuladoLog(
     '[getWrongQuestionsWithContents] Buscando conteúdos para',
     wrongQuestionsList.length,
     'questões',
@@ -534,8 +608,8 @@ async function getRealWrongQuestionsFromExam(
   studentAnswers: string[],
   projetoId: string,
 ): Promise<WrongQuestion[]> {
-  console.log('[getRealWrongQuestionsFromExam] Calculando erros reais...')
-  console.log('[getRealWrongQuestionsFromExam] Projeto ID:', projetoId)
+  simuladoLog('[getRealWrongQuestionsFromExam] Calculando erros reais...')
+  simuladoLog('[getRealWrongQuestionsFromExam] Projeto ID:', projetoId)
 
   // Buscar o projeto com question_contents e gabarito
   const { data: projeto, error } = await supabase
@@ -550,20 +624,20 @@ async function getRealWrongQuestionsFromExam(
   }
 
   if (!projeto) {
-    console.log('[getRealWrongQuestionsFromExam] Projeto não encontrado:', projetoId)
+    simuladoLog('[getRealWrongQuestionsFromExam] Projeto não encontrado:', projetoId)
     return []
   }
 
-  console.log('[getRealWrongQuestionsFromExam] Projeto encontrado:', projeto.nome)
+  simuladoLog('[getRealWrongQuestionsFromExam] Projeto encontrado:', projeto.nome)
 
   // Pegar conteúdos das questões da coluna question_contents
   const questionContents = projeto.question_contents as QuestionContentLike[] | null
 
-  console.log(
+  simuladoLog(
     '[getRealWrongQuestionsFromExam] Question contents disponível:',
     !!questionContents,
   )
-  console.log(
+  simuladoLog(
     '[getRealWrongQuestionsFromExam] Question contents quantidade:',
     questionContents?.length || 0,
   )
@@ -571,22 +645,22 @@ async function getRealWrongQuestionsFromExam(
   // Pegar gabarito
   const answerKey = projeto.answer_key as string[] | null
 
-  console.log('[getRealWrongQuestionsFromExam] Answer key disponível:', !!answerKey)
-  console.log(
+  simuladoLog('[getRealWrongQuestionsFromExam] Answer key disponível:', !!answerKey)
+  simuladoLog(
     '[getRealWrongQuestionsFromExam] Answer key quantidade:',
     answerKey?.length || 0,
   )
 
   if (!answerKey || answerKey.length === 0) {
-    console.log('[getRealWrongQuestionsFromExam] ⚠️ Projeto sem gabarito')
-    console.log(
+    simuladoLog('[getRealWrongQuestionsFromExam] ⚠️ Projeto sem gabarito')
+    simuladoLog(
       '[getRealWrongQuestionsFromExam] Campos disponíveis:',
       Object.keys(projeto),
     )
     return []
   }
 
-  console.log(
+  simuladoLog(
     '[getRealWrongQuestionsFromExam] ✅ Gabarito com',
     answerKey.length,
     'respostas',
@@ -617,7 +691,7 @@ async function getRealWrongQuestionsFromExam(
     }
   }
 
-  console.log(
+  simuladoLog(
     '[getRealWrongQuestionsFromExam] ✅ Calculados',
     wrongQuestions.length,
     'erros reais!',

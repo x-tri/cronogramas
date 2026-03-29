@@ -3,7 +3,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { SimuladoAnalyzer } from './simulado-analyzer'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import * as simuladoService from '../../services/simulado-analyzer'
-import type { SimuladoResult } from '../../types/supabase'
+import type {
+  SimuladoHistoryItem,
+  SimuladoResult,
+} from '../../types/supabase'
 import type { Aluno, BlocoCronograma, Cronograma } from '../../types/domain'
 
 vi.mock('../../services/simulado-analyzer')
@@ -34,7 +37,29 @@ describe('SimuladoAnalyzer', () => {
     status: 'ativo',
   }
 
-  const mockResult: SimuladoResult = {
+  const latestHistoryItem: SimuladoHistoryItem = {
+    id: 'projetos:latest',
+    source: 'projetos',
+    title: 'Simulado ENEM 2024',
+    date: '2024-01-15T10:00:00Z',
+    isLatest: true,
+    projectId: 'projeto-1',
+    projectStudentId: 'merged-214140291-1',
+    studentNumber: mockMatricula,
+  }
+
+  const olderHistoryItem: SimuladoHistoryItem = {
+    id: 'projetos:older',
+    source: 'projetos',
+    title: 'Simulado Diagnóstico',
+    date: '2023-11-20T10:00:00Z',
+    isLatest: false,
+    projectId: 'projeto-2',
+    projectStudentId: 'merged-214140291-2',
+    studentNumber: mockMatricula,
+  }
+
+  const latestResult: SimuladoResult = {
     exam: {
       id: 'exam-1',
       title: 'Simulado ENEM 2024',
@@ -69,35 +94,102 @@ describe('SimuladoAnalyzer', () => {
     ],
   }
 
-  const storeState = {
-    blocks: [] as BlocoCronograma[],
-    officialSchedule: [],
-    cronograma: mockCronograma,
-    currentStudent: mockStudent,
-    addBlock: vi.fn().mockResolvedValue({ id: 'block-1' }),
-    createCronograma: vi.fn().mockResolvedValue(mockCronograma),
+  const olderResult: SimuladoResult = {
+    exam: {
+      id: 'exam-2',
+      title: 'Simulado Diagnóstico',
+      answer_key: [],
+      question_contents: null,
+    },
+    studentAnswer: {
+      ...latestResult.studentAnswer,
+      id: 'answer-2',
+      exam_id: 'exam-2',
+      correct_answers: 100,
+      wrong_answers: 60,
+      blank_answers: 20,
+      tri_lc: 600,
+      tri_ch: 640,
+      tri_cn: 620,
+      tri_mt: 680,
+      created_at: '2023-11-20T10:00:00Z',
+    },
+    wrongQuestions: [
+      { questionNumber: 50, topic: 'História do Brasil', studentAnswer: 'B', correctAnswer: 'D' },
+    ],
+    topicsSummary: [{ topic: 'História do Brasil', count: 1, questions: [50] }],
   }
+
+  const createStoreState = () => {
+    const state = {
+      blocks: [] as BlocoCronograma[],
+      officialSchedule: [],
+      cronograma: mockCronograma,
+      currentStudent: mockStudent,
+      simuladoHistory: [] as SimuladoHistoryItem[],
+      selectedSimuladoHistoryItem: null as SimuladoHistoryItem | null,
+      selectedSimuladoResult: null as SimuladoResult | null,
+      addBlock: vi.fn().mockResolvedValue({ id: 'block-1' }),
+      createCronograma: vi.fn().mockResolvedValue(mockCronograma),
+      setSimuladoHistory: vi.fn((history: SimuladoHistoryItem[]) => {
+        state.simuladoHistory = history
+      }),
+      setSelectedSimuladoHistoryItem: vi.fn((item: SimuladoHistoryItem | null) => {
+        state.selectedSimuladoHistoryItem = item
+      }),
+      setSelectedSimuladoResult: vi.fn((result: SimuladoResult | null) => {
+        state.selectedSimuladoResult = result
+      }),
+      resetSimuladoState: vi.fn(() => {
+        state.simuladoHistory = []
+        state.selectedSimuladoHistoryItem = null
+        state.selectedSimuladoResult = null
+      }),
+    }
+
+    return state
+  }
+
+  let storeState = createStoreState()
 
   beforeEach(() => {
     vi.clearAllMocks()
+    storeState = createStoreState()
 
     vi.mocked(useCronogramaStore).mockImplementation((selector) =>
       selector(storeState as never),
     )
-    vi.mocked(simuladoService.analyzeStudentSimulado).mockResolvedValue(mockResult)
+
+    vi.mocked(simuladoService.listStudentSimulados).mockResolvedValue([
+      latestHistoryItem,
+      olderHistoryItem,
+    ])
+    vi.mocked(simuladoService.getSimuladoResultByHistoryItem).mockImplementation(
+      async (item) => {
+        return item.id === latestHistoryItem.id ? latestResult : olderResult
+      },
+    )
     vi.mocked(simuladoService.diagnoseStudentAnswers).mockResolvedValue(undefined)
   })
 
-  it('renderiza botão de análise no estado inicial', () => {
+  it('renderiza o botão Simulado no estado inicial', async () => {
     render(<SimuladoAnalyzer matricula={mockMatricula} />)
 
-    expect(screen.getByText('Analisar Simulado')).toBeInTheDocument()
+    expect(screen.getByText('Simulado')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(simuladoService.listStudentSimulados).toHaveBeenCalledWith(mockMatricula)
+    })
   })
 
-  it('exibe resultado e seleciona todas as questões por padrão', async () => {
+  it('abre o simulado mais recente e seleciona todas as questões por padrão', async () => {
     render(<SimuladoAnalyzer matricula={mockMatricula} />)
 
-    fireEvent.click(screen.getByText('Analisar Simulado'))
+    await waitFor(() => {
+      expect(storeState.selectedSimuladoHistoryItem?.id).toBe(latestHistoryItem.id)
+    })
+
+    fireEvent.click(screen.getByText('Simulado'))
 
     await waitFor(() => {
       expect(screen.getByText('Simulado ENEM 2024')).toBeInTheDocument()
@@ -111,10 +203,35 @@ describe('SimuladoAnalyzer', () => {
     })
   })
 
+  it('permite trocar o simulado ativo pelo dropdown', async () => {
+    render(<SimuladoAnalyzer matricula={mockMatricula} />)
+
+    await waitFor(() => {
+      expect(storeState.selectedSimuladoHistoryItem?.id).toBe(latestHistoryItem.id)
+    })
+
+    fireEvent.click(screen.getByLabelText('Selecionar simulado'))
+    fireEvent.click(screen.getByRole('button', { name: /Simulado Diagnóstico/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Simulado Diagnóstico')).toBeInTheDocument()
+      expect(screen.getByText('1 de 1 selecionadas')).toBeInTheDocument()
+    })
+
+    expect(storeState.selectedSimuladoHistoryItem?.id).toBe(olderHistoryItem.id)
+    expect(simuladoService.getSimuladoResultByHistoryItem).toHaveBeenCalledWith(
+      olderHistoryItem,
+    )
+  })
+
   it('desabilita distribuição quando nenhuma questão está selecionada', async () => {
     render(<SimuladoAnalyzer matricula={mockMatricula} />)
 
-    fireEvent.click(screen.getByText('Analisar Simulado'))
+    await waitFor(() => {
+      expect(storeState.selectedSimuladoHistoryItem?.id).toBe(latestHistoryItem.id)
+    })
+
+    fireEvent.click(screen.getByText('Simulado'))
 
     await waitFor(() => {
       expect(screen.getByText('2 de 2 selecionadas')).toBeInTheDocument()
@@ -128,10 +245,14 @@ describe('SimuladoAnalyzer', () => {
     })
   })
 
-  it('distribui apenas as questões selecionadas', async () => {
+  it('distribui apenas as questões selecionadas do simulado ativo', async () => {
     render(<SimuladoAnalyzer matricula={mockMatricula} />)
 
-    fireEvent.click(screen.getByText('Analisar Simulado'))
+    await waitFor(() => {
+      expect(storeState.selectedSimuladoHistoryItem?.id).toBe(latestHistoryItem.id)
+    })
+
+    fireEvent.click(screen.getByText('Simulado'))
 
     await waitFor(() => {
       expect(screen.getByText('2 de 2 selecionadas')).toBeInTheDocument()
@@ -158,25 +279,42 @@ describe('SimuladoAnalyzer', () => {
     expect(blockData.titulo).toBe('Interpretação de Texto')
   })
 
-  it('exibe erro quando não encontra simulado', async () => {
-    vi.mocked(simuladoService.analyzeStudentSimulado).mockResolvedValue(null)
+  it('exibe erro quando não encontra histórico de simulados', async () => {
+    vi.mocked(simuladoService.listStudentSimulados).mockResolvedValue([])
 
     render(<SimuladoAnalyzer matricula={mockMatricula} />)
-    fireEvent.click(screen.getByText('Analisar Simulado'))
 
     await waitFor(() => {
-      expect(screen.getByText('Nenhum simulado encontrado para este aluno')).toBeInTheDocument()
+      expect(screen.getByTitle('Nenhum simulado encontrado')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('Simulado'))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Nenhum simulado encontrado para este aluno'),
+      ).toBeInTheDocument()
     })
   })
 
-  it('exibe erro quando análise falha', async () => {
-    vi.mocked(simuladoService.analyzeStudentSimulado).mockRejectedValue(new Error('Falha'))
+  it('exibe erro quando a carga do resultado falha', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(simuladoService.getSimuladoResultByHistoryItem).mockRejectedValue(
+      new Error('Falha'),
+    )
 
     render(<SimuladoAnalyzer matricula={mockMatricula} />)
-    fireEvent.click(screen.getByText('Analisar Simulado'))
+
+    await waitFor(() => {
+      expect(storeState.selectedSimuladoHistoryItem?.id).toBe(latestHistoryItem.id)
+    })
+
+    fireEvent.click(screen.getByText('Simulado'))
 
     await waitFor(() => {
       expect(screen.getByText('Erro ao analisar simulado')).toBeInTheDocument()
     })
+
+    consoleErrorSpy.mockRestore()
   })
 })

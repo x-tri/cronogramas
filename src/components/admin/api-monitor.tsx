@@ -206,16 +206,23 @@ export function ApiMonitor() {
   }, []);
 
   useEffect(() => {
-    async function init() {
-      setLoading(true);
-      await Promise.all([loadTodayData(), loadChartData()]);
-      setLoading(false);
-    }
-    init();
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        setLoading(true);
+        await Promise.all([loadTodayData(), loadChartData()]);
+        setLoading(false);
+      })();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadTodayData, loadChartData]);
 
   useEffect(() => {
-    loadRecentCalls();
+    const timeoutId = window.setTimeout(() => {
+      void loadRecentCalls();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadRecentCalls]);
 
   if (loading) return <LoadingSpinner />;

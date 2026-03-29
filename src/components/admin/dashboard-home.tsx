@@ -181,6 +181,7 @@ function IconStorage() {
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export function DashboardHome() {
+  const [renderTimestamp] = useState(() => Date.now());
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<readonly AuditEntry[]>([]);
   const [activityPeriod, setActivityPeriod] = useState<"24h" | "7d">("24h");
@@ -264,16 +265,23 @@ export function DashboardHome() {
   }, []);
 
   useEffect(() => {
-    async function init() {
-      setLoading(true);
-      await Promise.all([loadStats(), loadChartData(), loadSchoolHealth()]);
-      setLoading(false);
-    }
-    init();
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        setLoading(true);
+        await Promise.all([loadStats(), loadChartData(), loadSchoolHealth()]);
+        setLoading(false);
+      })();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadStats, loadChartData, loadSchoolHealth]);
 
   useEffect(() => {
-    loadActivities();
+    const timeoutId = window.setTimeout(() => {
+      void loadActivities();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadActivities]);
 
   if (loading) return <LoadingSpinner />;
@@ -374,8 +382,7 @@ export function DashboardHome() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {schoolHealth.map((school) => {
-              const now = Date.now();
-              const lastMs = school.last_activity ? now - new Date(school.last_activity).getTime() : Infinity;
+              const lastMs = school.last_activity ? renderTimestamp - new Date(school.last_activity).getTime() : Infinity;
               const dayMs = 86_400_000;
               const dotColor =
                 lastMs < dayMs ? "bg-[#10b981]" : lastMs < dayMs * 7 ? "bg-[#f59e0b]" : "bg-[#dc2626]";

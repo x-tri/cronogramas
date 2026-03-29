@@ -5,6 +5,10 @@ import { getStudentByMatricula } from '../../services/simulado-analyzer'
 import { isSupabaseConfigured } from '../../config/repository-config'
 import type { Escola } from '../../types/domain'
 
+type StudentSearchProps = {
+  variant?: 'hero' | 'modal'
+}
+
 function resolveEscolaByName(rawName: string | null | undefined): {
   escola: Escola
   escolaNome?: string
@@ -27,10 +31,10 @@ function resolveEscolaByName(rawName: string | null | undefined): {
   return { escola: 'MARISTA' }
 }
 
-export function StudentSearch() {
+export function StudentSearch({ variant = 'modal' }: StudentSearchProps) {
   const [matricula, setMatricula] = useState('')
   const [error, setError] = useState<string | null>(null)
-  
+
   const repo = useRepository()
 
   const {
@@ -62,7 +66,7 @@ export function StudentSearch() {
           const schoolName = supabaseStudent?.school?.name
           const { escola, escolaNome } = resolveEscolaByName(schoolName)
           student = {
-            id: supabaseStudent.id,
+            id: supabaseStudent.matricula,
             matricula: supabaseStudent.matricula,
             nome: supabaseStudent.name,
             turma: supabaseStudent.turma ?? 'A',
@@ -103,14 +107,19 @@ export function StudentSearch() {
     if (e.key === 'Enter') handleSearch()
   }
 
+  const isHero = variant === 'hero'
+
   return (
-    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-      <div className="flex-1 w-full sm:max-w-sm">
-        <label htmlFor="matricula" className="block text-sm font-medium text-[#37352f] mb-1.5">
+    <div className={isHero ? 'flex flex-col items-start gap-3 sm:flex-row sm:items-end' : 'flex flex-col items-start gap-3 sm:flex-row sm:items-end'}>
+      <div className={`w-full ${isHero ? '' : 'flex-1 sm:max-w-sm'}`}>
+        <label
+          htmlFor="matricula"
+          className={`mb-1.5 block ${isHero ? 'text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8]' : 'text-sm font-medium text-[#37352f]'}`}
+        >
           Matrícula
         </label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div className={`pointer-events-none absolute inset-y-0 left-0 flex items-center ${isHero ? 'pl-4' : 'pl-3'}`}>
             <svg className="h-4 w-4 text-[#9ca3af]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -124,21 +133,22 @@ export function StudentSearch() {
             placeholder="Ex: 214150129"
             disabled={isLoadingStudent}
             className={`
-              block w-full pl-9 pr-3 py-1.5
-              text-sm text-[#37352f] placeholder-[#9ca3af]
-              bg-white border rounded
-              transition-colors duration-100
-              focus:outline-none focus:border-[#2383e2] focus:ring-1 focus:ring-[#2383e2]/20
-              hover:border-[#d1d1cd]
-              disabled:bg-[#f7f6f3] disabled:text-[#9ca3af]
+              block w-full text-[#1d1d1f] placeholder-[#94a3b8]
+              border bg-white transition-all duration-150
+              focus:outline-none focus:ring-4
+              disabled:bg-[#f8fafc] disabled:text-[#9ca3af]
+              ${isHero
+                ? 'h-14 rounded-2xl border-[#dbe5f3] pl-11 pr-4 text-base hover:border-[#bfdbfe] focus:border-[#2563eb] focus:ring-[#2563eb]/12'
+                : 'rounded-xl border-[#e2e8f0] pl-9 pr-3 py-2.5 text-sm hover:border-[#cbd5e1] focus:border-[#2563eb] focus:ring-[#2563eb]/12'
+              }
               ${error 
-                ? 'border-[#fca5a5] focus:border-[#ef4444] focus:ring-[#ef4444]/20' 
-                : 'border-[#e3e2e0]'
+                ? 'border-[#fca5a5] focus:border-[#ef4444] focus:ring-[#ef4444]/15' 
+                : ''
               }
             `}
           />
           {error && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+            <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center ${isHero ? 'pr-4' : 'pr-3'}`}>
               <svg className="h-4 w-4 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -154,19 +164,20 @@ export function StudentSearch() {
         onClick={handleSearch}
         disabled={isLoadingStudent}
         className={`
-          inline-flex items-center justify-center gap-1.5
-          px-3 py-1.5
-          text-sm font-medium text-white
-          bg-[#37352f] hover:bg-[#2d2d2d] active:bg-[#1a1a1a]
-          rounded
-          transition-colors duration-100
+          inline-flex items-center justify-center gap-2
+          text-sm font-semibold text-white
+          transition-all duration-150
           disabled:opacity-50 disabled:cursor-not-allowed
-          focus:outline-none focus:ring-2 focus:ring-[#2383e2]/30
+          focus:outline-none focus:ring-4 focus:ring-[#2563eb]/18
+          ${isHero
+            ? 'h-14 w-full rounded-2xl bg-[#111827] px-6 hover:bg-[#0f172a] sm:w-auto'
+            : 'rounded-xl bg-[#1f2937] px-4 py-2.5 hover:bg-[#111827]'
+          }
         `}
       >
         {isLoadingStudent ? (
           <>
-            <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
@@ -174,7 +185,7 @@ export function StudentSearch() {
           </>
         ) : (
           <>
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <span>Buscar</span>

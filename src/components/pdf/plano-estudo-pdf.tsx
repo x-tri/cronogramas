@@ -1,15 +1,6 @@
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { PlanoEstudo } from '../../services/maritaca'
 
-const AREA_COLORS: Record<string, string> = {
-  cn: '#10b981',
-  ch: '#f97316',
-  lc: '#3b82f6',
-  mt: '#ef4444',
-  revisao: '#8b5cf6',
-  pausa: '#9ca3af',
-}
-
 const PRIO_COLORS: Record<string, string> = {
   ALTA: '#dc2626',
   MEDIA: '#d97706',
@@ -165,7 +156,6 @@ export function PlanoEstudoPDF({ plano, nomeAluno, simuladoTitle }: Props) {
 
         {plano.atividades.map((a, i) => {
           const isPausa = a.area === 'pausa'
-          const areaColor = AREA_COLORS[a.area] ?? '#6b7280'
           const prioColor = PRIO_COLORS[a.prioridade] ?? '#6b7280'
 
           return (

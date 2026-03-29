@@ -59,7 +59,11 @@ export function AdminPdfs({ onBack, embedded }: AdminPdfsProps) {
   }, []);
 
   useEffect(() => {
-    loadData();
+    const timeoutId = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadData]);
 
   const turmas = [...new Set(records.map((r) => r.turma).filter(Boolean))].sort() as string[];

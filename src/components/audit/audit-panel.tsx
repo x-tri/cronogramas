@@ -253,9 +253,9 @@ export function AuditPanel() {
 
   useEffect(() => {
     if (isOpen && records.length === 0) {
-      loadAuditData()
+      void loadAuditData()
     }
-  }, [isOpen])
+  }, [isOpen, records.length])
 
   // Group by school
   const grouped = useMemo(() => {
@@ -284,15 +284,23 @@ export function AuditPanel() {
   return (
     <>
       {/* Trigger button in header */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="px-2 py-1 text-xs font-medium text-[#64748b] hover:text-[#1d1d1f] hover:bg-[#f1f1ef] rounded-md transition-colors"
-        title="Auditoria de cronogramas"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      </button>
+      <div className="group relative min-w-0">
+        <button
+          onClick={() => setIsOpen(true)}
+          className="inline-flex h-12 w-full items-center gap-2.5 rounded-2xl border border-[#fde68a] bg-[#fffbeb] px-4 text-left text-sm font-semibold text-[#b45309] transition-colors hover:bg-[#fef3c7]"
+          title="Auditoria de cronogramas"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white/80">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </span>
+          <span className="min-w-0 truncate">Auditoria</span>
+        </button>
+        <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl bg-[#0f172a] px-3 py-2 text-xs text-white opacity-0 shadow-[0_20px_40px_-24px_rgba(15,23,42,0.8)] transition-all duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+          Abre a visão gerencial com alunos, versões e cronogramas criados.
+        </div>
+      </div>
 
       {/* Modal */}
       {isOpen && createPortal(

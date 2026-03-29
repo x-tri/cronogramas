@@ -204,6 +204,35 @@ export type TopicSummary = {
   questions: number[]
 }
 
+export type SimuladoHistorySource = 'projetos' | 'student_answers'
+
+type SimuladoHistoryItemBase = {
+  id: string
+  source: SimuladoHistorySource
+  title: string
+  date: string
+  isLatest: boolean
+}
+
+export type ProjetoSimuladoHistoryItem = SimuladoHistoryItemBase & {
+  source: 'projetos'
+  projectId: string
+  projectStudentId: string | null
+  studentNumber: string | null
+}
+
+export type StudentAnswersSimuladoHistoryItem = SimuladoHistoryItemBase & {
+  source: 'student_answers'
+  answerIds: string[]
+  examIds: string[]
+  groupKey: string
+  studentNumber: string
+}
+
+export type SimuladoHistoryItem =
+  | ProjetoSimuladoHistoryItem
+  | StudentAnswersSimuladoHistoryItem
+
 // ============ TABELA PROJETOS (Gabaritos) ============
 
 export type ProjetoRow = {

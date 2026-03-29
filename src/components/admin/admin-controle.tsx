@@ -103,7 +103,7 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
 
     // Also check alunos_avulsos
     const unresolvedUuids = uuids.filter((id) => !studentById.has(id));
-    let avulsoMap = new Map<string, { nome: string; matricula: string; turma: string }>();
+    const avulsoMap = new Map<string, { nome: string; matricula: string; turma: string }>();
     if (unresolvedUuids.length > 0) {
       const { data: avulsos } = await supabase
         .from("alunos_avulsos_cronograma")
@@ -142,7 +142,11 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
   }, []);
 
   useEffect(() => {
-    loadData();
+    const timeoutId = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadData]);
 
   // Filter & sort

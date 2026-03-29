@@ -34,11 +34,11 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // Mock ResizeObserver
-const ResizeObserverMock = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+class ResizeObserverMock {
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
+}
 
 Object.defineProperty(globalThis, 'ResizeObserver', {
   value: ResizeObserverMock,

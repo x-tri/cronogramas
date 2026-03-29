@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase'
+import { simuladoSupabase as supabase } from '../../lib/simulado-supabase'
 import type {
   Exam,
   QuestionContent,
@@ -8,6 +8,7 @@ import {
   calculateWrongQuestions,
   getDetailedTopicByQuestionNumber,
 } from './helpers'
+import { simuladoLog } from './logger'
 
 /**
  * Busca os erros REAIS do aluno linkando com os conteúdos da prova
@@ -18,7 +19,7 @@ import {
 export async function getRealStudentErrors(
   matricula: string,
 ): Promise<{ wrongQuestions: WrongQuestion[]; exam: Exam | null } | null> {
-  console.log('[getRealStudentErrors] Buscando erros reais para matrícula:', matricula)
+  simuladoLog('[getRealStudentErrors] Buscando erros reais para matrícula:', matricula)
 
   try {
     // 1. Buscar projetos mais recentes
@@ -29,11 +30,11 @@ export async function getRealStudentErrors(
       .limit(10)
 
     if (projetoError || !projetos || projetos.length === 0) {
-      console.log('[getRealStudentErrors] Nenhum projeto encontrado')
+      simuladoLog('[getRealStudentErrors] Nenhum projeto encontrado')
       return null
     }
 
-    console.log(`[getRealStudentErrors] ${projetos.length} projetos encontrados`)
+    simuladoLog(`[getRealStudentErrors] ${projetos.length} projetos encontrados`)
 
     // 2. Procurar o aluno no projeto mais recente
     for (const projeto of projetos) {
@@ -75,8 +76,8 @@ export async function getRealStudentErrors(
 
       if (!studentData) continue
 
-      console.log('[getRealStudentErrors] Aluno encontrado no projeto:', projeto.id)
-      console.log(
+      simuladoLog('[getRealStudentErrors] Aluno encontrado no projeto:', projeto.id)
+      simuladoLog(
         '[getRealStudentErrors] Respostas:',
         studentData.answers?.length || 0,
       )
@@ -85,7 +86,7 @@ export async function getRealStudentErrors(
       const wrongQuestionsList = studentData.wrong_questions ?? studentData.questoes_erradas
 
       if (wrongQuestionsList && wrongQuestionsList.length > 0) {
-        console.log(
+        simuladoLog(
           '[getRealStudentErrors] Lista de erros encontrada:',
           wrongQuestionsList.length,
         )
@@ -114,10 +115,10 @@ export async function getRealStudentErrors(
 
       // 4. Se não tem lista detalhada, calcular comparando com gabarito
       if (studentData.answers && studentData.answers.length > 0) {
-        console.log('[getRealStudentErrors] Calculando erros comparando com gabarito...')
+        simuladoLog('[getRealStudentErrors] Calculando erros comparando com gabarito...')
 
         // Buscar exame correspondente - tentar por ID do projeto
-        console.log('[getRealStudentErrors] Buscando exam com ID:', projeto.id)
+        simuladoLog('[getRealStudentErrors] Buscando exam com ID:', projeto.id)
         const { data: examById, error: examError } = await supabase
           .from('exams')
           .select('*')
@@ -131,7 +132,7 @@ export async function getRealStudentErrors(
 
         // Se não encontrou, tentar buscar todos os exams e ver se algum tem o mesmo título
         if (!examData && projeto.nome) {
-          console.log(
+          simuladoLog(
             '[getRealStudentErrors] Tentando buscar exam por nome:',
             projeto.nome,
           )
@@ -143,13 +144,13 @@ export async function getRealStudentErrors(
 
           if (examsByName && examsByName.length > 0) {
             examData = examsByName[0]
-            console.log('[getRealStudentErrors] Exam encontrado por nome:', examData.id)
+            simuladoLog('[getRealStudentErrors] Exam encontrado por nome:', examData.id)
           }
         }
 
         // Se ainda não encontrou, listar todos os exams disponíveis
         if (!examData) {
-          console.log(
+          simuladoLog(
             '[getRealStudentErrors] Não encontrou exam específico, listando todos...',
           )
           const { data: allExams } = await supabase
@@ -157,17 +158,17 @@ export async function getRealStudentErrors(
             .select('id, title')
             .limit(10)
 
-          console.log('[getRealStudentErrors] Exams disponíveis:', allExams)
+          simuladoLog('[getRealStudentErrors] Exams disponíveis:', allExams)
         }
 
         if (examData) {
-          console.log('[getRealStudentErrors] Exam encontrado:', examData.id)
-          console.log(
+          simuladoLog('[getRealStudentErrors] Exam encontrado:', examData.id)
+          simuladoLog(
             '[getRealStudentErrors] Answer key:',
             examData.answer_key?.length || 0,
             'respostas',
           )
-          console.log(
+          simuladoLog(
             '[getRealStudentErrors] Question contents:',
             examData.question_contents?.length || 0,
             'conteúdos',
@@ -180,7 +181,7 @@ export async function getRealStudentErrors(
               examData.question_contents as QuestionContent[] | null,
             )
 
-            console.log(
+            simuladoLog(
               '[getRealStudentErrors] ✅ Calculados',
               wrongQuestions.length,
               'erros reais!',
@@ -191,15 +192,15 @@ export async function getRealStudentErrors(
               exam: examData as Exam,
             }
           } else {
-            console.log('[getRealStudentErrors] ⚠️ Exam encontrado mas sem answer_key')
+            simuladoLog('[getRealStudentErrors] ⚠️ Exam encontrado mas sem answer_key')
           }
         } else {
-          console.log('[getRealStudentErrors] ⚠️ Nenhum exam encontrado')
+          simuladoLog('[getRealStudentErrors] ⚠️ Nenhum exam encontrado')
         }
       }
     }
 
-    console.log('[getRealStudentErrors] Aluno não encontrado em nenhum projeto')
+    simuladoLog('[getRealStudentErrors] Aluno não encontrado em nenhum projeto')
     return null
   } catch (error) {
     console.error('[getRealStudentErrors] Erro:', error)
@@ -212,7 +213,7 @@ async function getExamQuestionContents(
   examId: string,
   wrongQuestionNumbers: number[],
 ): Promise<{ wrongQuestions: WrongQuestion[]; exam: Exam | null }> {
-  console.log('[getExamQuestionContents] Buscando conteúdos para exame:', examId)
+  simuladoLog('[getExamQuestionContents] Buscando conteúdos para exame:', examId)
 
   const { data: examData, error } = await supabase
     .from('exams')
@@ -246,7 +247,7 @@ async function getExamQuestionContents(
     }
   })
 
-  console.log(
+  simuladoLog(
     `[getExamQuestionContents] ${wrongQuestions.length} questões com conteúdo carregado`,
   )
 

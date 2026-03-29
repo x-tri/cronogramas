@@ -84,7 +84,11 @@ export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
   }, [selectedSchool, selectedTurma]);
 
   useEffect(() => {
-    loadEntries();
+    const timeoutId = window.setTimeout(() => {
+      void loadEntries();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadEntries]);
 
   // Group entries by dia
@@ -107,9 +111,16 @@ export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
     if (!newTurma) return;
 
     // Copy all entries from current turma to new turma
-    const newEntries = entries.map(({ id: _id, ...rest }) => ({
-      ...rest,
+    const newEntries = entries.map((entry) => ({
+      school_id: entry.school_id,
       turma: newTurma,
+      dia_semana: entry.dia_semana,
+      horario_inicio: entry.horario_inicio,
+      horario_fim: entry.horario_fim,
+      turno: entry.turno,
+      disciplina: entry.disciplina,
+      professor: entry.professor,
+      ano_letivo: entry.ano_letivo,
     }));
 
     const { error } = await supabase.from("school_schedules").insert(newEntries);
@@ -118,8 +129,8 @@ export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
       return;
     }
     alert(`Turma ${newTurma} criada com ${newEntries.length} aulas copiadas de ${selectedTurma}`);
-    // Reload turmas
-    setSelectedSchool((prev) => prev); // trigger re-fetch
+    setTurmas((prev) => [...new Set([...prev, newTurma])].sort());
+    setSelectedTurma(newTurma);
   }
 
   if (loading) {

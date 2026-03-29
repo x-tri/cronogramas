@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useCronogramaStore } from './cronograma-store'
-import { resetRepository, initializeRepository } from '../data/factory'
+import { resetRepository, forceMockRepository } from '../data/factory'
 import { resetMockRepository } from '../data/mock-repository'
 
 describe('useCronogramaStore', () => {
@@ -10,8 +10,8 @@ describe('useCronogramaStore', () => {
     // Reset repository
     resetMockRepository()
     resetRepository()
-    // Initialize repository for tests
-    initializeRepository()
+    // Isola testes da store para nunca depender de Supabase real
+    forceMockRepository()
   })
 
   describe('initial state', () => {
@@ -22,6 +22,9 @@ describe('useCronogramaStore', () => {
       expect(state.officialSchedule).toEqual([])
       expect(state.cronograma).toBeNull()
       expect(state.blocks).toEqual([])
+      expect(state.simuladoHistory).toEqual([])
+      expect(state.selectedSimuladoHistoryItem).toBeNull()
+      expect(state.selectedSimuladoResult).toBeNull()
       expect(state.isLoadingStudent).toBe(false)
       expect(state.isSaving).toBe(false)
       expect(state.error).toBeNull()
@@ -45,6 +48,9 @@ describe('useCronogramaStore', () => {
       store.setStudent(mockStudent)
 
       expect(useCronogramaStore.getState().currentStudent).toEqual(mockStudent)
+      expect(useCronogramaStore.getState().simuladoHistory).toEqual([])
+      expect(useCronogramaStore.getState().selectedSimuladoHistoryItem).toBeNull()
+      expect(useCronogramaStore.getState().selectedSimuladoResult).toBeNull()
     })
 
     it('should set official schedule', () => {
@@ -289,6 +295,9 @@ describe('useCronogramaStore', () => {
 
       const state = useCronogramaStore.getState()
       expect(state.currentStudent).toBeNull()
+      expect(state.simuladoHistory).toEqual([])
+      expect(state.selectedSimuladoHistoryItem).toBeNull()
+      expect(state.selectedSimuladoResult).toBeNull()
       expect(state.isSaving).toBe(false)
     })
   })

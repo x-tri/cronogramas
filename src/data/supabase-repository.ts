@@ -3,7 +3,6 @@ import type {
   CronogramaRow,
   BlocoCronogramaRow,
 } from '../types/supabase'
-import type { Aluno } from '../types/domain'
 import {
   cronogramaFromRow,
   cronogramaToRow,
@@ -13,7 +12,6 @@ import {
   alunoXTRIToRow,
 } from '../types/supabase'
 import type { AlunoXTRIRow } from '../types/supabase'
-import { ALL_STUDENTS } from './mock-data/students'
 import { DISCIPLINAS, DISCIPLINAS_BY_CODE } from './mock-data/subjects'
 import { getHorariosPorTurma } from './mock-data/schedules'
 import { logRepository } from '../config/repository-config'
@@ -78,21 +76,6 @@ export function createSupabaseRepository(): DataRepository {
           return alunoXTRIFromRow(avulso as AlunoXTRIRow)
         }
 
-        // 3. Fallback: mock (legado, sera removido)
-        const found = ALL_STUDENTS.find((s) => s.matricula === matricula)
-        if (found) {
-          return {
-            id: found.matricula,
-            matricula: found.matricula,
-            nome: found.nome,
-            turma: found.turma,
-            email: null,
-            fotoFilename: `${found.matricula}.jpg`,
-            escola: 'MARISTA',
-            createdAt: new Date(),
-          }
-        }
-
         return null
       },
 
@@ -116,18 +99,7 @@ export function createSupabaseRepository(): DataRepository {
           }))
         }
 
-        // Fallback: mock (legado)
-        const students = ALL_STUDENTS.filter((s) => s.turma === turma)
-        return students.map((s) => ({
-          id: s.matricula,
-          matricula: s.matricula,
-          nome: s.nome,
-          turma: s.turma,
-          email: null,
-          fotoFilename: `${s.matricula}.jpg`,
-          escola: 'MARISTA' as const,
-          createdAt: new Date(),
-        }))
+        return []
       },
 
       createAlunoXTRI: async (data) => {

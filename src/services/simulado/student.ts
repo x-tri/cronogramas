@@ -1,10 +1,11 @@
-import { supabase } from '../../lib/supabase'
+import { simuladoSupabase as supabase } from '../../lib/simulado-supabase'
 import type { SupabaseStudent } from '../../types/supabase'
+import { simuladoLog } from './logger'
 
 export async function getStudentByMatricula(
   matricula: string,
 ): Promise<SupabaseStudent | null> {
-  console.log('[getStudentByMatricula] Buscando student com matrícula:', matricula)
+  simuladoLog('[getStudentByMatricula] Buscando student com matrícula:', matricula)
 
   // Tentar buscar exatamente como foi passado
   const { data, error } = await supabase
@@ -14,7 +15,7 @@ export async function getStudentByMatricula(
     .maybeSingle()
 
   if (data) {
-    console.log('[getStudentByMatricula] Student encontrado:', data)
+    simuladoLog('[getStudentByMatricula] Student encontrado:', data)
     return data
   }
 
@@ -25,7 +26,7 @@ export async function getStudentByMatricula(
   // Se não encontrou, tentar com zeros à esquerda removidos
   const normalizedMatricula = matricula.trim().replace(/^0+/, '') || '0'
   if (normalizedMatricula !== matricula.trim()) {
-    console.log(
+    simuladoLog(
       '[getStudentByMatricula] Tentando com matrícula normalizada:',
       normalizedMatricula,
     )
@@ -36,7 +37,7 @@ export async function getStudentByMatricula(
       .maybeSingle()
 
     if (normalizedData) {
-      console.log(
+      simuladoLog(
         '[getStudentByMatricula] Student encontrado com matrícula normalizada:',
         normalizedData,
       )
@@ -51,7 +52,7 @@ export async function getStudentByMatricula(
     }
   }
 
-  console.log(
+  simuladoLog(
     '[getStudentByMatricula] Student não encontrado para matrícula:',
     matricula,
   )

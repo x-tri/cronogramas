@@ -55,7 +55,11 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
   }, []);
 
   useEffect(() => {
-    loadData();
+    const timeoutId = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadData]);
 
   const activeCoordinators = users.filter((u) => u.role !== "super_admin");

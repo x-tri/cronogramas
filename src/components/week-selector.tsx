@@ -1,6 +1,10 @@
 import { useCronogramaStore } from '../stores/cronograma-store'
 import { getWeekBounds } from './week-utils'
 
+type WeekSelectorProps = {
+  variant?: 'default' | 'compact'
+}
+
 function formatWeekRange(start: Date, end: Date): string {
   const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
   const startStr = start.toLocaleDateString('pt-BR', options)
@@ -18,7 +22,7 @@ function isCurrentWeek(date: Date): boolean {
   return currentWeek.start.getTime() === checkWeek.start.getTime()
 }
 
-export function WeekSelector() {
+export function WeekSelector({ variant = 'default' }: WeekSelectorProps) {
   const selectedWeek = useCronogramaStore((state) => state.selectedWeek)
   const setSelectedWeek = useCronogramaStore((state) => state.setSelectedWeek)
   const cronograma = useCronogramaStore((state) => state.cronograma)
@@ -44,12 +48,13 @@ export function WeekSelector() {
 
   // Check if cronograma exists for this week
   const hasCronograma = cronograma !== null
+  const isCompact = variant === 'compact'
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-2">
       <button
         onClick={goToPreviousWeek}
-        className="p-1.5 rounded hover:bg-[#f1f1ef] text-[#6b6b67] transition-colors"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[#e2e8f0] bg-white text-[#475569] transition-colors hover:border-[#cbd5e1] hover:bg-[#f8fafc] hover:text-[#0f172a]"
         title="Semana anterior"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,27 +62,41 @@ export function WeekSelector() {
         </svg>
       </button>
 
-      <div className="flex items-center gap-2 px-2">
-        <div className="text-sm font-medium text-[#37352f] min-w-[140px] text-center">
-          {formatWeekRange(start, end)}
+      <div
+        className={`min-w-[220px] flex-1 rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-4 ${
+          isCompact ? 'py-2.5' : 'py-3'
+        }`}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-sm font-semibold text-[#111827]">
+            {formatWeekRange(start, end)}
+          </div>
+
+          {isCurrent && (
+            <span className="rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-[10px] font-semibold text-[#1d4ed8]">
+              Atual
+            </span>
+          )}
+
+          {!hasCronograma && (
+            <span className="rounded-full border border-[#fcd34d] bg-[#fef3c7] px-2 py-0.5 text-[10px] font-semibold text-[#92400e]">
+              Novo
+            </span>
+          )}
         </div>
 
-        {isCurrent && (
-          <span className="px-1.5 py-0.5 bg-[#eff6ff] text-[#1d4ed8] text-[10px] font-medium rounded border border-[#bfdbfe]">
-            Atual
-          </span>
-        )}
-
-        {!hasCronograma && (
-          <span className="px-1.5 py-0.5 bg-[#fef3c7] text-[#92400e] text-[10px] font-medium rounded border border-[#fcd34d]">
-            Novo
-          </span>
+        {!isCompact && (
+          <p className="mt-1 text-xs text-[#64748b]">
+            {isCurrent
+              ? 'Semana em andamento para o aluno selecionado.'
+              : 'Use as setas para revisar semanas anteriores ou futuras.'}
+          </p>
         )}
       </div>
 
       <button
         onClick={goToNextWeek}
-        className="p-1.5 rounded hover:bg-[#f1f1ef] text-[#6b6b67] transition-colors"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[#e2e8f0] bg-white text-[#475569] transition-colors hover:border-[#cbd5e1] hover:bg-[#f8fafc] hover:text-[#0f172a]"
         title="Próxima semana"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,10 +107,10 @@ export function WeekSelector() {
       {!isCurrent && (
         <button
           onClick={goToCurrentWeek}
-          className="ml-1 px-2 py-1 text-xs font-medium text-[#37352f] hover:bg-[#f1f1ef] rounded transition-colors"
+          className="inline-flex h-11 items-center rounded-2xl border border-[#dbe5f3] bg-white px-3.5 text-xs font-semibold text-[#1d4ed8] transition-colors hover:border-[#bfdbfe] hover:bg-[#f8fbff]"
           title="Ir para semana atual"
         >
-          Hoje
+          Ir para atual
         </button>
       )}
     </div>

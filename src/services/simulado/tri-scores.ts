@@ -1,4 +1,5 @@
-import { supabase } from '../../lib/supabase'
+import { simuladoSupabase as supabase } from '../../lib/simulado-supabase'
+import { simuladoLog } from './logger'
 
 /**
  * Busca as notas TRI da tabela student_answers
@@ -13,7 +14,7 @@ export async function getTRIScoresFromStudentAnswers(
   tri_cn: number | null
   tri_mt: number | null
 } | null> {
-  console.log(
+  simuladoLog(
     '[getTRIScoresFromStudentAnswers] Buscando notas TRI - matrícula:',
     matricula,
     'sheet_code:',
@@ -21,7 +22,7 @@ export async function getTRIScoresFromStudentAnswers(
   )
 
   if (!matricula && !sheetCode) {
-    console.log('[getTRIScoresFromStudentAnswers] Nenhum identificador fornecido')
+    simuladoLog('[getTRIScoresFromStudentAnswers] Nenhum identificador fornecido')
     return null
   }
 
@@ -29,7 +30,7 @@ export async function getTRIScoresFromStudentAnswers(
   if (matricula) {
     const normalizedMatricula = matricula.trim().replace(/^0+/, '') || '0'
 
-    console.log(
+    simuladoLog(
       '[getTRIScoresFromStudentAnswers] Tentativa 1: Buscando por matrícula:',
       matricula,
     )
@@ -45,13 +46,13 @@ export async function getTRIScoresFromStudentAnswers(
       .limit(1)
       .maybeSingle()
 
-    console.log('[getTRIScoresFromStudentAnswers] Resultado busca matrícula:', {
+    simuladoLog('[getTRIScoresFromStudentAnswers] Resultado busca matrícula:', {
       encontrado: !!data,
       erro: error?.message,
     })
 
     if (!error && data) {
-      console.log(
+      simuladoLog(
         '[getTRIScoresFromStudentAnswers] ✅ Notas TRI encontradas (matrícula):',
         {
           student_number: data.student_number,
@@ -71,7 +72,7 @@ export async function getTRIScoresFromStudentAnswers(
 
     // Se não encontrou, tentar com matrícula normalizada (sem zeros à esquerda)
     if (normalizedMatricula !== matricula.trim()) {
-      console.log(
+      simuladoLog(
         '[getTRIScoresFromStudentAnswers] Tentativa 1b: Buscando por matrícula normalizada:',
         normalizedMatricula,
       )
@@ -87,7 +88,7 @@ export async function getTRIScoresFromStudentAnswers(
         .maybeSingle()
 
       if (!normalizedError && normalizedData) {
-        console.log(
+        simuladoLog(
           '[getTRIScoresFromStudentAnswers] ✅ Notas TRI encontradas (matrícula normalizada)',
         )
         return {
@@ -100,7 +101,7 @@ export async function getTRIScoresFromStudentAnswers(
     }
 
     // ========== PRIORIDADE 2: Buscar student_id na tabela students e usar student_id ==========
-    console.log(
+    simuladoLog(
       '[getTRIScoresFromStudentAnswers] Tentativa 2: Buscando student_id na tabela students...',
     )
 
@@ -111,7 +112,7 @@ export async function getTRIScoresFromStudentAnswers(
       .maybeSingle()
 
     if (studentData?.id) {
-      console.log(
+      simuladoLog(
         '[getTRIScoresFromStudentAnswers] Student ID encontrado:',
         studentData.id,
       )
@@ -125,7 +126,7 @@ export async function getTRIScoresFromStudentAnswers(
         .maybeSingle()
 
       if (!studentIdError && byStudentId) {
-        console.log(
+        simuladoLog(
           '[getTRIScoresFromStudentAnswers] ✅ Notas TRI encontradas (student_id):',
           {
             student_number: byStudentId.student_number,
@@ -148,7 +149,7 @@ export async function getTRIScoresFromStudentAnswers(
 
   // ========== FALLBACK: Buscar por sheet_code (apenas se matrícula falhou) ==========
   if (sheetCode) {
-    console.log(
+    simuladoLog(
       '[getTRIScoresFromStudentAnswers] Tentativa 2: Buscando por sheet_code:',
       sheetCode,
     )
@@ -162,7 +163,7 @@ export async function getTRIScoresFromStudentAnswers(
       .maybeSingle()
 
     if (!error && data) {
-      console.log(
+      simuladoLog(
         '[getTRIScoresFromStudentAnswers] ✅ Notas TRI encontradas (sheet_code):',
         {
           student_number: data.student_number,
@@ -183,7 +184,7 @@ export async function getTRIScoresFromStudentAnswers(
     // Tentar também com sheetCode sem zeros à esquerda
     const normalizedSheetCode = sheetCode.trim().replace(/^0+/, '') || '0'
     if (normalizedSheetCode !== sheetCode.trim()) {
-      console.log(
+      simuladoLog(
         '[getTRIScoresFromStudentAnswers] Tentativa 2b: Buscando por sheet_code normalizado:',
         normalizedSheetCode,
       )
@@ -197,7 +198,7 @@ export async function getTRIScoresFromStudentAnswers(
         .maybeSingle()
 
       if (!normalizedError && normalizedData) {
-        console.log(
+        simuladoLog(
           '[getTRIScoresFromStudentAnswers] ✅ Notas TRI encontradas (sheet_code normalizado):',
           normalizedData,
         )
@@ -212,7 +213,7 @@ export async function getTRIScoresFromStudentAnswers(
   }
 
   // ========== DEBUG: Se não encontrou, buscar TODOS para diagnosticar ==========
-  console.log(
+  simuladoLog(
     '[getTRIScoresFromStudentAnswers] ⚠️ Nenhuma nota TRI encontrada. Buscando todos os registros da tabela...',
   )
 
@@ -222,7 +223,7 @@ export async function getTRIScoresFromStudentAnswers(
     .limit(100)
 
   if (!allError && allRecords) {
-    console.log(
+    simuladoLog(
       '[getTRIScoresFromStudentAnswers] Total de registros na tabela:',
       allRecords.length,
     )
@@ -230,7 +231,7 @@ export async function getTRIScoresFromStudentAnswers(
     // Procurar matrícula exata nos registros
     const matchingRecord = allRecords.find((r) => r.student_number === matricula)
     if (matchingRecord) {
-      console.log(
+      simuladoLog(
         '[getTRIScoresFromStudentAnswers] ✅ Registro encontrado para matrícula:',
         matricula,
         matchingRecord,
@@ -244,7 +245,7 @@ export async function getTRIScoresFromStudentAnswers(
     }
 
     // Mostrar alguns registros para debug
-    console.log(
+    simuladoLog(
       '[getTRIScoresFromStudentAnswers] Primeiros 10 registros:',
       allRecords.slice(0, 10).map((r) => ({
         student_number: r.student_number,
@@ -258,14 +259,14 @@ export async function getTRIScoresFromStudentAnswers(
       (r) => r.student_number?.includes(matricula) || matricula.includes(r.student_number),
     )
     if (possibleMatches.length > 0) {
-      console.log(
+      simuladoLog(
         '[getTRIScoresFromStudentAnswers] Possíveis matches parciais:',
         possibleMatches,
       )
     }
   }
 
-  console.log(
+  simuladoLog(
     '[getTRIScoresFromStudentAnswers] ❌ Matrícula',
     matricula,
     'não encontrada na tabela student_answers',

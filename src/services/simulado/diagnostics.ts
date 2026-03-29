@@ -1,13 +1,14 @@
-import { supabase } from '../../lib/supabase'
+import { simuladoSupabase as supabase } from '../../lib/simulado-supabase'
 import type { SupabaseStudent } from '../../types/supabase'
+import { simuladoLog } from './logger'
 
 /**
  * Função de diagnóstico para testar a conexão com a tabela student_answers
  * e verificar se existem dados para uma matrícula específica
  */
 export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
-  console.log('========== DIAGNÓSTICO ==========')
-  console.log('Matrícula buscada:', matricula)
+  simuladoLog('========== DIAGNÓSTICO ==========')
+  simuladoLog('Matrícula buscada:', matricula)
 
   let studentData: SupabaseStudent | null = null
 
@@ -22,14 +23,14 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
       console.error('❌ Erro de conexão com Supabase:', healthError)
       return
     }
-    console.log('✅ Conexão com Supabase OK')
+    simuladoLog('✅ Conexão com Supabase OK')
   } catch (e) {
     console.error('❌ Erro ao conectar com Supabase:', e)
     return
   }
 
   // 2. Verificar se existe tabela 'students' e buscar o aluno
-  console.log('\n📋 VERIFICANDO TABELA students:')
+  simuladoLog('\n📋 VERIFICANDO TABELA students:')
   const { data: studentDataResult, error: studentError } = await supabase
     .from('students')
     .select('*')
@@ -41,16 +42,16 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
   if (studentError) {
     console.error('❌ Erro ao buscar na tabela students:', studentError)
   } else if (studentData) {
-    console.log('✅ Aluno encontrado na tabela students:')
-    console.log('   - ID:', studentData.id)
-    console.log('   - Nome:', studentData.name)
-    console.log('   - Matrícula:', studentData.matricula)
-    console.log('   - Sheet Code:', studentData.sheet_code)
-    console.log('   - Turma:', studentData.turma)
+    simuladoLog('✅ Aluno encontrado na tabela students:')
+    simuladoLog('   - ID:', studentData.id)
+    simuladoLog('   - Nome:', studentData.name)
+    simuladoLog('   - Matrícula:', studentData.matricula)
+    simuladoLog('   - Sheet Code:', studentData.sheet_code)
+    simuladoLog('   - Turma:', studentData.turma)
 
     // Se tem sheet_code, buscar na student_answers
     if (studentData.sheet_code) {
-      console.log(
+      simuladoLog(
         '\n📋 BUSCANDO NA student_answers COM SHEET_CODE:',
         studentData.sheet_code,
       )
@@ -62,17 +63,17 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
       if (sheetCodeError) {
         console.error('❌ Erro ao buscar por sheet_code:', sheetCodeError)
       } else {
-        console.log(
+        simuladoLog(
           '🔍 Registros encontrados com sheet_code:',
           answersBySheetCode?.length || 0,
         )
         if (answersBySheetCode && answersBySheetCode.length > 0) {
-          console.log('Registros:', answersBySheetCode)
+          simuladoLog('Registros:', answersBySheetCode)
         }
       }
     }
   } else {
-    console.log(
+    simuladoLog(
       '❌ Aluno NÃO encontrado na tabela students com matrícula:',
       matricula,
     )
@@ -80,7 +81,7 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
     // Tentar buscar com matrícula normalizada
     const normalizedMatricula = matricula.trim().replace(/^0+/, '') || '0'
     if (normalizedMatricula !== matricula.trim()) {
-      console.log('Tentando com matrícula normalizada:', normalizedMatricula)
+      simuladoLog('Tentando com matrícula normalizada:', normalizedMatricula)
       const { data: normStudent, error: normError } = await supabase
         .from('students')
         .select('*')
@@ -91,18 +92,18 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
         console.error('❌ Erro ao buscar com matrícula normalizada:', normError)
       } else if (normStudent) {
         studentData = normStudent as SupabaseStudent
-        console.log('✅ Aluno encontrado com matrícula normalizada:')
-        console.log('   - ID:', normStudent.id)
-        console.log('   - Nome:', normStudent.name)
-        console.log('   - Sheet Code:', normStudent.sheet_code)
+        simuladoLog('✅ Aluno encontrado com matrícula normalizada:')
+        simuladoLog('   - ID:', normStudent.id)
+        simuladoLog('   - Nome:', normStudent.name)
+        simuladoLog('   - Sheet Code:', normStudent.sheet_code)
       } else {
-        console.log('❌ Aluno também não encontrado com matrícula normalizada')
+        simuladoLog('❌ Aluno também não encontrado com matrícula normalizada')
       }
     }
   }
 
   // 3. Contar total de registros na tabela student_answers
-  console.log('\n📋 VERIFICANDO TABELA student_answers:')
+  simuladoLog('\n📋 VERIFICANDO TABELA student_answers:')
   const { count: totalCount, error: countError } = await supabase
     .from('student_answers')
     .select('*', { count: 'exact', head: true })
@@ -110,7 +111,7 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
   if (countError) {
     console.error('❌ Erro ao contar registros:', countError)
   } else {
-    console.log('📊 Total de registros:', totalCount)
+    simuladoLog('📊 Total de registros:', totalCount)
   }
 
   // 4. Buscar registros para a matrícula (formato original)
@@ -122,7 +123,7 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
   if (exactError) {
     console.error('❌ Erro ao buscar matrícula exata:', exactError)
   } else {
-    console.log(
+    simuladoLog(
       '🔍 Registros com matrícula exata (',
       matricula,
       '):',
@@ -131,7 +132,7 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
   }
 
   // 4.1 Verificar se existe coluna student_id na student_answers
-  console.log('\n📋 Verificando estrutura da tabela student_answers:')
+  simuladoLog('\n📋 Verificando estrutura da tabela student_answers:')
   try {
     const { data: sampleRecord } = await supabase
       .from('student_answers')
@@ -140,24 +141,24 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
       .single()
 
     if (sampleRecord) {
-      console.log('   Colunas disponíveis:', Object.keys(sampleRecord).join(', '))
+      simuladoLog('   Colunas disponíveis:', Object.keys(sampleRecord).join(', '))
 
       // Se existe student_id, tentar buscar por ele
       if ('student_id' in sampleRecord && studentData?.id) {
-        console.log('   Tentando buscar por student_id:', studentData.id)
+        simuladoLog('   Tentando buscar por student_id:', studentData.id)
         const { data: byStudentId } = await supabase
           .from('student_answers')
           .select('id, student_number, exam_id, created_at')
           .eq('student_id', studentData.id)
 
-        console.log('   Registros encontrados com student_id:', byStudentId?.length || 0)
+        simuladoLog('   Registros encontrados com student_id:', byStudentId?.length || 0)
         if (byStudentId && byStudentId.length > 0) {
-          console.log('   Registros:', byStudentId)
+          simuladoLog('   Registros:', byStudentId)
         }
       }
     }
   } catch (e) {
-    console.log('   Não foi possível verificar estrutura:', e)
+    simuladoLog('   Não foi possível verificar estrutura:', e)
   }
 
   // 5. Mostrar alguns exemplos de student_number na tabela
@@ -169,23 +170,23 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
   if (samplesError) {
     console.error('❌ Erro ao buscar amostras:', samplesError)
   } else {
-    console.log('\n📝 Exemplos de student_number na tabela:')
+    simuladoLog('\n📝 Exemplos de student_number na tabela:')
     samples?.forEach((s, i) => {
-      console.log(`   ${i + 1}. ${s.student_number} - ${s.student_name || 'Sem nome'}`)
+      simuladoLog(`   ${i + 1}. ${s.student_number} - ${s.student_name || 'Sem nome'}`)
     })
   }
 
   // 6. Verificar se existe a tabela 'projetos'
-  console.log('\n📋 VERIFICANDO TABELA projetos:')
+  simuladoLog('\n📋 VERIFICANDO TABELA projetos:')
   try {
     const { count: projetosCount, error: projetosCountError } = await supabase
       .from('projetos')
       .select('*', { count: 'exact', head: true })
 
     if (projetosCountError) {
-      console.log('⚠️ Erro na tabela projetos:', projetosCountError)
+      simuladoLog('⚠️ Erro na tabela projetos:', projetosCountError)
     } else {
-      console.log('📊 Total de registros na tabela projetos:', projetosCount)
+      simuladoLog('📊 Total de registros na tabela projetos:', projetosCount)
 
       // Buscar aluno na tabela projetos
       const { data: projetos, error: projetosError } = await supabase
@@ -195,9 +196,9 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
         .limit(5)
 
       if (!projetosError && projetos) {
-        console.log('📝 Projetos encontrados:')
+        simuladoLog('📝 Projetos encontrados:')
         for (const projeto of projetos) {
-          console.log(`   Projeto: ${projeto.id} - ${projeto.nome || 'Sem nome'}`)
+          simuladoLog(`   Projeto: ${projeto.id} - ${projeto.nome || 'Sem nome'}`)
           const studentsArray = projeto.students as Array<{
             matricula?: string
             name?: string
@@ -205,13 +206,13 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
             id?: string
           }> | null
 
-          console.log(`   Total de alunos no projeto: ${studentsArray?.length || 0}`)
+          simuladoLog(`   Total de alunos no projeto: ${studentsArray?.length || 0}`)
 
           // Mostrar os primeiros 3 alunos do projeto para entender o formato
           if (studentsArray && studentsArray.length > 0) {
-            console.log('   Exemplos de alunos no projeto:')
+            simuladoLog('   Exemplos de alunos no projeto:')
             studentsArray.slice(0, 3).forEach((s, idx) => {
-              console.log(
+              simuladoLog(
                 `      ${idx + 1}. ID: ${s.id}, Matrícula: ${s.matricula}, Nome: ${s.name || 'N/A'}`,
               )
             })
@@ -228,22 +229,22 @@ export async function diagnoseStudentAnswers(matricula: string): Promise<void> {
           )
 
           if (foundStudent) {
-            console.log(`   ✅ ✅ ✅ ALUNO ENCONTRADO NO PROJETO ${projeto.id}:`)
-            console.log('   Dados completos (JSON):')
-            console.log(JSON.stringify(foundStudent, null, 2))
-            console.log('   TODOS os campos disponíveis:')
-            console.log('   ', Object.keys(foundStudent).join(', '))
+            simuladoLog(`   ✅ ✅ ✅ ALUNO ENCONTRADO NO PROJETO ${projeto.id}:`)
+            simuladoLog('   Dados completos (JSON):')
+            simuladoLog(JSON.stringify(foundStudent, null, 2))
+            simuladoLog('   TODOS os campos disponíveis:')
+            simuladoLog('   ', Object.keys(foundStudent).join(', '))
           } else {
-            console.log('   ❌ Aluno não encontrado neste projeto')
+            simuladoLog('   ❌ Aluno não encontrado neste projeto')
           }
         }
       } else if (projetosError) {
-        console.log('   Erro ao buscar projetos:', projetosError)
+        simuladoLog('   Erro ao buscar projetos:', projetosError)
       }
     }
   } catch (e) {
-    console.log('⚠️ Tabela projetos não acessível:', e)
+    simuladoLog('⚠️ Tabela projetos não acessível:', e)
   }
 
-  console.log('\n========== FIM DO DIAGNÓSTICO ==========')
+  simuladoLog('\n========== FIM DO DIAGNÓSTICO ==========')
 }

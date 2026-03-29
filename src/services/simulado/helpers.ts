@@ -1,8 +1,5 @@
-import type {
-  QuestionContent,
-  TopicSummary,
-  WrongQuestion,
-} from '../../types/supabase'
+import type { QuestionContent, TopicSummary, WrongQuestion } from '../../types/supabase'
+import { simuladoLog } from './logger'
 
 export function calculateWrongQuestions(
   studentAnswers: string[],
@@ -31,7 +28,7 @@ export function calculateWrongQuestions(
     }
   }
 
-  console.log(`[calculateWrongQuestions] ${wrongQuestions.length} erros calculados`)
+  simuladoLog(`[calculateWrongQuestions] ${wrongQuestions.length} erros calculados`)
   return wrongQuestions
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -132,11 +132,6 @@ export function AuditLog() {
   const [actionFilter, setActionFilter] = useState("");
   const [searchText, setSearchText] = useState("");
 
-  // Stats
-  const [totalActions, setTotalActions] = useState(0);
-  const [uniqueUsers, setUniqueUsers] = useState(0);
-  const [topAction, setTopAction] = useState("");
-
   const PAGE_SIZE = 50;
 
   const buildQuery = useCallback(
@@ -182,33 +177,38 @@ export function AuditLog() {
     setSchools(data ?? []);
   }, []);
 
-  const computeStats = useCallback(
-    (data: readonly AuditEntry[]) => {
-      setTotalActions(data.length);
-      const users = new Set(data.map((e) => e.user_email).filter(Boolean));
-      setUniqueUsers(users.size);
-
-      const counts: Record<string, number> = {};
-      for (const entry of data) {
-        counts[entry.action] = (counts[entry.action] ?? 0) + 1;
-      }
-      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-      setTopAction(sorted.length > 0 ? (ACTION_LABELS[sorted[0][0]] ?? sorted[0][0]) : "-");
-    },
-    [],
-  );
-
   useEffect(() => {
-    loadSchools();
+    const timeoutId = window.setTimeout(() => {
+      void loadSchools();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadSchools]);
 
   useEffect(() => {
-    loadEntries();
+    const timeoutId = window.setTimeout(() => {
+      void loadEntries();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadEntries]);
 
-  useEffect(() => {
-    computeStats(entries);
-  }, [entries, computeStats]);
+  const { totalActions, uniqueUsers, topAction } = useMemo(() => {
+    const users = new Set(entries.map((entry) => entry.user_email).filter(Boolean));
+    const counts: Record<string, number> = {};
+
+    for (const entry of entries) {
+      counts[entry.action] = (counts[entry.action] ?? 0) + 1;
+    }
+
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+    return {
+      totalActions: entries.length,
+      uniqueUsers: users.size,
+      topAction: sorted.length > 0 ? (ACTION_LABELS[sorted[0][0]] ?? sorted[0][0]) : "-",
+    };
+  }, [entries]);
 
   // Client-side text filter
   const filteredEntries = searchText

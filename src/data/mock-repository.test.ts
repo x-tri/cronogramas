@@ -294,10 +294,10 @@ describe('MockRepository', () => {
     })
 
     it('should get subject by code', async () => {
-      const subject = await repository.subjects.getSubjectByCode('MAT1')
+      const subject = await repository.subjects.getSubjectByCode('MAT')
 
       expect(subject).toBeDefined()
-      expect(subject?.codigo).toBe('MAT1')
+      expect(subject?.codigo).toBe('MAT')
     })
 
     it('should return null for non-existent subject code', async () => {

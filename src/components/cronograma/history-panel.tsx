@@ -72,7 +72,7 @@ export function HistoryPanel() {
       </div>
 
       {/* Horizontal scroll of version cards */}
-      {versions.length > 0 && (
+      {versions.length > 1 && (
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
         {versions.map((v) => {
           const isActive = v.id === currentCronograma?.id

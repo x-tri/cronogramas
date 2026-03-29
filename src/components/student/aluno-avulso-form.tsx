@@ -3,7 +3,11 @@ import { useRepository } from '../../data/factory'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { ESCOLA_LABELS } from '../../types/domain'
 
-export function AlunoAvulsoForm() {
+type AlunoAvulsoFormProps = {
+  variant?: 'panel' | 'compact'
+}
+
+export function AlunoAvulsoForm({ variant = 'compact' }: AlunoAvulsoFormProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [nome, setNome] = useState('')
   const [matricula, setMatricula] = useState('')
@@ -58,32 +62,55 @@ export function AlunoAvulsoForm() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
+        className={
+          variant === 'panel'
+            ? 'flex w-full items-start gap-3 rounded-2xl border border-[#dbe5f3] bg-[#f8fbff] px-4 py-4 text-left text-[#1d4ed8] transition-all hover:-translate-y-0.5 hover:border-[#bfdbfe] hover:bg-white'
+            : 'inline-flex items-center gap-2 rounded-2xl border border-[#dbe5f3] bg-[#f8fbff] px-4 py-2.5 text-sm font-medium text-[#1d4ed8] transition-all hover:-translate-y-0.5 hover:border-[#bfdbfe] hover:bg-white'
+        }
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-        </svg>
-        Cadastrar Aluno Avulso
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/80">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+          </svg>
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
+            Cadastro manual
+          </span>
+          <span className="block truncate text-sm font-semibold text-[#1d4ed8]">
+            Cadastrar aluno avulso
+          </span>
+          {variant === 'panel' && (
+            <span className="mt-1 block text-xs text-[#64748b]">
+              Use esta opção quando o aluno ainda não estiver disponível pela matrícula.
+            </span>
+          )}
+        </span>
       </button>
     )
   }
 
   return (
-    <div className="bg-blue-50/50 rounded-lg border border-blue-200 p-6">
+    <div className="rounded-[24px] border border-[#dbe5f3] bg-white p-6 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.35)]">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#eff6ff]">
+            <svg className="h-4 w-4 text-[#2563eb]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
           </div>
-          <h3 className="text-sm font-semibold text-gray-900">
-            Cadastrar Aluno {ESCOLA_LABELS.XTRI}
-          </h3>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
+              Aluno avulso
+            </p>
+            <h3 className="text-sm font-semibold text-gray-900">
+              Cadastrar aluno {ESCOLA_LABELS.XTRI}
+            </h3>
+          </div>
         </div>
         <button
           onClick={() => setIsOpen(false)}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
+          className="rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-[#f8fafc] hover:text-gray-600"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -103,10 +130,10 @@ export function AlunoAvulsoForm() {
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               placeholder="Ex: João da Silva"
-              className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              required
-            />
-          </div>
+            className="block w-full rounded-2xl border border-[#dbe5f3] px-3.5 py-3 text-sm focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb]/12"
+            required
+          />
+        </div>
 
           <div>
             <label htmlFor="avulso-matricula" className="block text-sm font-medium text-gray-700 mb-1">
@@ -118,10 +145,10 @@ export function AlunoAvulsoForm() {
               value={matricula}
               onChange={(e) => setMatricula(e.target.value)}
               placeholder="Ex: AV001"
-              className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              required
-            />
-          </div>
+            className="block w-full rounded-2xl border border-[#dbe5f3] px-3.5 py-3 text-sm focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb]/12"
+            required
+          />
+        </div>
 
           <div>
             <label htmlFor="avulso-turma" className="block text-sm font-medium text-gray-700 mb-1">
@@ -133,9 +160,9 @@ export function AlunoAvulsoForm() {
               value={turma}
               onChange={(e) => setTurma(e.target.value)}
               placeholder="Ex: Avulso, Online, etc"
-              className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            />
-          </div>
+            className="block w-full rounded-2xl border border-[#dbe5f3] px-3.5 py-3 text-sm focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb]/12"
+          />
+        </div>
 
           <div>
             <label htmlFor="avulso-email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -147,13 +174,13 @@ export function AlunoAvulsoForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Ex: aluno@email.com"
-              className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            />
-          </div>
+            className="block w-full rounded-2xl border border-[#dbe5f3] px-3.5 py-3 text-sm focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb]/12"
+          />
+        </div>
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+          <div className="flex items-center gap-2 rounded-2xl bg-red-50 px-3 py-2 text-sm text-red-600">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -165,7 +192,7 @@ export function AlunoAvulsoForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-2xl bg-[#2563eb] px-4 py-2.5 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:bg-[#1d4ed8] disabled:opacity-50"
           >
             {isLoading ? (
               <>
@@ -187,7 +214,7 @@ export function AlunoAvulsoForm() {
           <button
             type="button"
             onClick={() => setIsOpen(false)}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-800"
           >
             Cancelar
           </button>

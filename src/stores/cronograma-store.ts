@@ -8,6 +8,10 @@ import type {
   HorarioOficial,
   Turno,
 } from '../types/domain'
+import type {
+  SimuladoHistoryItem,
+  SimuladoResult,
+} from '../types/supabase'
 import { getSlotByIndex } from '../constants/time-slots'
 import { getRepository } from '../data/factory'
 
@@ -19,6 +23,9 @@ type CronogramaState = {
   blocks: BlocoCronograma[]
   selectedWeek: Date
   cronogramaVersions: Cronograma[]
+  simuladoHistory: SimuladoHistoryItem[]
+  selectedSimuladoHistoryItem: SimuladoHistoryItem | null
+  selectedSimuladoResult: SimuladoResult | null
 
   // Loading states
   isLoadingStudent: boolean
@@ -32,6 +39,10 @@ type CronogramaState = {
   setOfficialSchedule: (schedule: HorarioOficial[]) => void
   setCronograma: (cronograma: Cronograma | null) => void
   setBlocks: (blocks: BlocoCronograma[]) => void
+  setSimuladoHistory: (history: SimuladoHistoryItem[]) => void
+  setSelectedSimuladoHistoryItem: (item: SimuladoHistoryItem | null) => void
+  setSelectedSimuladoResult: (result: SimuladoResult | null) => void
+  resetSimuladoState: () => void
   setSelectedWeek: (date: Date) => Promise<void>
   setLoadingStudent: (loading: boolean) => void
   setLoadingSchedule: (loading: boolean) => void
@@ -82,6 +93,9 @@ const initialState = {
   blocks: [],
   selectedWeek: new Date(),
   cronogramaVersions: [] as Cronograma[],
+  simuladoHistory: [] as SimuladoHistoryItem[],
+  selectedSimuladoHistoryItem: null as SimuladoHistoryItem | null,
+  selectedSimuladoResult: null as SimuladoResult | null,
   isLoadingStudent: false,
   isLoadingSchedule: false,
   isLoadingVersions: false,
@@ -94,10 +108,26 @@ export const useCronogramaStore = create<CronogramaState>()(
     (set, get) => ({
       ...initialState,
 
-      setStudent: (student) => set({ currentStudent: student }),
+      setStudent: (student) =>
+        set({
+          currentStudent: student,
+          simuladoHistory: [],
+          selectedSimuladoHistoryItem: null,
+          selectedSimuladoResult: null,
+        }),
       setOfficialSchedule: (schedule) => set({ officialSchedule: schedule }),
       setCronograma: (cronograma) => set({ cronograma }),
       setBlocks: (blocks) => set({ blocks }),
+      setSimuladoHistory: (history) => set({ simuladoHistory: history }),
+      setSelectedSimuladoHistoryItem: (item) =>
+        set({ selectedSimuladoHistoryItem: item }),
+      setSelectedSimuladoResult: (result) => set({ selectedSimuladoResult: result }),
+      resetSimuladoState: () =>
+        set({
+          simuladoHistory: [],
+          selectedSimuladoHistoryItem: null,
+          selectedSimuladoResult: null,
+        }),
       setSelectedWeek: async (date) => {
         set({ selectedWeek: date })
         // Reload cronograma for the new week if student is selected

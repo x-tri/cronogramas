@@ -25,7 +25,6 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
   const blocks = useCronogramaStore((state) => state.blocks)
   const selectedWeek = useCronogramaStore((state) => state.selectedWeek)
   const removeBlock = useCronogramaStore((state) => state.removeBlock)
-  const updateBlock = useCronogramaStore((state) => state.updateBlock)
   const moveBlock = useCronogramaStore((state) => state.moveBlock)
   const swapBlocks = useCronogramaStore((state) => state.swapBlocks)
 

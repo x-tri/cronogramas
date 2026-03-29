@@ -1,6 +1,10 @@
 import type { User as SupabaseAuthUser } from "@supabase/supabase-js";
 import { isSupabaseConfigured } from "../config/repository-config";
 import { logAudit } from "../services/audit";
+import {
+  signOutSimuladoSupabase,
+  syncSimuladoSupabaseSession,
+} from "./simulado-supabase";
 import { supabase } from "./supabase";
 
 export interface User {
@@ -133,6 +137,7 @@ export async function authenticate(
         password,
       });
       if (!error && data.user && data.session) {
+        await syncSimuladoSupabaseSession(email, password);
         logAudit("login", "user", data.user.id, { email });
         return mapSupabaseUser(data.user, data.session.access_token);
       }
@@ -151,7 +156,10 @@ export function login(_user: User): void {
 
 export async function logout(): Promise<void> {
   if (!isSupabaseConfigured()) return;
-  await supabase.auth.signOut();
+  await Promise.allSettled([
+    supabase.auth.signOut(),
+    signOutSimuladoSupabase(),
+  ]);
 }
 
 export async function getCurrentUser(): Promise<User | null> {
