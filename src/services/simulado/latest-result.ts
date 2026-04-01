@@ -242,7 +242,7 @@ function buildSimuladoResultFromGroup(group: SimuladoAnswerGroup): SimuladoResul
   const titleParts = [...new Set([day1Exam?.title, day2Exam?.title].filter(Boolean))]
   const title =
     titleParts.length > 0
-      ? [...new Set(titleParts.map(stripDayLabel))].join(' + ')
+      ? [...new Set((titleParts as string[]).map(stripDayLabel))].join(' + ')
       : standaloneExam?.title ?? primaryExam.title
 
   return {
@@ -331,6 +331,53 @@ export async function getStudentAnswersSimuladoResult(
 
   const group = groupFromHistoryItem(item, answers, exams)
   return buildSimuladoResultFromGroup(group)
+}
+
+export async function getStudentAnswersReferenceResult(
+  studentNumber: string,
+  referenceTitle?: string | null,
+  referenceDate?: string | null,
+): Promise<SimuladoResult | null> {
+  const history = await listStudentAnswersSimulados(studentNumber)
+  if (history.length === 0) return null
+
+  const normalizedReferenceTitle = referenceTitle
+    ? normalizeTitle(stripDayLabel(referenceTitle))
+    : null
+
+  const ranked = history
+    .map((item) => {
+      const normalizedItemTitle = normalizeTitle(stripDayLabel(item.title))
+      const titleMatches =
+        normalizedReferenceTitle != null &&
+        (normalizedItemTitle === normalizedReferenceTitle ||
+          normalizedItemTitle.includes(normalizedReferenceTitle) ||
+          normalizedReferenceTitle.includes(normalizedItemTitle))
+
+      const dateMatches =
+        referenceDate != null && areDatesClose(item.date, referenceDate)
+
+      let score = 0
+      if (titleMatches) score += 4
+      if (dateMatches) score += 2
+      if (item.isLatest) score += 1
+
+      return { item, score }
+    })
+    .sort((left, right) => right.score - left.score)
+
+  const bestMatch = ranked[0]?.item ?? null
+  if (!bestMatch) return null
+
+  const shouldUseFallbackLatest =
+    history.length === 1 ||
+    ranked[0].score > 0
+
+  if (!shouldUseFallbackLatest) {
+    return null
+  }
+
+  return getStudentAnswersSimuladoResult(bestMatch)
 }
 
 export async function getLatestSimuladoResult(

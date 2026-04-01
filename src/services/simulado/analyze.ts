@@ -5,6 +5,7 @@ import type {
 import { groupByTopic } from './helpers'
 import {
   getLatestSimuladoResult,
+  getStudentAnswersReferenceResult,
   getStudentAnswersSimuladoResult,
   isStudentAnswersHistoryItem,
   listStudentAnswersSimulados,
@@ -59,6 +60,72 @@ async function mergeTRIScores(
   }
 }
 
+function getAccountedTotal(result: SimuladoResult): number {
+  return (
+    result.studentAnswer.correct_answers +
+    result.studentAnswer.wrong_answers +
+    result.studentAnswer.blank_answers
+  )
+}
+
+async function reconcileWithOfficialAnswers(
+  result: SimuladoResult,
+  referenceTitle: string | null | undefined,
+  referenceDate: string | null | undefined,
+  studentNumber: string | null | undefined,
+): Promise<SimuladoResult> {
+  if (!studentNumber) {
+    return result
+  }
+
+  const officialResult = await getStudentAnswersReferenceResult(
+    studentNumber,
+    referenceTitle,
+    referenceDate,
+  )
+
+  if (!officialResult) {
+    return result
+  }
+
+  const currentTotal = getAccountedTotal(result)
+  const officialTotal = getAccountedTotal(officialResult)
+  const shouldAdoptOfficial =
+    officialTotal > currentTotal ||
+    officialResult.studentAnswer.blank_answers > result.studentAnswer.blank_answers ||
+    (officialResult.studentAnswer.answers?.length ?? 0) >
+      (result.studentAnswer.answers?.length ?? 0)
+
+  if (!shouldAdoptOfficial) {
+    return result
+  }
+
+  return {
+    ...result,
+    exam: {
+      ...result.exam,
+      question_contents: result.exam.question_contents ?? officialResult.exam.question_contents,
+    },
+    studentAnswer: {
+      ...result.studentAnswer,
+      exam_id: officialResult.studentAnswer.exam_id,
+      answers: officialResult.studentAnswer.answers,
+      correct_answers: officialResult.studentAnswer.correct_answers,
+      wrong_answers: officialResult.studentAnswer.wrong_answers,
+      blank_answers: officialResult.studentAnswer.blank_answers,
+      created_at: officialResult.studentAnswer.created_at,
+    },
+    wrongQuestions:
+      officialResult.wrongQuestions.length > 0
+        ? officialResult.wrongQuestions
+        : result.wrongQuestions,
+    topicsSummary:
+      officialResult.topicsSummary.length > 0
+        ? officialResult.topicsSummary
+        : result.topicsSummary,
+  }
+}
+
 function markLatest(items: SimuladoHistoryItem[]): SimuladoHistoryItem[] {
   return items.map((item, index) => ({
     ...item,
@@ -88,7 +155,7 @@ export async function listStudentSimulados(
     .filter((value, index, list) => list.indexOf(value) === index)
 
   for (const identifier of fallbackIdentifiers) {
-    const history = await listStudentAnswersSimulados(identifier)
+    const history = await listStudentAnswersSimulados(identifier as string)
     if (history.length > 0) {
       return markLatest(history)
     }
@@ -100,15 +167,24 @@ export async function listStudentSimulados(
 export async function getSimuladoResultByHistoryItem(
   item: SimuladoHistoryItem,
 ): Promise<SimuladoResult | null> {
-  const result = isStudentAnswersHistoryItem(item)
+  const baseResult = isStudentAnswersHistoryItem(item)
     ? await getStudentAnswersSimuladoResult(item)
     : await getProjetoSimuladoResult(item)
 
-  if (!result) {
+  if (!baseResult) {
     return null
   }
 
-  return mergeTRIScores(result, item.studentNumber)
+  const reconciledResult = isStudentAnswersHistoryItem(item)
+    ? baseResult
+    : await reconcileWithOfficialAnswers(
+        baseResult,
+        item.title,
+        item.date,
+        item.studentNumber,
+      )
+
+  return mergeTRIScores(reconciledResult, item.studentNumber)
 }
 
 export async function analyzeStudentSimulado(
@@ -173,7 +249,13 @@ export async function analyzeStudentSimulado(
   }
 
   if (projetoResult) {
-    return mergeLegacyTRI(projetoResult)
+    const reconciledProjetoResult = await reconcileWithOfficialAnswers(
+      projetoResult,
+      projetoResult.exam.title,
+      projetoResult.studentAnswer.created_at,
+      matricula,
+    )
+    return mergeLegacyTRI(reconciledProjetoResult)
   }
 
   const sheetCode = student?.sheet_code

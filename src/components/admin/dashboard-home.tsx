@@ -235,11 +235,10 @@ export function DashboardHome() {
 
     for (const school of schools) {
       const [cronRes, coordRes, auditRes] = await Promise.all([
-        supabase
-          .from("cronogramas")
-          .select("*", { count: "exact", head: true })
-          .eq("school_id", school.id)
-          .gte("created_at", weekAgo),
+        supabase.rpc("count_cronogramas_by_school", {
+          p_school_id: school.id,
+          p_since: weekAgo,
+        }),
         supabase
           .from("project_users")
           .select("*", { count: "exact", head: true })
@@ -257,7 +256,7 @@ export function DashboardHome() {
         id: school.id,
         name: school.name,
         coordinator_count: coordRes.count ?? 0,
-        cronogramas_week: cronRes.count ?? 0,
+        cronogramas_week: (cronRes.data as number) ?? 0,
         last_activity: auditRes.data?.[0]?.created_at ?? null,
       });
     }

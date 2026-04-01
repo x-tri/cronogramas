@@ -17,7 +17,21 @@ import { getHorariosPorTurma } from './mock-data/schedules'
 import { logRepository } from '../config/repository-config'
 import { supabase } from '../lib/supabase'
 
-// Supabase client é inicializado lazy no próprio módulo supabase.ts
+// Garante sessão válida antes de writes — verifica com o servidor (evita clock skew)
+async function assertSession(): Promise<void> {
+  // getUser() faz requisição real ao servidor — detecta tokens expirados mesmo com
+  // clock skew entre cliente e servidor (getSession() só usa relógio local)
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+  if (!user || userError) {
+    // Token expirado/inválido no servidor — tenta renovar
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession()
+    if (refreshError || !refreshed.session) {
+      throw new Error('Sessão expirada. Faça login novamente.')
+    }
+    // refreshSession() atualiza o cliente internamente — próxima request usa o novo token
+  }
+}
 
 export function createSupabaseRepository(): DataRepository {
   logRepository('Inicializando Supabase repository')
@@ -180,8 +194,8 @@ export function createSupabaseRepository(): DataRepository {
       },
 
       saveCronograma: async (cronogramaData) => {
-        
-        
+        await assertSession()
+
         const row = cronogramaToRow(cronogramaData)
 
         const { data, error } = await supabase
@@ -264,8 +278,8 @@ export function createSupabaseRepository(): DataRepository {
       },
 
       createBloco: async (blocoData) => {
-        
-        
+        await assertSession()
+
         const row = blocoToRow(blocoData)
 
         const { data, error } = await supabase

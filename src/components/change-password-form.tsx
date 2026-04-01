@@ -40,14 +40,8 @@ export function ChangePasswordForm({ userName, onSuccess }: ChangePasswordFormPr
         return;
       }
 
-      // Mark must_change_password = false
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from("project_users")
-          .update({ must_change_password: false })
-          .eq("auth_uid", user.id);
-      }
+      // Mark must_change_password = false (via SECURITY DEFINER RPC — bypassa RLS)
+      await supabase.rpc("mark_password_changed");
 
       onSuccess();
     } catch {

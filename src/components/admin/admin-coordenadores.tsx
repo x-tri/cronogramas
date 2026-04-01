@@ -73,6 +73,12 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
 
   async function handleRemove(email: string) {
     if (!confirm(`Remover ${email} do projeto?`)) return;
+    // Garantir sessao valida antes do RPC
+    const { error: sessionErr } = await supabase.auth.getUser();
+    if (sessionErr) {
+      alert("Sessao expirada. Faca login novamente.");
+      return;
+    }
     const { data, error } = await supabase.rpc("remove_project_user", {
       p_email: email,
     });
@@ -325,6 +331,7 @@ function AddUserModal({
 }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
   const [schoolId, setSchoolId] = useState("");
   const [role, setRole] = useState("coordinator");
   const [allowedSeries, setAllowedSeries] = useState<string[]>(["3º Ano"]);
@@ -348,11 +355,23 @@ function AddUserModal({
       setResult({ success: false, message: "Selecione uma escola para coordenadores" });
       return;
     }
+    if (password && password.length < 6) {
+      setResult({ success: false, message: "Senha deve ter pelo menos 6 caracteres" });
+      return;
+    }
     if (role === "super_admin" && !confirm("Criar usuario com poderes de Super Admin? Tera acesso TOTAL ao sistema.")) {
       return;
     }
     setSubmitting(true);
     setResult(null);
+
+    // Garantir sessao valida antes do RPC
+    const { error: sessionErr } = await supabase.auth.getUser();
+    if (sessionErr) {
+      setResult({ success: false, message: "Sessao expirada. Faca login novamente." });
+      setSubmitting(false);
+      return;
+    }
 
     const { data, error } = await supabase.rpc("add_project_user", {
       p_email: email,
@@ -360,6 +379,7 @@ function AddUserModal({
       p_name: name || null,
       p_role: role,
       p_allowed_series: allowedSeries,
+      p_password: password || null,
     });
 
     if (error) {
@@ -429,6 +449,22 @@ function AddUserModal({
               placeholder="Nome do usuario"
               className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:border-[#93c5fd] focus:ring-2 focus:ring-[#bfdbfe]"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-[#374151]">
+              Senha temporaria
+            </label>
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimo 6 caracteres"
+              className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:border-[#93c5fd] focus:ring-2 focus:ring-[#bfdbfe]"
+            />
+            <p className="text-xs text-[#94a3b8]">
+              Se preenchida, a conta de login sera criada automaticamente. O usuario devera trocar a senha no primeiro acesso.
+            </p>
           </div>
 
           <div className="space-y-1.5">

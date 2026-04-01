@@ -1,8 +1,8 @@
 import type { SimuladoResult } from '../types/supabase'
 import { logAudit, logApiUsage } from './audit'
+import { supabase } from '../lib/supabase'
 
-// Chamada via Edge Function do Supabase para evitar CORS (API key fica server-side)
-const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/maritaca-proxy`
+// Chamada via supabase.functions.invoke para injetar Authorization automaticamente
 const MARITACA_MODEL = 'sabia-3'
 
 export interface Atividade {
@@ -112,23 +112,29 @@ export async function gerarPlanoEstudo(result: SimuladoResult): Promise<PlanoEst
   const prompt = buildPrompt(result)
 
   const startTime = Date.now()
-  const response = await fetch(EDGE_FUNCTION_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const { data, error } = await supabase.functions.invoke('maritaca-proxy', {
+    body: {
       model: MARITACA_MODEL,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.4,
       max_tokens: 2000,
-    }),
+    },
   })
 
-  if (!response.ok) {
-    const err = await response.text()
-    throw new Error(`Maritaca API error ${response.status}: ${err}`)
+  if (error) {
+    logApiUsage({
+      endpoint: "maritaca-proxy",
+      model: "sabia-3",
+      tokens_in: 0,
+      tokens_out: 0,
+      status: 500,
+      duration_ms: Date.now() - startTime,
+      error: error.message,
+    })
+    throw new Error(`Maritaca API error: ${error.message}`)
   }
 
-  const data = await response.json() as {
+  const apiData = data as {
     choices: { message: { content: string } }[]
     usage?: { prompt_tokens?: number; completion_tokens?: number }
   }
@@ -136,15 +142,15 @@ export async function gerarPlanoEstudo(result: SimuladoResult): Promise<PlanoEst
   logApiUsage({
     endpoint: "maritaca-proxy",
     model: "sabia-3",
-    tokens_in: data?.usage?.prompt_tokens ?? 0,
-    tokens_out: data?.usage?.completion_tokens ?? 0,
-    status: response.status,
+    tokens_in: apiData?.usage?.prompt_tokens ?? 0,
+    tokens_out: apiData?.usage?.completion_tokens ?? 0,
+    status: 200,
     duration_ms: Date.now() - startTime,
-    error: response.ok ? null : "error",
+    error: null,
   })
   logAudit("generate_ai_plan", "plano_estudo", undefined, { model: "sabia-3" })
 
-  const content = data.choices[0]?.message?.content ?? ''
+  const content = apiData.choices[0]?.message?.content ?? ''
   const jsonMatch = content.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('Resposta da IA não contém JSON válido')
 

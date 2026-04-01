@@ -99,6 +99,34 @@ function AppContent() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
+  // Busca project_user por auth_uid, com fallback de linking por email
+  async function resolveProjectUser(authUid: string) {
+    // Tentar por auth_uid direto
+    const { data: byUid } = await supabase
+      .from("project_users")
+      .select("role, must_change_password")
+      .eq("auth_uid", authUid)
+      .eq("is_active", true)
+      .single();
+
+    if (byUid) return byUid;
+
+    // Fallback: linking por email (primeiro login de convite pendente)
+    const { data: linkResult } = await supabase.rpc("link_my_auth_uid");
+    if (linkResult?.linked) {
+      // Re-buscar agora que esta linkado
+      const { data: afterLink } = await supabase
+        .from("project_users")
+        .select("role, must_change_password")
+        .eq("auth_uid", authUid)
+        .eq("is_active", true)
+        .single();
+      return afterLink;
+    }
+
+    return null;
+  }
+
   useEffect(() => {
     let isMounted = true;
     (async () => {
@@ -107,12 +135,7 @@ function AppContent() {
         if (!isMounted) return;
         setUser(currentUser);
         if (currentUser) {
-          const { data: projectUser } = await supabase
-            .from("project_users")
-            .select("role, must_change_password")
-            .eq("auth_uid", currentUser.id)
-            .eq("is_active", true)
-            .single();
+          const projectUser = await resolveProjectUser(currentUser.id);
           if (isMounted) {
             setUserRole(projectUser?.role ?? null);
             setMustChangePassword(projectUser?.must_change_password ?? false);
@@ -130,6 +153,25 @@ function AppContent() {
     };
   }, []);
 
+  // Detecta expiração/invalidação de sessão e força re-login
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      const sessionLost =
+        event === "SIGNED_OUT" ||
+        (event === "TOKEN_REFRESHED" && !session) ||
+        (event === "INITIAL_SESSION" && !session);
+
+      if (sessionLost) {
+        setUser(null);
+        setUserRole(null);
+        setMustChangePassword(false);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   useEffect(() => {
     if (currentStudent) {
       setShowSearch(false);
@@ -141,12 +183,7 @@ function AppContent() {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
       if (currentUser) {
-        const { data: projectUser } = await supabase
-          .from("project_users")
-          .select("role, must_change_password")
-          .eq("auth_uid", currentUser.id)
-          .eq("is_active", true)
-          .single();
+        const projectUser = await resolveProjectUser(currentUser.id);
         setUserRole(projectUser?.role ?? null);
         setMustChangePassword(projectUser?.must_change_password ?? false);
       }
