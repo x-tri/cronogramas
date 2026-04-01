@@ -97,6 +97,7 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userSchoolId, setUserSchoolId] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
   // Busca project_user por auth_uid, com fallback de linking por email
@@ -104,7 +105,7 @@ function AppContent() {
     // Tentar por auth_uid direto
     const { data: byUid } = await supabase
       .from("project_users")
-      .select("role, must_change_password")
+      .select("role, must_change_password, school_id")
       .eq("auth_uid", authUid)
       .eq("is_active", true)
       .single();
@@ -117,7 +118,7 @@ function AppContent() {
       // Re-buscar agora que esta linkado
       const { data: afterLink } = await supabase
         .from("project_users")
-        .select("role, must_change_password")
+        .select("role, must_change_password, school_id")
         .eq("auth_uid", authUid)
         .eq("is_active", true)
         .single();
@@ -138,6 +139,7 @@ function AppContent() {
           const projectUser = await resolveProjectUser(currentUser.id);
           if (isMounted) {
             setUserRole(projectUser?.role ?? null);
+            setUserSchoolId(projectUser?.school_id ?? null);
             setMustChangePassword(projectUser?.must_change_password ?? false);
           }
         }
@@ -277,44 +279,34 @@ function AppContent() {
             {currentStudent && (
               <div className="flex flex-col gap-2">
                 <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
-                  <div className="flex min-w-0 items-center justify-between gap-3 rounded-[24px] border border-[#e5e7eb] bg-white/94 px-4 py-3 xl:w-[360px]">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[#111827]">
-                        {currentStudent.nome}
-                      </p>
-                      <p className="mt-0.5 text-xs text-[#64748b]">
-                        Turma {currentStudent.turma} · {currentStudent.matricula}
-                      </p>
+                  <div className="flex min-w-0 items-center gap-2 rounded-[24px] border border-[#e5e7eb] bg-white/94 px-3 py-2.5 xl:w-auto">
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Suspense fallback={null}>
+                        <SimuladoAnalyzer
+                          matricula={currentStudent.matricula}
+                          variant="icon"
+                        />
+                      </Suspense>
+                      <ResetButton variant="icon" />
+                      <Suspense fallback={null}>
+                        <ShareDropdown variant="icon" />
+                      </Suspense>
+                      <AuditPanel variant="icon" coordinatorSchoolId={userSchoolId} />
                     </div>
                     <button
                       onClick={() => setShowSearch(true)}
-                      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-2xl border border-[#dbe5f3] bg-[#f8fbff] px-3.5 text-sm font-medium text-[#1d4ed8] transition-colors hover:border-[#bfdbfe] hover:bg-white"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dbe5f3] bg-[#f8fbff] text-[#1d4ed8] transition-colors hover:border-[#bfdbfe] hover:bg-white"
                       title="Trocar aluno"
                     >
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
-                      Trocar aluno
                     </button>
                   </div>
 
                   <div className="min-w-0 flex-1 rounded-[24px] border border-[#e5e7eb] bg-white/94 px-3 py-2">
                     <WeekSelector variant="compact" />
                   </div>
-                </div>
-
-                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-                  <Suspense fallback={null}>
-                    <SimuladoAnalyzer
-                      matricula={currentStudent.matricula}
-                      variant="compact"
-                    />
-                  </Suspense>
-                  <ResetButton />
-                  <Suspense fallback={null}>
-                    <ShareDropdown />
-                  </Suspense>
-                  <AuditPanel />
                 </div>
               </div>
             )}

@@ -21,7 +21,7 @@ import {
 
 type SimuladoAnalyzerProps = {
   matricula: string
-  variant?: 'default' | 'compact'
+  variant?: 'default' | 'compact' | 'icon'
 }
 
 type LoadResultOptions = {
@@ -635,7 +635,8 @@ export function SimuladoAnalyzer({
       ? `${simuladoHistory.length} simulado${simuladoHistory.length > 1 ? 's' : ''}`
       : 'Sem histórico'
   const hasHistory = simuladoHistory.length > 0
-  const isCompact = variant === 'compact'
+  const isCompact = variant === 'compact' || variant === 'icon'
+  const isIcon = variant === 'icon'
   const hasGoalCutoff = goalCutoff?.notaCorteReferencia != null
   const goalCutoffHeadline = !goalSelection
     ? 'Análise geral (sem corte SISU)'
@@ -654,6 +655,145 @@ export function SimuladoAnalyzer({
     : goalSelection?.courseLabel ?? 'Sem objetivo de curso selecionado'
 
   if (isCompact) {
+    // Icon-only circular buttons variant
+    if (isIcon) {
+      return (
+        <>
+          {/* Simulado icon button */}
+          <div className="group/sim relative">
+            <button
+              onClick={handleAnalyze}
+              onMouseEnter={preloadAnalyzer}
+              onFocus={preloadAnalyzer}
+              disabled={isBusy}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8] transition-colors hover:bg-[#dbeafe] disabled:opacity-50"
+            >
+              {isLoadingResult ? (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m3 6V7m3 10v-4m4 6H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2z" />
+                </svg>
+              )}
+            </button>
+            <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-48 -translate-x-1/2 rounded-xl bg-[#0f172a] px-3 py-2 text-center text-xs text-white opacity-0 shadow-lg transition-all duration-150 group-hover/sim:opacity-100">
+              Simulado{hasHistory ? ` · ${selectedHistoryLabel}` : ''}
+            </div>
+          </div>
+
+          {/* History dropdown arrow (small) */}
+          <div className="group/hist relative">
+            <button
+              type="button"
+              onClick={() => setIsHistoryOpen((open) => !open)}
+              onMouseEnter={preloadAnalyzer}
+              disabled={isBusy}
+              aria-label="Selecionar simulado"
+              className="inline-flex h-9 w-5 items-center justify-center rounded-full text-[#1d4ed8] transition-colors hover:bg-[#dbeafe] disabled:opacity-50"
+            >
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Plano SISU icon button */}
+          <div className="group/sisu relative">
+            <button
+              onClick={handleOpenStudyReport}
+              onMouseEnter={preloadAnalyzer}
+              onFocus={preloadAnalyzer}
+              disabled={isGeneratingReport || isLoadingResult}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#ddd6fe] bg-[#f5f3ff] text-[#6d28d9] transition-colors hover:bg-[#ede9fe] disabled:opacity-50"
+            >
+              {isGeneratingReport ? (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              )}
+            </button>
+            <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-48 -translate-x-1/2 rounded-xl bg-[#0f172a] px-3 py-2 text-center text-xs text-white opacity-0 shadow-lg transition-all duration-150 group-hover/sisu:opacity-100">
+              Plano SISU · {goalCutoffHeadline}
+            </div>
+          </div>
+
+          {isHistoryOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setIsHistoryOpen(false)} />
+              <div className="absolute left-0 top-full z-20 mt-2 w-[22rem] overflow-hidden rounded-2xl border border-[#dbe5f3] bg-white shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)]">
+                <div className="border-b border-[#edf2f7] bg-[#f8fbff] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-[#1d1d1f]">Histórico de simulados</p>
+                      <p className="truncate text-[11px] text-[#64748b]">{selectedHistoryLabel}</p>
+                    </div>
+                    <span className="rounded-full border border-[#dbe5f3] bg-white px-2 py-1 text-[10px] font-semibold text-[#475569]">
+                      {historyCountLabel}
+                    </span>
+                  </div>
+                </div>
+                <div className="max-h-80 overflow-y-auto px-2 py-2">
+                  {isLoadingHistory ? (
+                    <div className="px-3 py-6 text-center text-xs text-[#64748b]">Carregando histórico...</div>
+                  ) : simuladoHistory.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-xs text-[#64748b]">Nenhum simulado encontrado</div>
+                  ) : (
+                    simuladoHistory.map((item) => {
+                      const isSelected = item.id === selectedSimuladoHistoryItem?.id
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => void handleSelectHistoryItem(item)}
+                          className={`flex w-full items-start justify-between rounded-xl px-3.5 py-3 text-left transition-all ${
+                            isSelected
+                              ? 'border border-[#cfe0ff] bg-[#f5f9ff] shadow-[0_12px_28px_-28px_rgba(37,99,235,0.8)]'
+                              : 'border border-transparent hover:bg-[#f8fafc]'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-[#1d1d1f]">{item.title}</p>
+                            <p className="mt-1 text-[11px] text-[#64748b]">{formatHistoryDate(item.date)}</p>
+                          </div>
+                          <div className="ml-3 flex shrink-0 items-center gap-2">
+                            {item.isLatest && (
+                              <span className="rounded-full bg-[#eef2ff] px-2 py-0.5 text-[10px] font-semibold text-[#4f46e5]">Mais recente</span>
+                            )}
+                            {isSelected && (
+                              <svg className="h-4 w-4 text-[#2563eb]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+          {error &&
+            createPortal(
+              <div className="fixed left-1/2 top-14 z-[80] -translate-x-1/2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 shadow-lg">
+                {error}
+              </div>,
+              document.body,
+            )}
+          {renderModal()}
+        </>
+      )
+    }
+
+    // Original compact variant (full-width buttons with text)
     return (
       <>
         <div className="group relative min-w-0">
@@ -719,8 +859,8 @@ export function SimuladoAnalyzer({
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                )}
-              </span>
+              )}
+            </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">Plano SISU</span>
               <span className="mt-0.5 block truncate text-[11px] font-medium text-[#7c3aed]">

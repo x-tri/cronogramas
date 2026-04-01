@@ -41,7 +41,7 @@ function exportToCSV(records: AuditRecord[]) {
   URL.revokeObjectURL(url)
 }
 
-export function AuditPanel() {
+export function AuditPanel({ variant = 'default', coordinatorSchoolId }: { variant?: 'default' | 'icon'; coordinatorSchoolId?: string | null } = {}) {
   const [isOpen, setIsOpen] = useState(false)
   const [records, setRecords] = useState<AuditRecord[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -58,6 +58,27 @@ export function AuditPanel() {
     setError(null)
 
     try {
+      // 0. Se coordenador tem escola, buscar alunos da escola para filtrar
+      let schoolStudentIds: Set<string> | null = null
+      if (coordinatorSchoolId) {
+        const { data: schoolStudents } = await supabase
+          .from('students')
+          .select('id, matricula')
+          .eq('school_id', coordinatorSchoolId)
+        if (schoolStudents && schoolStudents.length > 0) {
+          schoolStudentIds = new Set<string>()
+          for (const s of schoolStudents) {
+            schoolStudentIds.add(s.id)
+            if (s.matricula) schoolStudentIds.add(s.matricula)
+          }
+        } else {
+          // Escola sem alunos cadastrados
+          setRecords([])
+          setIsLoading(false)
+          return
+        }
+      }
+
       // 1. Buscar todos os cronogramas
       const { data: cronogramas, error: cronError } = await supabase
         .from('cronogramas')
@@ -71,15 +92,24 @@ export function AuditPanel() {
         return
       }
 
-      // 2. Agrupar por aluno_id: última data + contagem
+      // 2. Agrupar por aluno_id: última data + contagem (filtrado pela escola se aplicável)
       const alunoMap = new Map<string, { lastDate: string; count: number }>()
       for (const c of cronogramas) {
+        // Filtrar por escola do coordenador
+        if (schoolStudentIds && !schoolStudentIds.has(c.aluno_id)) continue
+
         const existing = alunoMap.get(c.aluno_id)
         if (!existing) {
           alunoMap.set(c.aluno_id, { lastDate: c.created_at, count: 1 })
         } else {
           existing.count++
         }
+      }
+
+      if (alunoMap.size === 0) {
+        setRecords([])
+        setIsLoading(false)
+        return
       }
 
       // 3. Separar UUIDs de matrículas
@@ -255,7 +285,7 @@ export function AuditPanel() {
     if (isOpen && records.length === 0) {
       void loadAuditData()
     }
-  }, [isOpen, records.length])
+  }, [isOpen, records.length, coordinatorSchoolId])
 
   // Group by school
   const grouped = useMemo(() => {
@@ -284,23 +314,39 @@ export function AuditPanel() {
   return (
     <>
       {/* Trigger button in header */}
-      <div className="group relative min-w-0">
-        <button
-          onClick={() => setIsOpen(true)}
-          className="inline-flex h-12 w-full items-center gap-2.5 rounded-2xl border border-[#fde68a] bg-[#fffbeb] px-4 text-left text-sm font-semibold text-[#b45309] transition-colors hover:bg-[#fef3c7]"
-          title="Auditoria de cronogramas"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white/80">
+      {variant === 'icon' ? (
+        <div className="group/audit relative">
+          <button
+            onClick={() => setIsOpen(true)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#fde68a] bg-[#fffbeb] text-[#b45309] transition-colors hover:bg-[#fef3c7]"
+          >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-          </span>
-          <span className="min-w-0 truncate">Auditoria</span>
-        </button>
-        <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl bg-[#0f172a] px-3 py-2 text-xs text-white opacity-0 shadow-[0_20px_40px_-24px_rgba(15,23,42,0.8)] transition-all duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-          Abre a visão gerencial com alunos, versões e cronogramas criados.
+          </button>
+          <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-32 -translate-x-1/2 rounded-xl bg-[#0f172a] px-3 py-2 text-center text-xs text-white opacity-0 shadow-lg transition-all duration-150 group-hover/audit:opacity-100">
+            Auditoria
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="group relative min-w-0">
+          <button
+            onClick={() => setIsOpen(true)}
+            className="inline-flex h-12 w-full items-center gap-2.5 rounded-2xl border border-[#fde68a] bg-[#fffbeb] px-4 text-left text-sm font-semibold text-[#b45309] transition-colors hover:bg-[#fef3c7]"
+            title="Auditoria de cronogramas"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white/80">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </span>
+            <span className="min-w-0 truncate">Auditoria</span>
+          </button>
+          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl bg-[#0f172a] px-3 py-2 text-xs text-white opacity-0 shadow-[0_20px_40px_-24px_rgba(15,23,42,0.8)] transition-all duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+            Abre a visão gerencial com alunos, versões e cronogramas criados.
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {isOpen && createPortal(
