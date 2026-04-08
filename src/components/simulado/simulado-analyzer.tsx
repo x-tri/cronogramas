@@ -11,21 +11,39 @@ import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, TURNOS } from '../../types/domain'
 import { TURNOS_CONFIG } from '../../constants/time-slots'
 import { getColorFromQuestionNumber } from '../../constants/colors'
-import type { StudyReport } from '../../services/study-report'
-import { StudyReportPanel } from './study-report-panel'
-import {
-  SisuGoalSelector,
-  type GoalCourseCutoff,
-  type GoalSelection,
-} from './sisu-goal-selector'
+import type { CursoEscolhido, ReportData, ReportProgress } from '../../types/report'
+import { buildSimuladoAudit } from '../../services/simulado/audit'
+import { CursoSelector } from './curso-selector'
+import { RelatorioCirurgico } from './relatorio-cirurgico'
 
 type SimuladoAnalyzerProps = {
   matricula: string
-  variant?: 'default' | 'compact' | 'icon'
+  variant?: 'default' | 'compact'
 }
 
 type LoadResultOptions = {
   openModal?: boolean
+}
+
+const REPORT_TIMEOUT_MS = 45000
+const REPORT_SLOW_WARNING_MS = 12000
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(timeoutMessage))
+    }, timeoutMs)
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timeoutId)
+        resolve(value)
+      })
+      .catch((error: unknown) => {
+        window.clearTimeout(timeoutId)
+        reject(error)
+      })
+  })
 }
 
 function formatHistoryDate(date: string): string {
@@ -42,13 +60,14 @@ export function SimuladoAnalyzer({
 }: SimuladoAnalyzerProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isLoadingResult, setIsLoadingResult] = useState(false)
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false)
+  const [isLoadingReport, setIsLoadingReport] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isResultOpen, setIsResultOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [report, setReport] = useState<StudyReport | null>(null)
-  const [goalSelection, setGoalSelection] = useState<GoalSelection | null>(null)
-  const [goalCutoff, setGoalCutoff] = useState<GoalCourseCutoff | null>(null)
+  const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [reportLoadingMessage, setReportLoadingMessage] = useState(
+    'Preparando o relatório com dados reais do Supabase...',
+  )
   const [selectedQuestions, setSelectedQuestions] = useState<Set<number>>(new Set())
 
   const blocks = useCronogramaStore((state) => state.blocks)
@@ -81,7 +100,7 @@ export function SimuladoAnalyzer({
     setSelectedQuestions(
       new Set(result.wrongQuestions.map((question) => question.questionNumber)),
     )
-    setReport(null)
+    setReportData(null)
     setIsResultOpen(true)
   }, [])
 
@@ -197,9 +216,7 @@ export function SimuladoAnalyzer({
     let isCancelled = false
 
     setError(null)
-    setReport(null)
-    setGoalSelection(null)
-    setGoalCutoff(null)
+    setReportData(null)
     setSelectedQuestions(new Set())
     setIsHistoryOpen(false)
     setIsResultOpen(false)
@@ -229,39 +246,56 @@ export function SimuladoAnalyzer({
     await loadResult(item, { openModal: true })
   }
 
-  const handleOpenStudyReport = async () => {
-    setError(null)
-    setReport(null)
-    await ensureSelectedResult({ openModal: true })
-  }
+  const handleGerarRelatorioCirurgico = useCallback(
+    async (curso: CursoEscolhido) => {
+      setIsLoadingReport(true)
+      setError(null)
+      setReportData(null)
+      setReportLoadingMessage('Preparando o relatório com dados reais do Supabase...')
 
-  const handleGenerateReport = async (courseId: number | null) => {
-    setIsGeneratingReport(true)
-    setError(null)
-    setReport(null)
-
-    try {
-      const simuladoResult = await ensureSelectedResult()
-      if (!simuladoResult) {
-        setError('Nenhum simulado encontrado para gerar o relatório')
-        return
+      const handleProgress = (progress: ReportProgress) => {
+        setReportLoadingMessage(progress.message)
       }
 
-      const { gerarRelatorioEstudoPorObjetivo } = await import('../../services/study-report')
-      const generatedReport = await gerarRelatorioEstudoPorObjetivo(simuladoResult, courseId ?? undefined)
-      setReport(generatedReport)
-      setIsResultOpen(false)
-    } catch (err) {
-      console.error('Erro ao gerar relatório de estudos:', err)
-      setError('Erro ao gerar relatório de estudos por objetivo')
-    } finally {
-      setIsGeneratingReport(false)
-    }
-  }
+      const slowWarningId = window.setTimeout(() => {
+        setReportLoadingMessage(
+          'Ainda consultando SISU, INEP e banco de questões. Isso pode levar alguns segundos.',
+        )
+      }, REPORT_SLOW_WARNING_MS)
+
+      try {
+        const simuladoResult = await ensureSelectedResult()
+        if (!simuladoResult) {
+          setError('Nenhum simulado encontrado para gerar o relatorio')
+          return
+        }
+
+        const { computeReportData } = await import('../../services/report-engine')
+        const data = await withTimeout(
+          computeReportData(simuladoResult, curso, { onProgress: handleProgress }),
+          REPORT_TIMEOUT_MS,
+          'O relatório demorou além do esperado. Feche e tente novamente.',
+        )
+        setReportData(data)
+      } catch (err) {
+        console.error('Erro ao gerar relatorio cirurgico:', err)
+        setError(
+          err instanceof Error
+            ? `Erro ao gerar relatorio: ${err.message}`
+            : 'Erro ao gerar relatorio cirurgico. Verifique a configuracao.',
+        )
+      } finally {
+        window.clearTimeout(slowWarningId)
+        setIsLoadingReport(false)
+      }
+    },
+    [ensureSelectedResult],
+  )
 
   const handleCloseResult = useCallback(() => {
     setIsResultOpen(false)
-    setReport(null)
+    setReportData(null)
+    setReportLoadingMessage('Preparando o relatório com dados reais do Supabase...')
     setSelectedQuestions(new Set())
     setError(null)
   }, [])
@@ -412,24 +446,31 @@ export function SimuladoAnalyzer({
   const renderModal = () => {
     const result = selectedSimuladoResult
 
-    if (report && !isResultOpen) {
+    // Modal do Relatorio Cirurgico (tela cheia do relatorio)
+    if ((reportData || isLoadingReport) && !isResultOpen) {
       return createPortal(
         <div
-          className="fixed inset-0 z-[70] flex items-start justify-center bg-black/30 px-4 pt-16 backdrop-blur-sm"
-          onClick={() => setReport(null)}
+          className="fixed inset-0 z-[70] flex items-start justify-center bg-black/30 px-4 pt-8 backdrop-blur-sm"
+          onClick={handleCloseResult}
         >
           <div
-            className="animate-apple-scale-in max-h-[80vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+            className="animate-apple-scale-in max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="p-5">
-              <StudyReportPanel
-                report={report}
-                nomeAluno={currentStudent?.nome ?? null}
-                simuladoTitle={
-                  result?.exam.title ?? selectedSimuladoHistoryItem?.title ?? 'Simulado'
-                }
-                onClose={() => setReport(null)}
+              <RelatorioCirurgico
+                report={reportData}
+                nomeAluno={result?.studentAnswer.student_name ?? currentStudent?.nome ?? 'Aluno'}
+                simulado={result ?? undefined}
+                student={{
+                  id: currentStudent?.id ?? null,
+                  matricula: currentStudent?.matricula ?? matricula,
+                  escola: currentStudent?.escola ?? null,
+                  schoolId: currentStudent?.escolaId ?? null,
+                }}
+                isLoading={isLoadingReport}
+                loadingMessage={reportLoadingMessage}
+                onClose={handleCloseResult}
               />
             </div>
           </div>
@@ -443,6 +484,7 @@ export function SimuladoAnalyzer({
     const totalQuestions = result.wrongQuestions.length
     const selectedCount = selectedQuestions.size
     const canDistribute = selectedCount > 0
+    const audit = buildSimuladoAudit(result)
 
     return createPortal(
       <div
@@ -462,6 +504,33 @@ export function SimuladoAnalyzer({
                   {result.studentAnswer.wrong_answers} erros •{' '}
                   {result.studentAnswer.blank_answers} em branco
                 </p>
+                {audit.hasDiscrepancy && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <p className="font-medium">
+                      Auditoria: {audit.accountedTotal}
+                      {audit.expectedTotal != null ? ` de ${audit.expectedTotal}` : ''}{' '}
+                      questoes contabilizadas.
+                      {audit.uncategorizedCount > 0 &&
+                        ` ${audit.uncategorizedCount} sem classificacao.`}
+                      {audit.overflowCount > 0 &&
+                        ` ${audit.overflowCount} acima do total esperado.`}
+                    </p>
+                    {audit.explanation && (
+                      <p className="mt-1 text-[11px] text-amber-800">
+                        {audit.explanation}
+                      </p>
+                    )}
+                    <p className="mt-1 text-[11px] text-amber-800">
+                      Base do front: {result.studentAnswer.correct_answers} acertos +{' '}
+                      {result.studentAnswer.wrong_answers} erros +{' '}
+                      {result.studentAnswer.blank_answers} brancos
+                      {audit.answersCount > 0 &&
+                        ` • respostas carregadas: ${audit.answersCount}`}
+                      {audit.wrongAnswersMismatch > 0 &&
+                        ` • erros detalhados: ${audit.wrongQuestionsCount}`}
+                    </p>
+                  </div>
+                )}
                 <div className="mt-2 flex items-center gap-3 text-xs">
                   {result.studentAnswer.tri_lc != null && (
                     <span className="flex items-center gap-1">
@@ -594,25 +663,26 @@ export function SimuladoAnalyzer({
               </div>
             </div>
 
-            <div className="border-t border-gray-100 pt-4">
-              <SisuGoalSelector
-                value={goalSelection}
-                onChange={setGoalSelection}
-                onCutoffChange={setGoalCutoff}
-                onGenerate={(courseId) => void handleGenerateReport(courseId)}
-                isGenerating={isGeneratingReport}
+            {/* Selecao de Curso para Relatorio Cirurgico */}
+            <div className="border-t border-gray-100 pt-3">
+              <CursoSelector
+                onSelect={(curso) => {
+                  setIsResultOpen(false)
+                  void handleGerarRelatorioCirurgico(curso)
+                }}
+                isLoading={isLoadingReport}
               />
             </div>
 
             <div className="flex items-center justify-between border-t border-gray-100 pt-2">
               <span className={`text-sm ${canDistribute ? 'text-gray-600' : 'text-red-500'}`}>
                 {canDistribute
-                  ? `${selectedCount} questão${selectedCount > 1 ? 's' : ''} pronta${selectedCount > 1 ? 's' : ''} para distribuição`
+                  ? `${selectedCount} questão${selectedCount > 1 ? 's' : ''} serão adicionadas`
                   : 'Selecione pelo menos uma questão'}
               </span>
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={handleCloseResult}>
-                  Fechar
+                  Cancelar
                 </Button>
                 <Button onClick={handleDistribute} disabled={!canDistribute}>
                   Distribuir {selectedCount > 0 ? `(${selectedCount})` : ''}
@@ -635,165 +705,9 @@ export function SimuladoAnalyzer({
       ? `${simuladoHistory.length} simulado${simuladoHistory.length > 1 ? 's' : ''}`
       : 'Sem histórico'
   const hasHistory = simuladoHistory.length > 0
-  const isCompact = variant === 'compact' || variant === 'icon'
-  const isIcon = variant === 'icon'
-  const hasGoalCutoff = goalCutoff?.notaCorteReferencia != null
-  const goalCutoffHeadline = !goalSelection
-    ? 'Análise geral (sem corte SISU)'
-    : hasGoalCutoff
-      ? `${goalCutoff?.origem === 'aprovados_final' ? 'Final Cut' : 'Corte'}: ${goalCutoff?.notaCorteReferencia?.toFixed(2)}`
-      : 'Buscando corte do curso...'
-  const goalCutoffDetail = hasGoalCutoff
-    ? [
-        goalCutoff?.ano != null ? `Ano ${goalCutoff.ano}` : null,
-        goalCutoff?.menorNota != null && goalCutoff?.maiorNota != null
-          ? `Maior/menor ${goalCutoff.maiorNota.toFixed(2)} · ${goalCutoff.menorNota.toFixed(2)}`
-          : goalCutoff?.modalidade,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : goalSelection?.courseLabel ?? 'Sem objetivo de curso selecionado'
+  const isCompact = variant === 'compact'
 
   if (isCompact) {
-    // Icon-only circular buttons variant
-    if (isIcon) {
-      return (
-        <>
-          {/* Simulado icon button */}
-          <div className="group/sim relative">
-            <button
-              onClick={handleAnalyze}
-              onMouseEnter={preloadAnalyzer}
-              onFocus={preloadAnalyzer}
-              disabled={isBusy}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8] transition-colors hover:bg-[#dbeafe] disabled:opacity-50"
-            >
-              {isLoadingResult ? (
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              ) : (
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m3 6V7m3 10v-4m4 6H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2z" />
-                </svg>
-              )}
-            </button>
-            <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-48 -translate-x-1/2 rounded-xl bg-[#0f172a] px-3 py-2 text-center text-xs text-white opacity-0 shadow-lg transition-all duration-150 group-hover/sim:opacity-100">
-              Simulado{hasHistory ? ` · ${selectedHistoryLabel}` : ''}
-            </div>
-          </div>
-
-          {/* History dropdown arrow (small) */}
-          <div className="group/hist relative">
-            <button
-              type="button"
-              onClick={() => setIsHistoryOpen((open) => !open)}
-              onMouseEnter={preloadAnalyzer}
-              disabled={isBusy}
-              aria-label="Selecionar simulado"
-              className="inline-flex h-9 w-5 items-center justify-center rounded-full text-[#1d4ed8] transition-colors hover:bg-[#dbeafe] disabled:opacity-50"
-            >
-              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Plano SISU icon button */}
-          <div className="group/sisu relative">
-            <button
-              onClick={handleOpenStudyReport}
-              onMouseEnter={preloadAnalyzer}
-              onFocus={preloadAnalyzer}
-              disabled={isGeneratingReport || isLoadingResult}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#ddd6fe] bg-[#f5f3ff] text-[#6d28d9] transition-colors hover:bg-[#ede9fe] disabled:opacity-50"
-            >
-              {isGeneratingReport ? (
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              ) : (
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              )}
-            </button>
-            <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-48 -translate-x-1/2 rounded-xl bg-[#0f172a] px-3 py-2 text-center text-xs text-white opacity-0 shadow-lg transition-all duration-150 group-hover/sisu:opacity-100">
-              Plano SISU · {goalCutoffHeadline}
-            </div>
-          </div>
-
-          {isHistoryOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setIsHistoryOpen(false)} />
-              <div className="absolute left-0 top-full z-20 mt-2 w-[22rem] overflow-hidden rounded-2xl border border-[#dbe5f3] bg-white shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)]">
-                <div className="border-b border-[#edf2f7] bg-[#f8fbff] px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-[#1d1d1f]">Histórico de simulados</p>
-                      <p className="truncate text-[11px] text-[#64748b]">{selectedHistoryLabel}</p>
-                    </div>
-                    <span className="rounded-full border border-[#dbe5f3] bg-white px-2 py-1 text-[10px] font-semibold text-[#475569]">
-                      {historyCountLabel}
-                    </span>
-                  </div>
-                </div>
-                <div className="max-h-80 overflow-y-auto px-2 py-2">
-                  {isLoadingHistory ? (
-                    <div className="px-3 py-6 text-center text-xs text-[#64748b]">Carregando histórico...</div>
-                  ) : simuladoHistory.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-xs text-[#64748b]">Nenhum simulado encontrado</div>
-                  ) : (
-                    simuladoHistory.map((item) => {
-                      const isSelected = item.id === selectedSimuladoHistoryItem?.id
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => void handleSelectHistoryItem(item)}
-                          className={`flex w-full items-start justify-between rounded-xl px-3.5 py-3 text-left transition-all ${
-                            isSelected
-                              ? 'border border-[#cfe0ff] bg-[#f5f9ff] shadow-[0_12px_28px_-28px_rgba(37,99,235,0.8)]'
-                              : 'border border-transparent hover:bg-[#f8fafc]'
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-[#1d1d1f]">{item.title}</p>
-                            <p className="mt-1 text-[11px] text-[#64748b]">{formatHistoryDate(item.date)}</p>
-                          </div>
-                          <div className="ml-3 flex shrink-0 items-center gap-2">
-                            {item.isLatest && (
-                              <span className="rounded-full bg-[#eef2ff] px-2 py-0.5 text-[10px] font-semibold text-[#4f46e5]">Mais recente</span>
-                            )}
-                            {isSelected && (
-                              <svg className="h-4 w-4 text-[#2563eb]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-          {error &&
-            createPortal(
-              <div className="fixed left-1/2 top-14 z-[80] -translate-x-1/2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 shadow-lg">
-                {error}
-              </div>,
-              document.body,
-            )}
-          {renderModal()}
-        </>
-      )
-    }
-
-    // Original compact variant (full-width buttons with text)
     return (
       <>
         <div className="group relative min-w-0">
@@ -838,38 +752,6 @@ export function SimuladoAnalyzer({
             {hasHistory
               ? `${selectedHistoryLabel}. Abrir notas, erros e seleção de questões.`
               : 'Nenhum simulado relacionado para este aluno.'}
-          </div>
-        </div>
-
-        <div className="group relative min-w-0">
-          <button
-            onClick={handleOpenStudyReport}
-            onMouseEnter={preloadAnalyzer}
-            onFocus={preloadAnalyzer}
-            disabled={isGeneratingReport || isLoadingResult}
-            className="inline-flex h-12 w-full items-center gap-2.5 rounded-2xl border border-[#ddd6fe] bg-[#f5f3ff] px-4 text-left text-sm font-semibold text-[#6d28d9] transition-colors hover:bg-[#ede9fe] disabled:opacity-50"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white/80">
-              {isGeneratingReport ? (
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              ) : (
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              )}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold">Plano SISU</span>
-              <span className="mt-0.5 block truncate text-[11px] font-medium text-[#7c3aed]">
-                {goalCutoffHeadline}
-              </span>
-            </span>
-          </button>
-          <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-72 -translate-x-1/2 rounded-xl bg-[#0f172a] px-3 py-2 text-xs text-white opacity-0 shadow-[0_20px_40px_-24px_rgba(15,23,42,0.8)] transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:opacity-100">
-            {goalCutoffHeadline}. {goalCutoffDetail}.
           </div>
         </div>
 
@@ -1047,48 +929,6 @@ export function SimuladoAnalyzer({
               </button>
             </div>
 
-            <button
-              onClick={handleOpenStudyReport}
-              onMouseEnter={preloadAnalyzer}
-              onFocus={preloadAnalyzer}
-              disabled={isGeneratingReport || isLoadingResult}
-              className="inline-flex min-h-[54px] min-w-[132px] flex-1 items-center gap-3 rounded-2xl border border-[#e2e8f0] bg-white px-3.5 py-3 text-left text-[#334155] transition-colors hover:border-[#cbd5e1] hover:bg-[#f8fafc] disabled:opacity-50"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#f8fafc] text-[#4f46e5]">
-                {isGeneratingReport ? (
-                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                ) : (
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                )}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-[#111827]">Plano SISU</span>
-                <span className="mt-0.5 block truncate text-xs text-[#94a3b8]">
-                  {goalCutoffHeadline}
-                </span>
-              </span>
-            </button>
           </div>
         </div>
 

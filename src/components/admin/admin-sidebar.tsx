@@ -3,9 +3,11 @@ import type { AdminPage } from "../../types/admin";
 
 interface AdminSidebarProps {
   currentPage: AdminPage;
+  availablePages: ReadonlyArray<AdminPage>;
   onNavigate: (page: AdminPage) => void;
   userName: string;
   onLogout: () => void;
+  onExit?: () => void;
 }
 
 interface NavItem {
@@ -27,7 +29,7 @@ const iconProps = {
 const NAV_ITEMS: readonly NavItem[] = [
   {
     page: "overview",
-    label: "Visao Geral",
+    label: "Visão Executiva",
     icon: (
       <svg {...iconProps} viewBox="0 0 24 24">
         <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -39,7 +41,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   },
   {
     page: "coordinators",
-    label: "Coordenadores",
+    label: "Mentores & Acessos",
     icon: (
       <svg {...iconProps} viewBox="0 0 24 24">
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -51,7 +53,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   },
   {
     page: "schedules",
-    label: "Horarios de Aula",
+    label: "Grades Oficiais",
     icon: (
       <svg {...iconProps} viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="10" />
@@ -61,7 +63,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   },
   {
     page: "control",
-    label: "Controle Cronogramas",
+    label: "Cronogramas dos Alunos",
     icon: (
       <svg {...iconProps} viewBox="0 0 24 24">
         <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
@@ -71,8 +73,35 @@ const NAV_ITEMS: readonly NavItem[] = [
     ),
   },
   {
+    page: "performance",
+    label: "Planos & Mentoria",
+    icon: (
+      <svg {...iconProps} viewBox="0 0 24 24">
+        <path d="M4 19h16" />
+        <path d="M7 16l3-5 3 2 4-7" />
+        <circle cx="7" cy="16" r="1" />
+        <circle cx="10" cy="11" r="1" />
+        <circle cx="13" cy="13" r="1" />
+        <circle cx="17" cy="6" r="1" />
+      </svg>
+    ),
+  },
+  {
+    page: "content_mapping",
+    label: "GLiNER Ops",
+    icon: (
+      <svg {...iconProps} viewBox="0 0 24 24">
+        <path d="M12 4v4" />
+        <path d="M12 16v4" />
+        <path d="M4 12h4" />
+        <path d="M16 12h4" />
+        <circle cx="12" cy="12" r="4" />
+      </svg>
+    ),
+  },
+  {
     page: "pdfs",
-    label: "Historico PDFs",
+    label: "PDFs & Entregas",
     icon: (
       <svg {...iconProps} viewBox="0 0 24 24">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -85,7 +114,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   },
   {
     page: "audit",
-    label: "Auditoria",
+    label: "Auditoria do Sistema",
     icon: (
       <svg {...iconProps} viewBox="0 0 24 24">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -94,7 +123,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   },
   {
     page: "api",
-    label: "API & IA",
+    label: "Monitor API & IA",
     icon: (
       <svg {...iconProps} viewBox="0 0 24 24">
         <polyline points="16 18 22 12 16 6" />
@@ -107,9 +136,11 @@ const NAV_ITEMS: readonly NavItem[] = [
 
 export function AdminSidebar({
   currentPage,
+  availablePages,
   onNavigate,
   userName,
   onLogout,
+  onExit,
 }: AdminSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -130,7 +161,7 @@ export function AdminSidebar({
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => availablePages.includes(item.page)).map((item) => {
           const isActive = currentPage === item.page;
           return (
             <button
@@ -157,6 +188,30 @@ export function AdminSidebar({
 
       {/* User footer */}
       <div className="border-t border-[#e5e7eb] px-4 py-4">
+        {onExit ? (
+          <button
+            type="button"
+            onClick={onExit}
+            className="mb-3 w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs
+              text-[#2563eb] hover:bg-[#eff6ff]
+              transition-colors duration-150 cursor-pointer"
+          >
+            <svg
+              width={14}
+              height={14}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              viewBox="0 0 24 24"
+            >
+              <path d="M15 19l-7-7 7-7" />
+              <path d="M19 12H8" />
+            </svg>
+            <span className="hidden md:inline">Voltar ao cronograma</span>
+          </button>
+        ) : null}
         <p
           className="text-xs font-medium text-[#1d1d1f] truncate hidden md:block mb-2"
           title={userName}

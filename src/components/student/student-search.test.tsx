@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { StudentSearch } from './student-search'
 import { RepositoryProvider, resetRepository, forceMockRepository, initializeRepository } from '../../data/factory'
 import type { DataRepository } from '../../data/repository'
+import { useCronogramaStore } from '../../stores/cronograma-store'
 
 describe('StudentSearch', () => {
   let mockRepository: DataRepository
@@ -12,6 +13,7 @@ describe('StudentSearch', () => {
     resetRepository()
     mockRepository = forceMockRepository()
     initializeRepository()
+    useCronogramaStore.getState().reset()
   })
 
   const renderWithProvider = (component: React.ReactNode) => {

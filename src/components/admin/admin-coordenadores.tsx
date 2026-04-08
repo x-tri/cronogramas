@@ -118,7 +118,7 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
               </button>
               <div className="h-4 w-px bg-[#e5e7eb]" />
               <h1 className="text-sm font-medium text-[#1d1d1f]">
-                Usuarios do Projeto
+                Mentores e acessos
               </h1>
             </div>
             <button

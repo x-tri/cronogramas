@@ -119,7 +119,15 @@ function LoadingSpinner() {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
-export function AuditLog() {
+interface AuditLogProps {
+  userRole?: string | null;
+  userSchoolId?: string | null;
+}
+
+export function AuditLog({
+  userRole = null,
+  userSchoolId = null,
+}: AuditLogProps) {
   const [entries, setEntries] = useState<readonly AuditEntry[]>([]);
   const [schools, setSchools] = useState<readonly School[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,6 +139,7 @@ export function AuditLog() {
   const [schoolFilter, setSchoolFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [searchText, setSearchText] = useState("");
+  const isSchoolScoped = userRole !== "super_admin" && Boolean(userSchoolId);
 
   const PAGE_SIZE = 50;
 
@@ -143,7 +152,9 @@ export function AuditLog() {
         .order("created_at", { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
-      if (schoolFilter) {
+      if (isSchoolScoped && userSchoolId) {
+        query = query.eq("school_id", userSchoolId);
+      } else if (schoolFilter) {
         query = query.eq("school_id", schoolFilter);
       }
       if (actionFilter) {
@@ -151,7 +162,7 @@ export function AuditLog() {
       }
       return query;
     },
-    [period, schoolFilter, actionFilter],
+    [actionFilter, isSchoolScoped, period, schoolFilter, userSchoolId],
   );
 
   const loadEntries = useCallback(async () => {
@@ -173,9 +184,17 @@ export function AuditLog() {
   }, [buildQuery, entries.length]);
 
   const loadSchools = useCallback(async () => {
-    const { data } = await supabase.from("schools").select("id, name").order("name");
+    const query = isSchoolScoped && userSchoolId
+      ? supabase
+          .from("schools")
+          .select("id, name")
+          .eq("id", userSchoolId)
+          .order("name")
+      : supabase.from("schools").select("id, name").order("name");
+
+    const { data } = await query;
     setSchools(data ?? []);
-  }, []);
+  }, [isSchoolScoped, userSchoolId]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -262,18 +281,20 @@ export function AuditLog() {
         </div>
 
         {/* School Dropdown */}
-        <select
-          value={schoolFilter}
-          onChange={(e) => setSchoolFilter(e.target.value)}
-          className="px-3 py-1.5 text-xs rounded-lg border border-[#e5e7eb] bg-white text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
-        >
-          <option value="">Todas as escolas</option>
-          {schools.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        {!isSchoolScoped && (
+          <select
+            value={schoolFilter}
+            onChange={(e) => setSchoolFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs rounded-lg border border-[#e5e7eb] bg-white text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+          >
+            <option value="">Todas as escolas</option>
+            {schools.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* Action Dropdown */}
         <select

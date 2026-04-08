@@ -46,6 +46,7 @@ playwright-report/
 .cache
 .mf
 .rollup.cache
+.venv-gliner/
 
 # Misc
 *.tsbuildinfo

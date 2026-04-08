@@ -2,14 +2,19 @@ import { simuladoSupabase as supabase } from '../../lib/simulado-supabase'
 import type {
   ProjetoSimuladoHistoryItem,
   SimuladoResult,
+  SupabaseStudent,
   WrongQuestion,
 } from '../../types/supabase'
 import { simuladoLog } from './logger'
 import {
   distributeErrorsInArea,
-  getDetailedTopicByQuestionNumber,
   groupByTopic,
 } from './helpers'
+import {
+  getDetailedTopicByQuestionNumber,
+  type QuestionContentLike,
+  resolveQuestionTopic,
+} from './question-topic'
 
 // Tipo para os dados do aluno dentro da coluna students JSONB
 type ProjetoStudent = {
@@ -98,6 +103,19 @@ function normalizeMatricula(value: string): string {
   return value.trim().replace(/^0+/, '') || '0'
 }
 
+function normalizeComparableText(value: string | null | undefined): string | null {
+  if (!value) return null
+
+  const normalized = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return normalized || null
+}
+
 function extractStudentNumber(student: ProjetoStudent): string | null {
   const idMatch = student.id?.match(/merged-(\d+)-\d+$/)
   return (
@@ -128,9 +146,37 @@ function isMatchingStudent(student: ProjetoStudent, matricula: string): boolean 
   })
 }
 
+function matchesScopedStudentContext(
+  student: ProjetoStudent,
+  scopedStudent?: SupabaseStudent | null,
+): boolean {
+  if (!scopedStudent) {
+    return true
+  }
+
+  const checks: boolean[] = []
+  const scopedTurma = normalizeComparableText(scopedStudent.turma)
+  const scopedName = normalizeComparableText(scopedStudent.name)
+  const candidateTurma = normalizeComparableText(student.turma)
+  const candidateName = normalizeComparableText(
+    student.studentName ?? student.name ?? student.nome ?? null,
+  )
+
+  if (scopedTurma && candidateTurma) {
+    checks.push(scopedTurma === candidateTurma)
+  }
+
+  if (scopedName && candidateName) {
+    checks.push(scopedName === candidateName)
+  }
+
+  return checks.length === 0 ? true : checks.every(Boolean)
+}
+
 function findProjetoStudent(
   projeto: Projeto,
   matricula: string,
+  scopedStudent?: SupabaseStudent | null,
 ): ProjetoStudent | null {
   const studentsArray = projeto.students as ProjetoStudent[] | null
   simuladoLog(
@@ -142,7 +188,11 @@ function findProjetoStudent(
   }
 
   return (
-    studentsArray.find((student) => isMatchingStudent(student, matricula)) ?? null
+    studentsArray.find(
+      (student) =>
+        isMatchingStudent(student, matricula) &&
+        matchesScopedStudentContext(student, scopedStudent),
+    ) ?? null
   )
 }
 
@@ -185,6 +235,7 @@ function buildProjetoHistoryItem(
 
 export async function listProjetosSimulados(
   matricula: string,
+  scopedStudent?: SupabaseStudent | null,
 ): Promise<ProjetoSimuladoHistoryItem[]> {
   simuladoLog('[listProjetosSimulados] Buscando projetos para matrícula:', matricula)
   const projetos = await fetchProjetos()
@@ -196,7 +247,7 @@ export async function listProjetosSimulados(
 
   const history = projetos
     .map((projeto) => {
-      const studentData = findProjetoStudent(projeto, matricula)
+      const studentData = findProjetoStudent(projeto, matricula, scopedStudent)
       return studentData ? { projeto, studentData } : null
     })
     .filter(
@@ -260,8 +311,9 @@ export async function getProjetoSimuladoResult(
  */
 export async function getSimuladoFromProjetos(
   matricula: string,
+  scopedStudent?: SupabaseStudent | null,
 ): Promise<SimuladoResult | null> {
-  const history = await listProjetosSimulados(matricula)
+  const history = await listProjetosSimulados(matricula, scopedStudent)
   const latest = history[0]
 
   if (!latest) {
@@ -583,6 +635,7 @@ async function getWrongQuestionsWithContents(
     console.error('[getWrongQuestionsWithContents] Erro ao buscar exam:', error)
     // Retorna sem conteúdos detalhados
     return wrongQuestionNumbers.map((qNum) => ({
+      examId,
       questionNumber: qNum,
       topic: getDetailedTopicByQuestionNumber(qNum),
       studentAnswer: 'X',
@@ -595,8 +648,9 @@ async function getWrongQuestionsWithContents(
   return wrongQuestionNumbers.map((qNum) => {
     const content = questionContents?.find((qc) => qc.questionNumber === qNum)
     return {
+      examId,
       questionNumber: qNum,
-      topic: content?.content || getDetailedTopicByQuestionNumber(qNum),
+      topic: resolveQuestionTopic(content, qNum),
       studentAnswer: 'X',
       correctAnswer: content?.answer || '?',
     }
@@ -680,11 +734,10 @@ async function getRealWrongQuestionsFromExam(
         (qc) => (qc.questionNumber || qc.numero || qc.questao) === questionNumber,
       )
 
-      const topicText = content?.content || content?.conteudo || content?.topic || content?.topico
-
       wrongQuestions.push({
+        examId: projetoId,
         questionNumber,
-        topic: topicText || getDetailedTopicByQuestionNumber(questionNumber),
+        topic: resolveQuestionTopic(content, questionNumber),
         studentAnswer,
         correctAnswer,
       })
@@ -697,15 +750,4 @@ async function getRealWrongQuestionsFromExam(
     'erros reais!',
   )
   return wrongQuestions
-}
-
-type QuestionContentLike = {
-  questionNumber?: number
-  numero?: number
-  questao?: number
-  content?: string
-  conteudo?: string
-  topic?: string
-  topico?: string
-  answer?: string
 }

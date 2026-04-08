@@ -1,4 +1,8 @@
 import { simuladoSupabase as supabase } from '../../lib/simulado-supabase'
+import {
+  getCurrentProjectUser,
+  isSchoolScopedProjectUser,
+} from '../../lib/project-user'
 import type { SupabaseStudent } from '../../types/supabase'
 import { simuladoLog } from './logger'
 
@@ -6,13 +10,22 @@ export async function getStudentByMatricula(
   matricula: string,
 ): Promise<SupabaseStudent | null> {
   simuladoLog('[getStudentByMatricula] Buscando student com matrícula:', matricula)
+  const projectUser = await getCurrentProjectUser()
+  const scopedSchoolId = isSchoolScopedProjectUser(projectUser)
+    ? projectUser?.schoolId ?? null
+    : null
 
   // Tentar buscar exatamente como foi passado
-  const { data, error } = await supabase
+  let exactQuery = supabase
     .from('students')
     .select('*,school:schools(*)')
     .eq('matricula', matricula)
-    .maybeSingle()
+
+  if (scopedSchoolId) {
+    exactQuery = exactQuery.eq('school_id', scopedSchoolId)
+  }
+
+  const { data, error } = await exactQuery.maybeSingle()
 
   if (data) {
     simuladoLog('[getStudentByMatricula] Student encontrado:', data)
@@ -30,11 +43,16 @@ export async function getStudentByMatricula(
       '[getStudentByMatricula] Tentando com matrícula normalizada:',
       normalizedMatricula,
     )
-    const { data: normalizedData, error: normalizedError } = await supabase
+    let normalizedQuery = supabase
       .from('students')
-      .select('*')
+      .select('*,school:schools(*)')
       .eq('matricula', normalizedMatricula)
-      .maybeSingle()
+
+    if (scopedSchoolId) {
+      normalizedQuery = normalizedQuery.eq('school_id', scopedSchoolId)
+    }
+
+    const { data: normalizedData, error: normalizedError } = await normalizedQuery.maybeSingle()
 
     if (normalizedData) {
       simuladoLog(

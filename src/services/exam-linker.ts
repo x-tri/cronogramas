@@ -1,18 +1,9 @@
 import { supabase } from '../lib/supabase'
 import type { Exam } from '../types/supabase'
-
-type QuestionContentLike = {
-  questionNumber?: number
-  numero?: number
-  questao?: number
-  content?: string
-  conteudo?: string
-  topico?: string
-  topic?: string
-  answer?: string
-  resposta?: string
-  gabarito?: string
-}
+import {
+  type QuestionContentLike,
+  resolveQuestionTopic,
+} from './simulado/question-topic'
 
 type NormalizedQuestionContent = {
   questionNumber: number
@@ -24,7 +15,10 @@ const normalizeQuestionContent = (
   question: QuestionContentLike,
 ): NormalizedQuestionContent => ({
   questionNumber: question.questionNumber ?? question.numero ?? question.questao ?? 0,
-  content: question.content ?? question.conteudo ?? question.topico ?? question.topic ?? '',
+  content: resolveQuestionTopic(
+    question,
+    question.questionNumber ?? question.numero ?? question.questao ?? 0,
+  ),
   answer: question.answer ?? question.resposta ?? question.gabarito ?? '',
 })
 

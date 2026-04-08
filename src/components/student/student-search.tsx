@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useRepository } from '../../data/factory'
+import { useRepository, useRepositoryMode } from '../../data/factory'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { getStudentByMatricula } from '../../services/simulado-analyzer'
 import { isSupabaseConfigured } from '../../config/repository-config'
@@ -36,6 +36,7 @@ export function StudentSearch({ variant = 'modal' }: StudentSearchProps) {
   const [error, setError] = useState<string | null>(null)
 
   const repo = useRepository()
+  const repositoryMode = useRepositoryMode()
 
   const {
     isLoadingStudent,
@@ -60,7 +61,7 @@ export function StudentSearch({ variant = 'modal' }: StudentSearchProps) {
       let student = await repo.students.findByMatricula(trimmed)
 
       // Fallback: check Supabase if not in mock data and Supabase is configured
-      if (!student && isSupabaseConfigured()) {
+      if (!student && repositoryMode !== 'mock' && isSupabaseConfigured()) {
         const supabaseStudent = await getStudentByMatricula(trimmed)
         if (supabaseStudent) {
           const schoolName = supabaseStudent?.school?.name
@@ -73,6 +74,7 @@ export function StudentSearch({ variant = 'modal' }: StudentSearchProps) {
             email: null,
             fotoFilename: null,
             escola,
+            escolaId: supabaseStudent.school_id ?? null,
             escolaNome,
             createdAt: new Date(),
           }

@@ -82,6 +82,7 @@ async function reconcileWithOfficialAnswers(
     studentNumber,
     referenceTitle,
     referenceDate,
+    await getStudentByMatricula(studentNumber),
   )
 
   if (!officialResult) {
@@ -145,7 +146,7 @@ export async function listStudentSimulados(
     return null
   })
 
-  const projetosHistory = await listProjetosSimulados(matricula)
+  const projetosHistory = await listProjetosSimulados(matricula, student)
   if (projetosHistory.length > 0) {
     return markLatest(projetosHistory)
   }
@@ -155,7 +156,7 @@ export async function listStudentSimulados(
     .filter((value, index, list) => list.indexOf(value) === index)
 
   for (const identifier of fallbackIdentifiers) {
-    const history = await listStudentAnswersSimulados(identifier as string)
+    const history = await listStudentAnswersSimulados(identifier as string, student)
     if (history.length > 0) {
       return markLatest(history)
     }
@@ -191,14 +192,18 @@ export async function analyzeStudentSimulado(
   matricula: string,
 ): Promise<SimuladoResult | null> {
   const normalized = normalizeMatricula(matricula)
+  const student = await getStudentByMatricula(matricula).then((found) =>
+    found ? found : normalized !== matricula.trim() ? getStudentByMatricula(normalized) : null,
+  )
 
-  const [student, realErrors, projetoResult, triScores] = await Promise.all([
-    getStudentByMatricula(matricula).then((found) =>
-      found ? found : normalized !== matricula.trim() ? getStudentByMatricula(normalized) : null,
-    ),
+  const [realErrors, projetoResult, triScores] = await Promise.all([
     getRealStudentErrors(matricula),
-    getSimuladoFromProjetos(matricula).then((result) =>
-      result ? result : normalized !== matricula.trim() ? getSimuladoFromProjetos(normalized) : null,
+    getSimuladoFromProjetos(matricula, student).then((result) =>
+      result
+        ? result
+        : normalized !== matricula.trim()
+          ? getSimuladoFromProjetos(normalized, student)
+          : null,
     ),
     getTRIScoresFromStudentAnswers(matricula, undefined),
   ])
@@ -261,13 +266,16 @@ export async function analyzeStudentSimulado(
   const sheetCode = student?.sheet_code
 
   const fallback = await (async () => {
-    const result = await getLatestSimuladoResult(matricula)
+    const result = await getLatestSimuladoResult(matricula, student ?? undefined)
     if (result) return result
     if (normalized !== matricula.trim()) {
-      const normalizedResult = await getLatestSimuladoResult(normalized)
+      const normalizedResult = await getLatestSimuladoResult(
+        normalized,
+        student ?? undefined,
+      )
       if (normalizedResult) return normalizedResult
     }
-    if (sheetCode) return getLatestSimuladoResult(sheetCode)
+    if (sheetCode) return getLatestSimuladoResult(sheetCode, student ?? undefined)
     return null
   })()
 

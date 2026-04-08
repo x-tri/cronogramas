@@ -109,6 +109,7 @@ export type Aluno = {
   turma: string
   email: string | null
   escola: Escola
+  escolaId?: string | null
   escolaNome?: string | null
   fotoFilename: string | null
   createdAt: Date

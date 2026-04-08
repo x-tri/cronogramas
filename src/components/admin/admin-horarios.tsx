@@ -158,7 +158,7 @@ export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
                   Voltar
                 </button>
                 <div className="h-4 w-px bg-[#e5e7eb]" />
-                <h1 className="text-sm font-medium text-[#1d1d1f]">Horarios de Aula</h1>
+                <h1 className="text-sm font-medium text-[#1d1d1f]">Grades oficiais</h1>
               </div>
               <div className="flex items-center gap-2">
                 {selectedTurma && (

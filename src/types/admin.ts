@@ -3,6 +3,7 @@ export type AuditAction =
   | "logout"
   | "create_cronograma"
   | "delete_cronograma"
+  | "update_cronograma"
   | "create_block"
   | "update_block"
   | "delete_block"
@@ -13,7 +14,16 @@ export type AuditAction =
   | "create_schedule"
   | "update_schedule"
   | "delete_schedule"
-  | "generate_ai_plan";
+  | "generate_ai_plan"
+  | "create_mentor_plan"
+  | "update_mentor_plan"
+  | "send_mentor_plan"
+  | "run_gap_analysis"
+  | "review_topic_mapping"
+  | "feedback_alert"
+  | "create_content_topic"
+  | "run_question_enrichment"
+  | "override_question_enrichment";
 
 export interface AuditLogEntry {
   id: string;
@@ -60,6 +70,8 @@ export type AdminPage =
   | "coordinators"
   | "schedules"
   | "control"
+  | "performance"
+  | "content_mapping"
   | "pdfs"
   | "audit"
   | "api";

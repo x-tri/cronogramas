@@ -148,7 +148,8 @@ export function ShareDropdown({ variant = 'default' }: { variant?: 'default' | '
       await uploadPdf({
         blob,
         filename,
-        schoolId: currentStudent.escola ?? '',
+        schoolId: currentStudent.escolaId ?? null,
+        schoolName: currentStudent.escolaNome ?? currentStudent.escola ?? null,
         alunoId: currentStudent.id,
         alunoNome: currentStudent.nome,
         turma: currentStudent.turma,

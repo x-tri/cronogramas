@@ -4,11 +4,12 @@ import type {
   QuestionContent,
   WrongQuestion,
 } from '../../types/supabase'
-import {
-  calculateWrongQuestions,
-  getDetailedTopicByQuestionNumber,
-} from './helpers'
+import { calculateWrongQuestions } from './helpers'
 import { simuladoLog } from './logger'
+import {
+  getDetailedTopicByQuestionNumber,
+  resolveQuestionTopic,
+} from './question-topic'
 
 /**
  * Busca os erros REAIS do aluno linkando com os conteúdos da prova
@@ -179,6 +180,7 @@ export async function getRealStudentErrors(
               studentData.answers,
               examData.answer_key,
               examData.question_contents as QuestionContent[] | null,
+              examData.id,
             )
 
             simuladoLog(
@@ -226,6 +228,7 @@ async function getExamQuestionContents(
     // Retorna sem conteúdo detalhado
     return {
       wrongQuestions: wrongQuestionNumbers.map((qNum) => ({
+        examId,
         questionNumber: qNum,
         topic: getDetailedTopicByQuestionNumber(qNum),
         studentAnswer: 'X',
@@ -240,8 +243,9 @@ async function getExamQuestionContents(
   const wrongQuestions = wrongQuestionNumbers.map((qNum) => {
     const content = questionContents?.find((qc) => qc.questionNumber === qNum)
     return {
+      examId,
       questionNumber: qNum,
-      topic: content?.content || getDetailedTopicByQuestionNumber(qNum),
+      topic: resolveQuestionTopic(content, qNum),
       studentAnswer: 'X',
       correctAnswer: content?.answer || '?',
     }

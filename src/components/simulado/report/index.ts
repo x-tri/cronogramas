@@ -1,0 +1,6 @@
+export { ReportHeader } from './report-header'
+export { SecaoResumo } from './secao-resumo'
+export { SecaoInvestir } from './secao-investir'
+export { SecaoDesperdiciosTexto } from './secao-desperdicios-texto'
+export { SecaoAprovadosDetalhado } from './secao-aprovados-detalhado'
+export { ReportLoadingSkeleton } from './loading-skeleton'

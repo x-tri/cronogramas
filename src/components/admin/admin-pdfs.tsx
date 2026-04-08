@@ -28,6 +28,12 @@ interface AdminPdfsProps {
 }
 
 const BUCKET_URL_BASE = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/cronogramas-pdf`;
+const PDF_TYPE_LABELS: Readonly<Record<string, string>> = {
+  cronograma: "Cronograma semanal",
+  plano_estudo: "Plano de estudo",
+  relatorio: "Relatório de desempenho",
+  caderno_questoes: "Caderno de questões",
+};
 
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return "-";
@@ -138,7 +144,7 @@ export function AdminPdfs({ onBack, embedded }: AdminPdfsProps) {
                   Voltar
                 </button>
                 <div className="h-4 w-px bg-[#e5e7eb]" />
-                <h1 className="text-sm font-medium text-[#1d1d1f]">Historico de PDFs</h1>
+                <h1 className="text-sm font-medium text-[#1d1d1f]">PDFs e entregas</h1>
               </div>
               {filtered.length > 0 && (
                 <button
@@ -156,6 +162,19 @@ export function AdminPdfs({ onBack, embedded }: AdminPdfsProps) {
 
       <main className={embedded ? "px-6 py-4 space-y-6" : "mx-auto max-w-6xl px-6 py-6 space-y-4"}>
         {/* Stats */}
+        <div className="rounded-2xl border border-[#e5e7eb] bg-white p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
+            Histórico de PDFs
+          </p>
+          <h2 className="mt-2 text-lg font-semibold text-[#1d1d1f]">
+            O que já foi gerado e ficou salvo no storage
+          </h2>
+          <p className="mt-1 text-sm text-[#64748b]">
+            Esta tela mostra apenas PDFs registrados pelo app no Supabase Storage:
+            cronograma semanal, relatório de desempenho e caderno de questões.
+          </p>
+        </div>
+
         <div className="flex items-center gap-4">
           <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
             <p className="text-2xl font-semibold text-[#1d1d1f]">{records.length}</p>
@@ -221,8 +240,16 @@ export function AdminPdfs({ onBack, embedded }: AdminPdfsProps) {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-16 text-center text-sm text-[#94a3b8]">
-                    Nenhum PDF gerado ainda
+                  <td colSpan={7} className="px-4 py-16 text-center">
+                    <div className="mx-auto max-w-xl space-y-2">
+                      <p className="text-sm font-medium text-[#1d1d1f]">
+                        Nenhum PDF registrado ainda
+                      </p>
+                      <p className="text-sm text-[#94a3b8]">
+                        Os registros começam a aparecer aqui quando o mentor baixa um cronograma,
+                        relatório ou caderno de questões pelo próprio app.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -235,7 +262,9 @@ export function AdminPdfs({ onBack, embedded }: AdminPdfsProps) {
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-xs font-mono text-[#64748b] hidden md:table-cell">{r.matricula ?? "-"}</td>
-                    <td className="px-4 py-2.5 text-xs text-[#64748b] hidden lg:table-cell capitalize">{r.tipo.replace("_", " ")}</td>
+                    <td className="px-4 py-2.5 text-xs text-[#64748b] hidden lg:table-cell">
+                      {PDF_TYPE_LABELS[r.tipo] ?? r.tipo.replace("_", " ")}
+                    </td>
                     <td className="px-4 py-2.5 text-xs text-[#94a3b8] hidden md:table-cell">{formatFileSize(r.file_size)}</td>
                     <td className="px-4 py-2.5 text-xs text-[#94a3b8]">
                       {new Date(r.created_at).toLocaleDateString("pt-BR")}

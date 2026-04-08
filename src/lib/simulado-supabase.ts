@@ -8,6 +8,12 @@ type SupabaseConfig = {
 
 let simuladoSupabaseInstance: SupabaseClient | null = null
 
+const AUXILIARY_AUTH_CONFIG = {
+  persistSession: false,
+  autoRefreshToken: false,
+  detectSessionInUrl: false,
+}
+
 function getPrimaryConfig(): SupabaseConfig | null {
   const url = import.meta.env.VITE_SUPABASE_URL?.trim()
   const key = import.meta.env.VITE_SUPABASE_KEY?.trim()
@@ -52,7 +58,9 @@ export function getSimuladoSupabaseClient(): SupabaseClient {
   }
 
   if (!simuladoSupabaseInstance) {
-    simuladoSupabaseInstance = createClient(dedicated.url, dedicated.key)
+    simuladoSupabaseInstance = createClient(dedicated.url, dedicated.key, {
+      auth: AUXILIARY_AUTH_CONFIG,
+    })
   }
 
   return simuladoSupabaseInstance
@@ -98,5 +106,5 @@ export async function signOutSimuladoSupabase(): Promise<void> {
     return
   }
 
-  await getSimuladoSupabaseClient().auth.signOut()
+  await getSimuladoSupabaseClient().auth.signOut().catch(() => undefined)
 }

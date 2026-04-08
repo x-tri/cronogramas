@@ -8,6 +8,33 @@ Este arquivo fornece orientações precisas para agentes de IA que trabalham no 
 
 **XTRI Cronogramas** é um sistema web de gestão de cronogramas de estudo personalizados para alunos do Pré-Vestibular do Colégio Marista de Natal. O sistema apresenta uma interface Kanban moderna com design inspirado no Apple/Notion, integrando horários oficiais de aula com planejamento personalizado baseado em análise de desempenho em simulados.
 
+## Máxima de Produto
+
+**Este app será um motor de aprendizado.**
+
+Essa frase deve orientar decisões de produto, dados, UX e arquitetura. O sistema não deve ser tratado como:
+
+- um CRUD de cronogramas
+- uma fila editorial de questões
+- um repositório passivo de simulados
+
+O sistema deve ser tratado como uma camada de inteligência pedagógica capaz de:
+
+- enriquecer questões com semântica útil para decisão
+- transformar erros do aluno em sinais pedagógicos acionáveis
+- explicar por que uma questão, conteúdo ou ajuste de plano foi recomendado
+- ajustar cronogramas, listas e briefings do mentor com base em evidência
+- evoluir com feedback operacional sem depender de curadoria manual como fluxo principal
+
+### Implicações Práticas
+
+- **GLiNER** deve operar como motor de enriquecimento semântico, não como tela de aprovação manual.
+- **Planos do mentor** devem consumir sinais e explicações, não apenas taxonomia estática.
+- **Recomendações** devem ser sempre explicáveis e auditáveis.
+- **Questões ENEM** devem ser selecionadas por relevância pedagógica, contexto do aluno e integridade do item.
+- **A UI administrativa** deve priorizar cobertura, auditoria, impacto e operação do motor, não workflows editoriais.
+- **A arquitetura** deve privilegiar construção incremental no stack atual (`Supabase/Postgres`) antes de introduzir novas infraestruturas especializadas.
+
 ### Funcionalidades Principais
 
 - Busca de alunos por matrícula (Colégio Marista ou Escola XTRI)

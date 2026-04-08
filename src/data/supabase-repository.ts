@@ -15,6 +15,10 @@ import type { AlunoXTRIRow } from '../types/supabase'
 import { DISCIPLINAS, DISCIPLINAS_BY_CODE } from './mock-data/subjects'
 import { getHorariosPorTurma } from './mock-data/schedules'
 import { logRepository } from '../config/repository-config'
+import {
+  getCurrentProjectUser,
+  isSchoolScopedProjectUser,
+} from '../lib/project-user'
 import { supabase } from '../lib/supabase'
 
 // Garante sessão válida antes de writes — verifica com o servidor (evita clock skew)
@@ -49,12 +53,22 @@ export function createSupabaseRepository(): DataRepository {
   const repo: DataRepository = {
     students: {
       findByMatricula: async (matricula) => {
+        const projectUser = await getCurrentProjectUser()
+        const scopedSchoolId = isSchoolScopedProjectUser(projectUser)
+          ? projectUser?.schoolId ?? null
+          : null
+
         // 1. Busca no Supabase (students) — fonte de verdade
-        const { data: student } = await supabase
+        let studentQuery = supabase
           .from('students')
           .select('id, matricula, name, turma, school_id')
           .eq('matricula', matricula)
-          .maybeSingle()
+        
+        if (scopedSchoolId) {
+          studentQuery = studentQuery.eq('school_id', scopedSchoolId)
+        }
+
+        const { data: student } = await studentQuery.maybeSingle()
 
         if (student) {
           // Resolver nome da escola
@@ -75,11 +89,16 @@ export function createSupabaseRepository(): DataRepository {
             email: null,
             fotoFilename: `${student.matricula}.jpg`,
             escola: escolaNome,
+            escolaId: student.school_id ?? null,
             createdAt: new Date(),
           }
         }
 
         // 2. Fallback: alunos_avulsos_cronograma
+        if (scopedSchoolId) {
+          return null
+        }
+
         const { data: avulso } = await supabase
           .from('alunos_avulsos_cronograma')
           .select('*')
@@ -94,11 +113,22 @@ export function createSupabaseRepository(): DataRepository {
       },
 
       findByTurma: async (turma) => {
+        const projectUser = await getCurrentProjectUser()
+        const scopedSchoolId = isSchoolScopedProjectUser(projectUser)
+          ? projectUser?.schoolId ?? null
+          : null
+
         // Busca no Supabase primeiro
-        const { data: dbStudents } = await supabase
+        let query = supabase
           .from('students')
           .select('matricula, name, turma, school_id')
           .eq('turma', turma)
+
+        if (scopedSchoolId) {
+          query = query.eq('school_id', scopedSchoolId)
+        }
+
+        const { data: dbStudents } = await query
 
         if (dbStudents && dbStudents.length > 0) {
           return dbStudents.map((s) => ({

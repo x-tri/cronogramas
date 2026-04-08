@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { simuladoSupabase } from "../../lib/simulado-supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -7,7 +8,10 @@ interface DashboardStats {
   readonly total_schools: number;
   readonly total_coordinators: number;
   readonly total_students: number;
+  readonly students_with_cronograma: number;
   readonly total_cronogramas: number;
+  readonly total_blocos: number;
+  readonly media_blocos_por_aluno: number;
   readonly total_pdfs: number;
   readonly storage_bytes: number;
   readonly cronogramas_today: number;
@@ -180,7 +184,15 @@ function IconStorage() {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
-export function DashboardHome() {
+interface DashboardHomeProps {
+  userRole?: string | null;
+  userSchoolId?: string | null;
+}
+
+export function DashboardHome({
+  userRole = null,
+  userSchoolId = null,
+}: DashboardHomeProps) {
   const [renderTimestamp] = useState(() => Date.now());
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<readonly AuditEntry[]>([]);
@@ -188,80 +200,353 @@ export function DashboardHome() {
   const [chartData, setChartData] = useState<readonly DailyCronograma[]>([]);
   const [schoolHealth, setSchoolHealth] = useState<readonly SchoolHealth[]>([]);
   const [loading, setLoading] = useState(true);
+  const isSchoolScoped = userRole !== "super_admin" && Boolean(userSchoolId);
+
+  const loadScopedStudentIds = useCallback(async (): Promise<string[]> => {
+    if (!userSchoolId) {
+      return [];
+    }
+
+    const [primaryRes, simuladoRes] = await Promise.all([
+      supabase
+        .from("students")
+        .select("matricula")
+        .eq("school_id", userSchoolId),
+      simuladoSupabase
+        .from("students")
+        .select("matricula")
+        .eq("school_id", userSchoolId),
+    ]);
+
+    return [...(primaryRes.data ?? []), ...(simuladoRes.data ?? [])]
+      .map((student) => student.matricula)
+      .filter(
+        (matricula): matricula is string =>
+          typeof matricula === "string" && matricula.trim().length > 0,
+      );
+  }, [userSchoolId]);
+
+  const countScopedCronogramas = useCallback(async (params?: {
+    studentIds?: string[];
+    since?: string;
+    until?: string;
+  }): Promise<number> => {
+    const studentIds = params?.studentIds ?? [];
+
+    if (studentIds.length === 0) {
+      return 0;
+    }
+
+    let query = supabase
+      .from("cronogramas")
+      .select("id", { count: "exact" })
+      .in("aluno_id", studentIds);
+
+    if (params?.since) {
+      query = query.gte("updated_at", params.since);
+    }
+
+    if (params?.until) {
+      query = query.lt("updated_at", params.until);
+    }
+
+    const { count } = await query;
+    return count ?? 0;
+  }, []);
 
   const loadStats = useCallback(async () => {
-    const { data } = await supabase.rpc("get_admin_dashboard_stats");
-    if (data) {
-      setStats(data as unknown as DashboardStats);
+    if (isSchoolScoped && userSchoolId) {
+      const [schoolRes, primaryStudentsRes, simuladoStudentsRes, coordinatorsRes, pdfsRes, studentIds] =
+        await Promise.all([
+          supabase.from("schools").select("id").eq("id", userSchoolId).maybeSingle(),
+          supabase
+            .from("students")
+            .select("matricula")
+            .eq("school_id", userSchoolId),
+          simuladoSupabase
+            .from("students")
+            .select("matricula")
+            .eq("school_id", userSchoolId),
+          supabase
+            .from("project_users")
+            .select("auth_uid", { count: "exact" })
+            .eq("role", "coordinator")
+            .eq("is_active", true)
+            .eq("school_id", userSchoolId),
+          supabase
+            .from("pdf_history")
+            .select("id, file_size")
+            .eq("school_id", userSchoolId),
+          loadScopedStudentIds(),
+        ]);
+
+      const { data: cronogramasData } =
+        studentIds.length > 0
+          ? await supabase
+              .from("cronogramas")
+              .select("id, aluno_id, created_at, updated_at")
+              .in("aluno_id", studentIds)
+          : { data: [] };
+
+      const cronogramas = cronogramasData ?? [];
+      const cronogramaIds = cronogramas.map((cronograma) => cronograma.id);
+      const todayStart = startOfDay(0);
+      const weekStart = startOfDay(7);
+
+      const { count: blocosCount } =
+        cronogramaIds.length > 0
+          ? await supabase
+              .from("blocos_cronograma")
+              .select("id", { count: "exact" })
+              .in("cronograma_id", cronogramaIds)
+          : { count: 0 };
+
+      const totalCronogramas = cronogramas.length;
+      const cronogramasToday = cronogramas.filter(
+        (cronograma) => (cronograma.updated_at ?? cronograma.created_at) >= todayStart,
+      ).length;
+      const cronogramasWeek = cronogramas.filter(
+        (cronograma) => (cronograma.updated_at ?? cronograma.created_at) >= weekStart,
+      ).length;
+      const studentsWithCronograma = new Set(
+        cronogramas.map((cronograma) => cronograma.aluno_id),
+      ).size;
+      const totalBlocos = blocosCount ?? 0;
+      const mediaBlocosPorAluno =
+        studentsWithCronograma > 0 ? Math.round(totalBlocos / studentsWithCronograma) : 0;
+      const totalStudents = new Set(
+        [...(primaryStudentsRes.data ?? []), ...(simuladoStudentsRes.data ?? [])]
+          .map((student) => student.matricula)
+          .filter(
+            (matricula): matricula is string =>
+              typeof matricula === "string" && matricula.trim().length > 0,
+          ),
+      ).size;
+
+      const storageBytes = (pdfsRes.data ?? []).reduce(
+        (total, record) => total + (record.file_size ?? 0),
+        0,
+      );
+
+      setStats({
+        total_schools: schoolRes.data ? 1 : 0,
+        total_coordinators: coordinatorsRes.count ?? 0,
+        total_students: totalStudents,
+        students_with_cronograma: studentsWithCronograma,
+        total_cronogramas: totalCronogramas,
+        total_blocos: totalBlocos,
+        media_blocos_por_aluno: mediaBlocosPorAluno,
+        total_pdfs: pdfsRes.data?.length ?? 0,
+        storage_bytes: storageBytes,
+        cronogramas_today: cronogramasToday,
+        cronogramas_week: cronogramasWeek,
+        api_calls_today: 0,
+        api_errors_today: 0,
+      });
+      return;
     }
-  }, []);
+
+    const [rpcRes, cronogramasRes, blocosRes] = await Promise.all([
+      supabase.rpc("get_admin_dashboard_stats"),
+      supabase.from("cronogramas").select("id, aluno_id, created_at, updated_at"),
+      supabase.from("blocos_cronograma").select("id", { count: "exact" }),
+    ]);
+
+    if (rpcRes.data) {
+      const cronogramas = cronogramasRes.data ?? [];
+      const studentsWithCronograma = new Set(
+        cronogramas.map((cronograma) => cronograma.aluno_id),
+      ).size;
+      const totalBlocos = blocosRes.count ?? 0;
+
+      setStats({
+        ...(rpcRes.data as unknown as Omit<DashboardStats, "students_with_cronograma" | "total_blocos" | "media_blocos_por_aluno">),
+        students_with_cronograma: studentsWithCronograma,
+        total_blocos: totalBlocos,
+        media_blocos_por_aluno:
+          studentsWithCronograma > 0 ? Math.round(totalBlocos / studentsWithCronograma) : 0,
+      });
+    }
+  }, [
+    isSchoolScoped,
+    loadScopedStudentIds,
+    userSchoolId,
+  ]);
 
   const loadActivities = useCallback(async () => {
     const since = activityPeriod === "24h" ? startOfDay(1) : startOfDay(7);
-    const { data } = await supabase
+    let query = supabase
       .from("audit_log")
       .select("*")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(30);
+
+    if (isSchoolScoped && userSchoolId) {
+      query = query.eq("school_id", userSchoolId);
+    }
+
+    const { data } = await query;
     setActivities(data ?? []);
-  }, [activityPeriod]);
+  }, [activityPeriod, isSchoolScoped, userSchoolId]);
 
   const loadChartData = useCallback(async () => {
+    const scopedStudentIds =
+      isSchoolScoped && userSchoolId ? await loadScopedStudentIds() : [];
+
     const days: DailyCronograma[] = [];
     for (let i = 6; i >= 0; i--) {
       const dayStart = startOfDay(i);
       const dayEnd = i === 0 ? new Date().toISOString() : startOfDay(i - 1);
-      const { count } = await supabase
-        .from("cronogramas")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", dayStart)
-        .lt("created_at", dayEnd);
+
+      const count =
+        isSchoolScoped && userSchoolId
+          ? await countScopedCronogramas({
+              studentIds: scopedStudentIds,
+              since: dayStart,
+              until: dayEnd,
+            })
+          : (
+              await supabase
+                .from("cronogramas")
+                .select("id", { count: "exact" })
+                .gte("updated_at", dayStart)
+                .lt("updated_at", dayEnd)
+                .limit(1)
+            ).count ?? 0;
+
       const d = new Date();
       d.setDate(d.getDate() - i);
-      days.push({ date: d.toISOString(), count: count ?? 0 });
+      days.push({ date: d.toISOString(), count });
     }
     setChartData(days);
-  }, []);
+  }, [countScopedCronogramas, isSchoolScoped, loadScopedStudentIds, userSchoolId]);
 
   const loadSchoolHealth = useCallback(async () => {
-    const { data: schools } = await supabase
-      .from("schools")
-      .select("id, name");
-    if (!schools) return;
-
     const weekAgo = startOfDay(7);
-    const health: SchoolHealth[] = [];
 
-    for (const school of schools) {
-      const [cronRes, coordRes, auditRes] = await Promise.all([
-        supabase.rpc("count_cronogramas_by_school", {
-          p_school_id: school.id,
-          p_since: weekAgo,
-        }),
+    if (isSchoolScoped && userSchoolId) {
+      const [schoolRes, coordinatorsRes, auditRes, studentIds] = await Promise.all([
+        supabase
+          .from("schools")
+          .select("id, name")
+          .eq("id", userSchoolId)
+          .maybeSingle(),
         supabase
           .from("project_users")
-          .select("*", { count: "exact", head: true })
-          .eq("school_id", school.id)
-          .eq("role", "coordinator"),
+          .select("auth_uid", { count: "exact" })
+          .eq("role", "coordinator")
+          .eq("is_active", true)
+          .eq("school_id", userSchoolId),
         supabase
           .from("audit_log")
           .select("created_at")
-          .eq("school_id", school.id)
+          .eq("school_id", userSchoolId)
+          .gte("created_at", weekAgo)
           .order("created_at", { ascending: false })
           .limit(1),
+        loadScopedStudentIds(),
       ]);
 
-      health.push({
+      if (!schoolRes.data) {
+        setSchoolHealth([]);
+        return;
+      }
+
+      const cronogramasWeek = await countScopedCronogramas({
+        studentIds,
+        since: weekAgo,
+      });
+
+      setSchoolHealth([
+        {
+          id: schoolRes.data.id,
+          name: schoolRes.data.name,
+          coordinator_count: coordinatorsRes.count ?? 0,
+          cronogramas_week: cronogramasWeek,
+          last_activity: auditRes.data?.[0]?.created_at ?? null,
+        },
+      ]);
+      return;
+    }
+
+    const [schoolsRes, primaryStudentsRes, simuladoStudentsRes, cronogramasRes, coordinatorsRes, auditRes] =
+      await Promise.all([
+        supabase.from("schools").select("id, name"),
+        supabase.from("students").select("matricula, school_id"),
+        simuladoSupabase.from("students").select("matricula, school_id"),
+        supabase
+          .from("cronogramas")
+          .select("aluno_id, created_at, updated_at")
+          .gte("updated_at", weekAgo),
+        supabase
+          .from("project_users")
+          .select("school_id, role, is_active")
+          .eq("role", "coordinator")
+          .eq("is_active", true),
+        supabase
+          .from("audit_log")
+          .select("school_id, created_at")
+          .not("school_id", "is", null)
+          .gte("created_at", weekAgo),
+      ]);
+
+    const schools = schoolsRes.data ?? [];
+    if (schools.length === 0) {
+      setSchoolHealth([]);
+      return;
+    }
+
+    const studentSchoolByMatricula = new Map<string, string>();
+    for (const student of [...(primaryStudentsRes.data ?? []), ...(simuladoStudentsRes.data ?? [])]) {
+      if (student.matricula && student.school_id) {
+        studentSchoolByMatricula.set(student.matricula, student.school_id);
+      }
+    }
+
+    const cronogramasBySchool = new Map<string, number>();
+    for (const cronograma of cronogramasRes.data ?? []) {
+      const schoolId = studentSchoolByMatricula.get(cronograma.aluno_id);
+      if (!schoolId) continue;
+      cronogramasBySchool.set(
+        schoolId,
+        (cronogramasBySchool.get(schoolId) ?? 0) + 1,
+      );
+    }
+
+    const coordinatorsBySchool = new Map<string, number>();
+    for (const coordinator of coordinatorsRes.data ?? []) {
+      if (!coordinator.school_id) continue;
+      coordinatorsBySchool.set(
+        coordinator.school_id,
+        (coordinatorsBySchool.get(coordinator.school_id) ?? 0) + 1,
+      );
+    }
+
+    const lastActivityBySchool = new Map<string, string>();
+    for (const entry of auditRes.data ?? []) {
+      if (!entry.school_id) continue;
+      const previous = lastActivityBySchool.get(entry.school_id);
+      if (!previous || new Date(entry.created_at).getTime() > new Date(previous).getTime()) {
+        lastActivityBySchool.set(entry.school_id, entry.created_at);
+      }
+    }
+
+    setSchoolHealth(
+      schools.map((school) => ({
         id: school.id,
         name: school.name,
-        coordinator_count: coordRes.count ?? 0,
-        cronogramas_week: (cronRes.data as number) ?? 0,
-        last_activity: auditRes.data?.[0]?.created_at ?? null,
-      });
-    }
-    setSchoolHealth(health);
-  }, []);
+        coordinator_count: coordinatorsBySchool.get(school.id) ?? 0,
+        cronogramas_week: cronogramasBySchool.get(school.id) ?? 0,
+        last_activity: lastActivityBySchool.get(school.id) ?? null,
+      })),
+    );
+  }, [
+    countScopedCronogramas,
+    isSchoolScoped,
+    loadScopedStudentIds,
+    userSchoolId,
+  ]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -289,20 +574,70 @@ export function DashboardHome() {
 
   return (
     <div className="space-y-8">
+      <div className="rounded-2xl border border-[#e5e7eb] bg-white p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
+          Visão Executiva
+        </p>
+        <h2 className="mt-2 text-lg font-semibold text-[#1d1d1f]">
+          O que foi produzido na operação e como cada escola está rodando
+        </h2>
+        <p className="mt-1 text-sm text-[#64748b]">
+          Esta tela responde ao básico de auditoria operacional: quantos alunos já têm
+          cronograma, quantos cronogramas e blocos foram montados, quantos PDFs ficaram
+          registrados e qual foi a atividade recente da equipe.
+        </p>
+      </div>
+
       {/* KPI Cards */}
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <KpiCard label="Escolas" value={stats.total_schools} icon={<IconSchool />} />
-          <KpiCard label="Coordenadores" value={stats.total_coordinators} icon={<IconUsers />} />
-          <KpiCard label="Alunos" value={stats.total_students} icon={<IconStudent />} />
-          <KpiCard
-            label="Cronogramas"
-            value={stats.total_cronogramas}
-            subtitle={`${stats.cronogramas_today} hoje / ${stats.cronogramas_week} esta semana`}
-            icon={<IconCalendar />}
-          />
-          <KpiCard label="PDFs" value={stats.total_pdfs} icon={<IconDocument />} />
-          <KpiCard label="Armazenamento" value={formatBytes(stats.storage_bytes)} icon={<IconStorage />} />
+        <div className="space-y-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8] mb-3">
+              Produção da operação
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <KpiCard
+                label="Alunos com cronograma"
+                value={stats.students_with_cronograma}
+                subtitle="Alunos já atendidos com plano montado"
+                icon={<IconStudent />}
+              />
+              <KpiCard
+                label="Cronogramas gerados"
+                value={stats.total_cronogramas}
+                subtitle={`${stats.cronogramas_today} hoje / ${stats.cronogramas_week} esta semana`}
+                icon={<IconCalendar />}
+              />
+              <KpiCard
+                label="Blocos criados"
+                value={stats.total_blocos}
+                subtitle={`${stats.media_blocos_por_aluno} blocos por aluno, em média`}
+                icon={<IconCalendar />}
+              />
+              <KpiCard
+                label="PDFs registrados"
+                value={stats.total_pdfs}
+                subtitle="Histórico de relatórios, cadernos e cronogramas"
+                icon={<IconDocument />}
+              />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8] mb-3">
+              Base da plataforma
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <KpiCard
+                label={isSchoolScoped ? "Sua escola" : "Escolas"}
+                value={stats.total_schools}
+                icon={<IconSchool />}
+              />
+              <KpiCard label="Coordenadores" value={stats.total_coordinators} icon={<IconUsers />} />
+              <KpiCard label="Alunos totais" value={stats.total_students} icon={<IconStudent />} />
+              <KpiCard label="Armazenamento" value={formatBytes(stats.storage_bytes)} icon={<IconStorage />} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -375,7 +710,9 @@ export function DashboardHome() {
 
       {/* School Health Grid */}
       <div>
-        <h3 className="text-base font-semibold text-[#1d1d1f] mb-4">Saude das Escolas</h3>
+        <h3 className="text-base font-semibold text-[#1d1d1f] mb-4">
+          {isSchoolScoped ? "Saúde da sua escola" : "Saude das Escolas"}
+        </h3>
         {schoolHealth.length === 0 ? (
           <p className="text-sm text-[#94a3b8]">Nenhuma escola cadastrada</p>
         ) : (

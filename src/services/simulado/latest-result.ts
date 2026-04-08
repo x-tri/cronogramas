@@ -4,6 +4,7 @@ import type {
   QuestionContent,
   SimuladoHistoryItem,
   SimuladoResult,
+  SupabaseStudent,
   StudentAnswer,
   StudentAnswersSimuladoHistoryItem,
   WrongQuestion,
@@ -35,6 +36,19 @@ function buildStudentNumberCandidates(studentNumber: string): string[] {
   const raw = studentNumber.trim()
   const normalized = normalizeStudentNumber(raw)
   return [...new Set([raw, normalized].filter(Boolean))]
+}
+
+function normalizeComparableText(value: string | null | undefined): string | null {
+  if (!value) return null
+
+  const normalized = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return normalized || null
 }
 
 function normalizeTitle(title: string): string {
@@ -74,7 +88,35 @@ function areDatesClose(dateA: string, dateB: string): boolean {
   return Math.abs(new Date(dateA).getTime() - new Date(dateB).getTime()) <= DAY_GROUP_WINDOW_MS
 }
 
-async function fetchStudentAnswers(studentNumber: string): Promise<StudentAnswer[]> {
+function matchesScopedStudentAnswer(
+  answer: StudentAnswer,
+  scopedStudent?: SupabaseStudent | null,
+): boolean {
+  if (!scopedStudent) {
+    return true
+  }
+
+  const checks: boolean[] = []
+  const scopedTurma = normalizeComparableText(scopedStudent.turma)
+  const scopedName = normalizeComparableText(scopedStudent.name)
+  const answerTurma = normalizeComparableText(answer.turma)
+  const answerName = normalizeComparableText(answer.student_name)
+
+  if (scopedTurma && answerTurma) {
+    checks.push(scopedTurma === answerTurma)
+  }
+
+  if (scopedName && answerName) {
+    checks.push(scopedName === answerName)
+  }
+
+  return checks.length === 0 ? true : checks.every(Boolean)
+}
+
+async function fetchStudentAnswers(
+  studentNumber: string,
+  scopedStudent?: SupabaseStudent | null,
+): Promise<StudentAnswer[]> {
   const candidates = buildStudentNumberCandidates(studentNumber)
   simuladoLog('[listStudentAnswersSimulados] Buscando student_answers para:', candidates)
 
@@ -89,7 +131,8 @@ async function fetchStudentAnswers(studentNumber: string): Promise<StudentAnswer
     return []
   }
 
-  return (data as StudentAnswer[] | null) ?? []
+  const answers = (data as StudentAnswer[] | null) ?? []
+  return answers.filter((answer) => matchesScopedStudentAnswer(answer, scopedStudent))
 }
 
 async function fetchExamsByIds(examIds: string[]): Promise<ExamRecord[]> {
@@ -217,6 +260,7 @@ function buildSimuladoResultFromGroup(group: SimuladoAnswerGroup): SimuladoResul
       ...findWrongQuestionsForDay(
         day1Answer.answers,
         day1Exam.question_contents as QuestionContent[],
+        day1Exam.id,
       ),
     )
   }
@@ -226,6 +270,7 @@ function buildSimuladoResultFromGroup(group: SimuladoAnswerGroup): SimuladoResul
       ...findWrongQuestionsForDay(
         day2Answer.answers,
         day2Exam.question_contents as QuestionContent[],
+        day2Exam.id,
       ),
     )
   }
@@ -235,6 +280,7 @@ function buildSimuladoResultFromGroup(group: SimuladoAnswerGroup): SimuladoResul
       ...findWrongQuestionsForDay(
         standaloneAnswer.answers,
         standaloneExam.question_contents as QuestionContent[],
+        standaloneExam.id,
       ),
     )
   }
@@ -297,8 +343,9 @@ function groupFromHistoryItem(
 
 export async function listStudentAnswersSimulados(
   studentNumber: string,
+  scopedStudent?: SupabaseStudent | null,
 ): Promise<StudentAnswersSimuladoHistoryItem[]> {
-  const answers = await fetchStudentAnswers(studentNumber)
+  const answers = await fetchStudentAnswers(studentNumber, scopedStudent)
   if (answers.length === 0) return []
 
   const examIds = [...new Set(answers.map((answer) => answer.exam_id))]
@@ -337,8 +384,9 @@ export async function getStudentAnswersReferenceResult(
   studentNumber: string,
   referenceTitle?: string | null,
   referenceDate?: string | null,
+  scopedStudent?: SupabaseStudent | null,
 ): Promise<SimuladoResult | null> {
-  const history = await listStudentAnswersSimulados(studentNumber)
+  const history = await listStudentAnswersSimulados(studentNumber, scopedStudent)
   if (history.length === 0) return null
 
   const normalizedReferenceTitle = referenceTitle
@@ -382,8 +430,9 @@ export async function getStudentAnswersReferenceResult(
 
 export async function getLatestSimuladoResult(
   studentNumber: string,
+  scopedStudent?: SupabaseStudent | null,
 ): Promise<SimuladoResult | null> {
-  const history = await listStudentAnswersSimulados(studentNumber)
+  const history = await listStudentAnswersSimulados(studentNumber, scopedStudent)
   const latest = history[0]
 
   if (!latest) {

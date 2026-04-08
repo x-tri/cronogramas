@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import { Modal } from "../ui/modal";
 import { supabase } from "../../lib/supabase";
+import { simuladoSupabase } from "../../lib/simulado-supabase";
+import { logAudit } from "../../services/audit";
 
 interface School {
   id: string;
@@ -18,30 +21,119 @@ interface AlunoControle {
   ultimo_cronograma: string | null;
 }
 
+interface CronogramaVersionRow {
+  id: string;
+  semana_inicio: string;
+  semana_fim: string;
+  created_at: string;
+  updated_at: string | null;
+  status: "ativo" | "arquivado";
+  observacoes: string | null;
+}
+
+interface StudentLookupRow {
+  id: string;
+  name: string | null;
+  turma: string | null;
+  matricula: string;
+  school_id: string | null;
+}
+
 interface AdminControleProps {
   onBack: () => void;
   embedded?: boolean;
+  userRole?: string | null;
+  userSchoolId?: string | null;
 }
 
-export function AdminControle({ onBack, embedded }: AdminControleProps) {
+export function AdminControle({
+  onBack,
+  embedded,
+  userRole = null,
+  userSchoolId = null,
+}: AdminControleProps) {
   const [alunos, setAlunos] = useState<AlunoControle[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [deletingCronogramaId, setDeletingCronogramaId] = useState<string | null>(null);
   const [filterTurma, setFilterTurma] = useState("");
   const [sortBy, setSortBy] = useState<"nome" | "turma" | "blocos" | "data">("data");
+  const [selectedAluno, setSelectedAluno] = useState<AlunoControle | null>(null);
+  const [selectedAlunoVersions, setSelectedAlunoVersions] = useState<CronogramaVersionRow[]>([]);
+  const isSchoolScoped = userRole !== "super_admin" && Boolean(userSchoolId);
+  const effectiveSelectedSchool = isSchoolScoped ? (userSchoolId ?? "") : selectedSchool;
 
   const loadData = useCallback(async () => {
     setLoading(true);
 
-    const [schoolsRes, cronogramasRes] = await Promise.all([
-      supabase.from("schools").select("id, name").order("name"),
-      supabase.from("cronogramas").select("aluno_id, id, created_at"),
+    // Junta alunos do banco principal e do banco dedicado de simulados para não
+    // classificar como "Avulso" cronogramas de alunos reais que só existem na origem do simulado.
+    const schoolsQuery = isSchoolScoped && userSchoolId
+      ? supabase.from("schools").select("id, name").eq("id", userSchoolId).order("name")
+      : supabase.from("schools").select("id, name").order("name");
+
+    const primaryStudentsQuery = isSchoolScoped && userSchoolId
+      ? supabase
+          .from("students")
+          .select("id, name, turma, matricula, school_id")
+          .eq("school_id", userSchoolId)
+      : supabase.from("students").select("id, name, turma, matricula, school_id");
+
+    const simuladoStudentsQuery = isSchoolScoped && userSchoolId
+      ? simuladoSupabase
+          .from("students")
+          .select("id, name, turma, matricula, school_id")
+          .eq("school_id", userSchoolId)
+      : simuladoSupabase.from("students").select("id, name, turma, matricula, school_id");
+
+    const [schoolsRes, primaryStudentsRes, simuladoStudentsRes] = await Promise.all([
+      schoolsQuery,
+      primaryStudentsQuery,
+      simuladoStudentsQuery,
     ]);
 
     setSchools(schoolsRes.data ?? []);
 
-    const cronogramas = cronogramasRes.data ?? [];
+    const scopedStudentMap = new Map<string, StudentLookupRow>();
+    for (const student of [
+      ...((primaryStudentsRes.data ?? []) as StudentLookupRow[]),
+      ...((simuladoStudentsRes.data ?? []) as StudentLookupRow[]),
+    ]) {
+      if (!scopedStudentMap.has(student.matricula)) {
+        scopedStudentMap.set(student.matricula, student);
+      }
+      if (!scopedStudentMap.has(student.id)) {
+        scopedStudentMap.set(student.id, student);
+      }
+    }
+    const scopedStudents = [...new Set(scopedStudentMap.values())];
+    const scopedAlunoIds = Array.from(
+      new Set(
+        scopedStudents.flatMap((student) =>
+          [student.id, student.matricula].filter(
+            (value): value is string => typeof value === "string" && value.trim().length > 0,
+          ),
+        ),
+      ),
+    );
+
+    if (isSchoolScoped && scopedAlunoIds.length === 0) {
+      setAlunos([]);
+      setLoading(false);
+      return;
+    }
+
+    let cronogramasQuery = supabase
+      .from("cronogramas")
+      .select("aluno_id, id, created_at, updated_at");
+    if (isSchoolScoped && scopedAlunoIds.length > 0) {
+      cronogramasQuery = cronogramasQuery.in("aluno_id", scopedAlunoIds);
+    }
+
+    const { data: cronogramasData } = await cronogramasQuery;
+    const cronogramas = cronogramasData ?? [];
     if (cronogramas.length === 0) {
       setAlunos([]);
       setLoading(false);
@@ -51,13 +143,14 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
     // Group by aluno_id
     const alunoMap = new Map<string, { count: number; lastDate: string; cronogramaIds: string[] }>();
     for (const c of cronogramas) {
+      const activityAt = c.updated_at ?? c.created_at;
       const existing = alunoMap.get(c.aluno_id);
       if (existing) {
         existing.count++;
         existing.cronogramaIds.push(c.id);
-        if (c.created_at > existing.lastDate) existing.lastDate = c.created_at;
+        if (activityAt > existing.lastDate) existing.lastDate = activityAt;
       } else {
-        alunoMap.set(c.aluno_id, { count: 1, lastDate: c.created_at, cronogramaIds: [c.id] });
+        alunoMap.set(c.aluno_id, { count: 1, lastDate: activityAt, cronogramaIds: [c.id] });
       }
     }
 
@@ -68,15 +161,18 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
       .select("cronograma_id")
       .in("cronograma_id", allCronogramaIds);
 
+    const cronogramaOwnerById = new Map<string, string>();
+    for (const [alunoId, info] of alunoMap) {
+      for (const cronogramaId of info.cronogramaIds) {
+        cronogramaOwnerById.set(cronogramaId, alunoId);
+      }
+    }
+
     const blocosByAluno = new Map<string, number>();
     for (const b of blocosData ?? []) {
-      // find which aluno owns this cronograma
-      for (const [alunoId, info] of alunoMap) {
-        if (info.cronogramaIds.includes(b.cronograma_id)) {
-          blocosByAluno.set(alunoId, (blocosByAluno.get(alunoId) ?? 0) + 1);
-          break;
-        }
-      }
+      const alunoId = cronogramaOwnerById.get(b.cronograma_id);
+      if (!alunoId) continue;
+      blocosByAluno.set(alunoId, (blocosByAluno.get(alunoId) ?? 0) + 1);
     }
 
     // Resolve student info
@@ -85,26 +181,74 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
     const uuids = alunoIds.filter((id) => uuidRegex.test(id));
     const matriculas = alunoIds.filter((id) => !uuidRegex.test(id));
 
-    type StudentRow = { id: string; name: string; turma: string; matricula: string; school_id: string };
+    const [primaryByUuid, primaryByMatricula] = isSchoolScoped
+      ? [
+          { data: scopedStudents.filter((student) => uuids.includes(student.id)) },
+          { data: scopedStudents.filter((student) => matriculas.includes(student.matricula)) },
+        ]
+      : await Promise.all([
+          uuids.length > 0
+            ? supabase.from("students").select("id, name, turma, matricula, school_id").in("id", uuids)
+            : Promise.resolve({ data: null }),
+          matriculas.length > 0
+            ? supabase.from("students").select("id, name, turma, matricula, school_id").in("matricula", matriculas)
+            : Promise.resolve({ data: null }),
+        ]);
 
-    const [byUuid, byMatricula] = await Promise.all([
-      uuids.length > 0
-        ? supabase.from("students").select("id, name, turma, matricula, school_id").in("id", uuids)
-        : Promise.resolve({ data: null }),
-      matriculas.length > 0
-        ? supabase.from("students").select("id, name, turma, matricula, school_id").in("matricula", matriculas)
-        : Promise.resolve({ data: null }),
-    ]);
+    const studentById = new Map<string, StudentLookupRow>();
+    const studentByMatricula = new Map<string, StudentLookupRow>();
+    const registerStudents = (rows: readonly StudentLookupRow[]) => {
+      for (const student of rows) {
+        if (!studentById.has(student.id)) {
+          studentById.set(student.id, student);
+        }
+        if (!studentByMatricula.has(student.matricula)) {
+          studentByMatricula.set(student.matricula, student);
+        }
+      }
+    };
 
-    const studentById = new Map<string, StudentRow>();
-    for (const s of (byUuid.data ?? []) as StudentRow[]) studentById.set(s.id, s);
-    const studentByMatricula = new Map<string, StudentRow>();
-    for (const s of (byMatricula.data ?? []) as StudentRow[]) studentByMatricula.set(s.matricula, s);
+    registerStudents((primaryByUuid.data ?? []) as StudentLookupRow[]);
+    registerStudents((primaryByMatricula.data ?? []) as StudentLookupRow[]);
 
-    // Also check alunos_avulsos
     const unresolvedUuids = uuids.filter((id) => !studentById.has(id));
+    const unresolvedMatriculas = matriculas.filter((matricula) => !studentByMatricula.has(matricula));
+
+    const [simuladoByUuid, simuladoByMatricula] = unresolvedUuids.length > 0 || unresolvedMatriculas.length > 0
+      ? await Promise.all([
+          unresolvedUuids.length > 0
+            ? (() => {
+                let query = simuladoSupabase
+                  .from("students")
+                  .select("id, name, turma, matricula, school_id")
+                  .in("id", unresolvedUuids);
+                if (isSchoolScoped && userSchoolId) {
+                  query = query.eq("school_id", userSchoolId);
+                }
+                return query;
+              })()
+            : Promise.resolve({ data: null }),
+          unresolvedMatriculas.length > 0
+            ? (() => {
+                let query = simuladoSupabase
+                  .from("students")
+                  .select("id, name, turma, matricula, school_id")
+                  .in("matricula", unresolvedMatriculas);
+                if (isSchoolScoped && userSchoolId) {
+                  query = query.eq("school_id", userSchoolId);
+                }
+                return query;
+              })()
+            : Promise.resolve({ data: null }),
+        ])
+      : [{ data: null }, { data: null }];
+
+    registerStudents((simuladoByUuid.data ?? []) as StudentLookupRow[]);
+    registerStudents((simuladoByMatricula.data ?? []) as StudentLookupRow[]);
+
+    // Coordenador não deve resolver aluno avulso de outra origem fora da escola dele.
     const avulsoMap = new Map<string, { nome: string; matricula: string; turma: string }>();
-    if (unresolvedUuids.length > 0) {
+    if (!isSchoolScoped && unresolvedUuids.length > 0) {
       const { data: avulsos } = await supabase
         .from("alunos_avulsos_cronograma")
         .select("id, nome, matricula, turma")
@@ -139,7 +283,7 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
 
     setAlunos(result);
     setLoading(false);
-  }, []);
+  }, [isSchoolScoped, userSchoolId]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -153,7 +297,9 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
   const turmas = [...new Set(alunos.map((a) => a.turma))].filter((t) => t !== "-").sort();
 
   let filtered = alunos;
-  if (selectedSchool) filtered = filtered.filter((a) => a.school_id === selectedSchool);
+  if (effectiveSelectedSchool) {
+    filtered = filtered.filter((a) => a.school_id === effectiveSelectedSchool);
+  }
   if (filterTurma) filtered = filtered.filter((a) => a.turma === filterTurma);
 
   const sorted = [...filtered].sort((a, b) => {
@@ -185,13 +331,100 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const schoolName = selectedSchool
-      ? schools.find((s) => s.id === selectedSchool)?.name ?? "escola"
+    const schoolName = effectiveSelectedSchool
+      ? schools.find((s) => s.id === effectiveSelectedSchool)?.name ?? "escola"
       : "todas-escolas";
     a.download = `controle-cronogramas-${schoolName.toLowerCase().replace(/\s+/g, "-")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  function closeVersionsModal() {
+    setSelectedAluno(null);
+    setSelectedAlunoVersions([]);
+    setLoadingVersions(false);
+    setDeletingCronogramaId(null);
+  }
+
+  async function openVersionsModal(aluno: AlunoControle) {
+    setSelectedAluno(aluno);
+    setSelectedAlunoVersions([]);
+    setLoadingVersions(true);
+
+    const { data, error } = await supabase
+      .from("cronogramas")
+      .select("id, semana_inicio, semana_fim, created_at, updated_at, status, observacoes")
+      .eq("aluno_id", aluno.aluno_id)
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      console.error("[AdminControle] Falha ao carregar versões do cronograma:", error);
+      setLoadingVersions(false);
+      return;
+    }
+
+    setSelectedAlunoVersions((data ?? []) as CronogramaVersionRow[]);
+    setLoadingVersions(false);
+  }
+
+  async function handleDeleteCronograma(
+    aluno: AlunoControle,
+    version: CronogramaVersionRow,
+  ) {
+    const semanaLabel = `${new Date(version.semana_inicio).toLocaleDateString("pt-BR")} a ${new Date(version.semana_fim).toLocaleDateString("pt-BR")}`;
+    const confirmDelete = window.confirm(
+      `Excluir o cronograma de ${aluno.nome} da semana ${semanaLabel}? Os blocos dessa versão também serão removidos.`,
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    setDeletingCronogramaId(version.id);
+
+    const { error } = await supabase
+      .from("cronogramas")
+      .delete()
+      .eq("id", version.id);
+
+    if (error) {
+      console.error("[AdminControle] Falha ao excluir cronograma:", error);
+      setDeletingCronogramaId(null);
+      return;
+    }
+
+    logAudit("delete_cronograma", "cronograma", version.id, {
+      alunoId: aluno.aluno_id,
+      matricula: aluno.matricula,
+      alunoNome: aluno.nome,
+      semanaInicio: version.semana_inicio,
+      semanaFim: version.semana_fim,
+      origem: "admin_controle",
+    });
+
+    const nextVersions = selectedAlunoVersions.filter((item) => item.id !== version.id);
+    setSelectedAlunoVersions(nextVersions);
+    setDeletingCronogramaId(null);
+    await loadData();
+
+    if (nextVersions.length === 0) {
+      closeVersionsModal();
+    }
+  }
+
+  const versionsFooter = selectedAluno ? (
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-xs text-[#64748b]">
+        Escolha a semana exata antes de excluir.
+      </p>
+      <button
+        onClick={closeVersionsModal}
+        className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-medium text-[#475569] transition-colors hover:bg-[#f8fafc]"
+      >
+        Fechar
+      </button>
+    </div>
+  ) : undefined;
 
   if (loading) {
     return (
@@ -218,7 +451,7 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
                   Voltar
                 </button>
                 <div className="h-4 w-px bg-[#e5e7eb]" />
-                <h1 className="text-sm font-medium text-[#1d1d1f]">Controle de Cronogramas</h1>
+                <h1 className="text-sm font-medium text-[#1d1d1f]">Cronogramas dos alunos</h1>
               </div>
               <button
                 onClick={exportCSV}
@@ -257,19 +490,21 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
 
         {/* Filters */}
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-[#64748b]">Escola:</label>
-            <select
-              value={selectedSchool}
-              onChange={(e) => setSelectedSchool(e.target.value)}
-              className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs text-[#1d1d1f] min-w-[180px]"
-            >
-              <option value="">Todas</option>
-              {schools.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
+          {!isSchoolScoped && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-[#64748b]">Escola:</label>
+              <select
+                value={selectedSchool}
+                onChange={(e) => setSelectedSchool(e.target.value)}
+                className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs text-[#1d1d1f] min-w-[180px]"
+              >
+                <option value="">Todas</option>
+                {schools.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <label className="text-xs text-[#64748b]">Turma:</label>
             <select
@@ -322,12 +557,15 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b] hidden md:table-cell">
                   Ultimo
                 </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#64748b]">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody>
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-16 text-center text-sm text-[#94a3b8]">
+                  <td colSpan={7} className="px-4 py-16 text-center text-sm text-[#94a3b8]">
                     Nenhum aluno criou cronograma ainda
                   </td>
                 </tr>
@@ -364,12 +602,100 @@ export function AdminControle({ onBack, embedded }: AdminControleProps) {
                         ? new Date(a.ultimo_cronograma).toLocaleDateString("pt-BR")
                         : "-"}
                     </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <button
+                        onClick={() => void openVersionsModal(a)}
+                        className="rounded-lg border border-[#fecaca] bg-white px-3 py-1.5 text-xs font-medium text-[#dc2626] transition-colors hover:bg-[#fef2f2]"
+                      >
+                        Excluir cronograma
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+
+        <Modal
+          isOpen={Boolean(selectedAluno)}
+          onClose={closeVersionsModal}
+          title={selectedAluno ? `Cronogramas de ${selectedAluno.nome}` : "Cronogramas"}
+          footer={versionsFooter}
+        >
+          {selectedAluno && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-[#e5e7eb] bg-[#f8fafc] px-4 py-3">
+                <p className="text-sm font-semibold text-[#1d1d1f]">{selectedAluno.nome}</p>
+                <p className="mt-1 text-xs text-[#64748b]">
+                  Turma {selectedAluno.turma} · Matrícula {selectedAluno.matricula} · {selectedAluno.total_cronogramas} cronograma(s)
+                </p>
+              </div>
+
+              {loadingVersions ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#2563eb] border-t-transparent" />
+                </div>
+              ) : selectedAlunoVersions.length === 0 ? (
+                <p className="py-6 text-center text-sm text-[#94a3b8]">
+                  Nenhuma versão encontrada para este aluno.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {selectedAlunoVersions.map((version) => {
+                    const isDeleting = deletingCronogramaId === version.id;
+                    const semana = `${new Date(version.semana_inicio).toLocaleDateString("pt-BR")} a ${new Date(version.semana_fim).toLocaleDateString("pt-BR")}`;
+                    const activityAt = version.updated_at ?? version.created_at;
+                    const alteradoEm = new Date(activityAt).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+
+                    return (
+                      <div
+                        key={version.id}
+                        className="flex items-start justify-between gap-4 rounded-xl border border-[#e5e7eb] bg-white px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-[#1d1d1f]">
+                              {semana}
+                            </p>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              version.status === "ativo"
+                                ? "bg-[#dcfce7] text-[#15803d]"
+                                : "bg-[#e5e7eb] text-[#475569]"
+                            }`}>
+                              {version.status}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-[#64748b]">
+                            Última alteração em {alteradoEm}
+                          </p>
+                          {version.observacoes && (
+                            <p className="mt-1 text-xs text-[#94a3b8]">
+                              {version.observacoes}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => void handleDeleteCronograma(selectedAluno, version)}
+                          disabled={isDeleting}
+                          className="rounded-lg border border-[#fecaca] bg-white px-3 py-1.5 text-xs font-medium text-[#dc2626] transition-colors hover:bg-[#fef2f2] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isDeleting ? "Excluindo..." : "Excluir"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </Modal>
       </main>
     </div>
   );

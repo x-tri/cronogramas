@@ -25,20 +25,33 @@ const AuditLog = lazy(() =>
 const ApiMonitor = lazy(() =>
   import("./api-monitor").then((m) => ({ default: m.ApiMonitor }))
 );
+const AdminPerformance = lazy(() =>
+  import("./admin-performance").then((m) => ({ default: m.AdminPerformance }))
+);
+const AdminGlinerOps = lazy(() =>
+  import("./admin-gliner-ops").then((m) => ({
+    default: m.AdminGlinerOps,
+  }))
+);
 
 interface AdminDashboardProps {
   user: { name: string; email: string };
+  userRole?: string | null;
+  userSchoolId?: string | null;
   onLogout: () => void;
+  onExit?: () => void;
 }
 
 const PAGE_TITLES: Readonly<Record<AdminPage, string>> = {
-  overview: "Visao Geral",
-  coordinators: "Coordenadores",
-  schedules: "Horarios de Aula",
-  control: "Controle de Cronogramas",
-  pdfs: "Historico de PDFs",
-  audit: "Auditoria",
-  api: "API & IA",
+  overview: "Visão Executiva",
+  coordinators: "Mentores & Acessos",
+  schedules: "Grades Oficiais",
+  control: "Cronogramas dos Alunos",
+  performance: "Planos & Mentoria",
+  content_mapping: "GLiNER Ops",
+  pdfs: "PDFs & Entregas",
+  audit: "Auditoria do Sistema",
+  api: "Monitor API & IA",
 };
 
 function LoadingSpinner() {
@@ -67,22 +80,45 @@ function LoadingSpinner() {
   );
 }
 
-function renderPage(page: AdminPage) {
+function renderPage(page: AdminPage, params: {
+  userRole: string | null;
+  userSchoolId: string | null;
+}) {
   const embeddedBack = () => {};
 
   switch (page) {
     case "overview":
-      return <DashboardHome />;
+      return (
+        <DashboardHome
+          userRole={params.userRole}
+          userSchoolId={params.userSchoolId}
+        />
+      );
     case "coordinators":
       return <AdminCoordinadores onBack={embeddedBack} />;
     case "schedules":
       return <AdminHorarios onBack={embeddedBack} />;
     case "control":
-      return <AdminControle onBack={embeddedBack} />;
+      return (
+        <AdminControle
+          onBack={embeddedBack}
+          userRole={params.userRole}
+          userSchoolId={params.userSchoolId}
+        />
+      );
+    case "performance":
+      return <AdminPerformance embedded />;
+    case "content_mapping":
+      return <AdminGlinerOps embedded />;
     case "pdfs":
       return <AdminPdfs onBack={embeddedBack} />;
     case "audit":
-      return <AuditLog />;
+      return (
+        <AuditLog
+          userRole={params.userRole}
+          userSchoolId={params.userSchoolId}
+        />
+      );
     case "api":
       return <ApiMonitor />;
     default: {
@@ -92,16 +128,43 @@ function renderPage(page: AdminPage) {
   }
 }
 
-export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
-  const [currentPage, setCurrentPage] = useState<AdminPage>("overview");
+function getAvailablePages(userRole: string | null | undefined): AdminPage[] {
+  if (userRole === "coordinator") {
+    return ["performance", "content_mapping"];
+  }
+
+  return [
+    "overview",
+    "coordinators",
+    "schedules",
+    "control",
+    "performance",
+    "content_mapping",
+    "pdfs",
+    "audit",
+    "api",
+  ];
+}
+
+export function AdminDashboard({
+  user,
+  userRole = null,
+  userSchoolId = null,
+  onLogout,
+  onExit,
+}: AdminDashboardProps) {
+  const availablePages = getAvailablePages(userRole);
+  const [currentPage, setCurrentPage] = useState<AdminPage>(availablePages[0] ?? "overview");
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
       <AdminSidebar
         currentPage={currentPage}
+        availablePages={availablePages}
         onNavigate={setCurrentPage}
         userName={user.name}
         onLogout={onLogout}
+        onExit={onExit}
       />
 
       <main className="flex-1 flex flex-col bg-[#f5f5f7] overflow-hidden">
@@ -118,7 +181,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
           <Suspense fallback={<LoadingSpinner />}>
-            {renderPage(currentPage)}
+            {renderPage(currentPage, {
+              userRole,
+              userSchoolId,
+            })}
           </Suspense>
         </div>
       </main>

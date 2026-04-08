@@ -1,17 +1,78 @@
 import { supabase } from "../lib/supabase";
 import { logAudit } from "./audit";
+import { getCurrentProjectUser } from "../lib/project-user";
 
 const BUCKET = "cronogramas-pdf";
 
 interface UploadPdfParams {
   blob: Blob;
   filename: string;
-  schoolId: string;
+  schoolId?: string | null;
+  schoolName?: string | null;
   alunoId: string;
   alunoNome: string;
   turma?: string;
   matricula?: string;
-  tipo?: "cronograma" | "plano_estudo";
+  tipo?: "cronograma" | "plano_estudo" | "relatorio" | "caderno_questoes";
+}
+
+function isUuid(value: string | null | undefined): value is string {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value),
+  );
+}
+
+async function resolveSchoolId(params: {
+  schoolId?: string | null;
+  schoolName?: string | null;
+  matricula?: string;
+  alunoId: string;
+}): Promise<string | null> {
+  if (isUuid(params.schoolId)) {
+    return params.schoolId;
+  }
+
+  if (params.matricula) {
+    const { data: studentByMatricula } = await supabase
+      .from("students")
+      .select("school_id")
+      .eq("matricula", params.matricula)
+      .maybeSingle();
+
+    if (isUuid(studentByMatricula?.school_id)) {
+      return studentByMatricula.school_id;
+    }
+  }
+
+  const { data: studentById } = await supabase
+    .from("students")
+    .select("school_id")
+    .eq("id", params.alunoId)
+    .maybeSingle();
+
+  if (isUuid(studentById?.school_id)) {
+    return studentById.school_id;
+  }
+
+  if (params.schoolName?.trim()) {
+    const { data: school } = await supabase
+      .from("schools")
+      .select("id")
+      .eq("name", params.schoolName.trim())
+      .maybeSingle();
+
+    if (isUuid(school?.id)) {
+      return school.id;
+    }
+  }
+
+  const projectUser = await getCurrentProjectUser();
+  if (isUuid(projectUser?.schoolId)) {
+    return projectUser.schoolId;
+  }
+
+  return null;
 }
 
 /**
@@ -22,14 +83,21 @@ export async function uploadPdf({
   blob,
   filename,
   schoolId,
+  schoolName,
   alunoId,
   alunoNome,
   turma,
   matricula,
   tipo = "cronograma",
 }: UploadPdfParams): Promise<{ url: string; path: string } | null> {
+  const resolvedSchoolId = await resolveSchoolId({
+    schoolId,
+    schoolName,
+    matricula,
+    alunoId,
+  });
   const turmaFolder = turma ?? "sem-turma";
-  const storagePath = `${schoolId}/${turmaFolder}/${filename}`;
+  const storagePath = `${resolvedSchoolId ?? "sem-escola"}/${turmaFolder}/${filename}`;
 
   // Upload to storage (upsert to overwrite if same week)
   const { error: uploadError } = await supabase.storage
@@ -50,8 +118,8 @@ export async function uploadPdf({
     .getPublicUrl(storagePath);
 
   // Register in history (ignore errors - storage is the priority)
-  await supabase.from("pdf_history").insert({
-    school_id: schoolId,
+  const { error: historyError } = await supabase.from("pdf_history").insert({
+    school_id: resolvedSchoolId,
     aluno_id: alunoId,
     aluno_nome: alunoNome,
     turma,
@@ -62,7 +130,22 @@ export async function uploadPdf({
     file_size: blob.size,
   });
 
-  logAudit("generate_pdf", "pdf", filename, { aluno: alunoNome, turma, schoolId });
+  if (historyError) {
+    console.warn("[pdf-storage] Falha ao registrar pdf_history:", historyError.message, {
+      filename,
+      resolvedSchoolId,
+      alunoId,
+      matricula,
+      tipo,
+    });
+  }
+
+  logAudit("generate_pdf", "pdf", filename, {
+    aluno: alunoNome,
+    turma,
+    schoolId: resolvedSchoolId,
+    tipo,
+  });
 
   return { url: urlData.publicUrl, path: storagePath };
 }

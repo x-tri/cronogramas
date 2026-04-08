@@ -175,6 +175,22 @@ export type QuestionContent = {
   questionNumber: number
   answer: string
   content: string // tópico
+  gliner?: {
+    model: string
+    sourceText: string
+    suggestedArea?: string | null
+    suggestedAreaConfidence?: number | null
+    suggestedSubject?: string | null
+    suggestedSubjectConfidence?: number | null
+    suggestedTopic?: string | null
+    suggestedTopicConfidence?: number | null
+    suggestedLabel?: string | null
+    approvedLabel?: string | null
+    reviewStatus?: 'pending' | 'approved' | 'rejected' | null
+    summary?: string | null
+    keywords?: string[]
+    classifiedAt?: string | null
+  } | null
 }
 
 export type Exam = {
@@ -185,6 +201,7 @@ export type Exam = {
 }
 
 export type WrongQuestion = {
+  examId?: string | null
   questionNumber: number
   topic: string
   studentAnswer: string
