@@ -62,6 +62,8 @@ export function AdminControle({
   const [sortBy, setSortBy] = useState<"nome" | "turma" | "blocos" | "data">("data");
   const [selectedAluno, setSelectedAluno] = useState<AlunoControle | null>(null);
   const [selectedAlunoVersions, setSelectedAlunoVersions] = useState<CronogramaVersionRow[]>([]);
+  const [unlinkingMatricula, setUnlinkingMatricula] = useState<string | null>(null);
+  const [googleLinkedStudents, setGoogleLinkedStudents] = useState<Set<string>>(new Set());
   const isSchoolScoped = userRole !== "super_admin" && Boolean(userSchoolId);
   const effectiveSelectedSchool = isSchoolScoped ? (userSchoolId ?? "") : selectedSchool;
 
@@ -282,8 +284,84 @@ export function AdminControle({
     }
 
     setAlunos(result);
+
+    // Carregar alunos com Google vinculado
+    const googleCheckMatriculas = result.map((a) => a.matricula).filter((m) => m !== "-");
+    if (googleCheckMatriculas.length > 0) {
+      const { data: linked } = await supabase
+        .from("students")
+        .select("matricula, profile_id")
+        .in("matricula", googleCheckMatriculas)
+        .not("profile_id", "is", null);
+
+      if (linked) {
+        // Verificar quais profile_ids são de Google (não @aluno.xtri.com)
+        const profileIds = linked.map((l) => l.profile_id).filter(Boolean) as string[];
+        if (profileIds.length > 0) {
+          const { data: googleUsers } = await supabase
+            .from("profiles")
+            .select("id, email")
+            .in("id", profileIds);
+
+          const googleSet = new Set<string>();
+          for (const gu of googleUsers ?? []) {
+            if (gu.email && !gu.email.endsWith("@aluno.xtri.com")) {
+              const matchedStudent = linked.find((l) => l.profile_id === gu.id);
+              if (matchedStudent) googleSet.add(matchedStudent.matricula);
+            }
+          }
+          setGoogleLinkedStudents(googleSet);
+        }
+      }
+    }
+
     setLoading(false);
   }, [isSchoolScoped, userSchoolId]);
+
+  const handleUnlinkGoogle = useCallback(async (matricula: string, nome: string) => {
+    if (!confirm(`Desvincular conta Google de ${nome} (${matricula})?\n\nO aluno precisará vincular novamente no próximo login.`)) return;
+
+    setUnlinkingMatricula(matricula);
+
+    // Buscar profile_id atual
+    const { data: student } = await supabase
+      .from("students")
+      .select("profile_id")
+      .eq("matricula", matricula)
+      .single();
+
+    if (student?.profile_id) {
+      // Remover project_user do Google
+      await supabase
+        .from("project_users")
+        .delete()
+        .eq("auth_uid", student.profile_id)
+        .eq("role", "student");
+
+      // Remover profile do Google
+      await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", student.profile_id)
+        .not("email", "like", "%@aluno.xtri.com");
+
+      // Limpar profile_id do student
+      await supabase
+        .from("students")
+        .update({ profile_id: null })
+        .eq("matricula", matricula);
+
+      logAudit("update_block", "student_google_unlink", matricula, { nome });
+
+      setGoogleLinkedStudents((prev) => {
+        const next = new Set(prev);
+        next.delete(matricula);
+        return next;
+      });
+    }
+
+    setUnlinkingMatricula(null);
+  }, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -603,12 +681,24 @@ export function AdminControle({
                         : "-"}
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <button
-                        onClick={() => void openVersionsModal(a)}
-                        className="rounded-lg border border-[#fecaca] bg-white px-3 py-1.5 text-xs font-medium text-[#dc2626] transition-colors hover:bg-[#fef2f2]"
-                      >
-                        Excluir cronograma
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {googleLinkedStudents.has(a.matricula) && (
+                          <button
+                            onClick={() => void handleUnlinkGoogle(a.matricula, a.nome)}
+                            disabled={unlinkingMatricula === a.matricula}
+                            className="rounded-lg border border-[#e5e7eb] bg-white px-2.5 py-1.5 text-xs font-medium text-[#64748b] transition-colors hover:bg-[#f1f5f9] disabled:opacity-50"
+                            title="Desvincular conta Google deste aluno"
+                          >
+                            {unlinkingMatricula === a.matricula ? "..." : "🔓 Google"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => void openVersionsModal(a)}
+                          className="rounded-lg border border-[#fecaca] bg-white px-3 py-1.5 text-xs font-medium text-[#dc2626] transition-colors hover:bg-[#fef2f2]"
+                        >
+                          Excluir cronograma
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
