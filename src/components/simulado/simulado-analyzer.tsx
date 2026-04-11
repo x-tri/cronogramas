@@ -13,6 +13,7 @@ import { TURNOS_CONFIG } from '../../constants/time-slots'
 import { getColorFromQuestionNumber } from '../../constants/colors'
 import type { CursoEscolhido, ReportData, ReportProgress } from '../../types/report'
 import { buildSimuladoAudit } from '../../services/simulado/audit'
+import { saveStudentReport } from '../../services/student-report-storage'
 import { CursoSelector } from './curso-selector'
 import { RelatorioCirurgico } from './relatorio-cirurgico'
 
@@ -277,6 +278,18 @@ export function SimuladoAnalyzer({
           'O relatório demorou além do esperado. Feche e tente novamente.',
         )
         setReportData(data)
+
+        // Salvar relatório no Supabase (fire-and-forget)
+        const historyItem = selectedSimuladoHistoryItem
+        void saveStudentReport({
+          studentKey: matricula,
+          studentName: simuladoResult.studentAnswer.student_name ?? matricula,
+          turma: simuladoResult.studentAnswer.turma ?? undefined,
+          examId: historyItem?.id ?? simuladoResult.exam.id,
+          examTitle: historyItem?.title ?? simuladoResult.exam.title,
+          curso,
+          reportData: data,
+        })
       } catch (err) {
         console.error('Erro ao gerar relatorio cirurgico:', err)
         setError(
