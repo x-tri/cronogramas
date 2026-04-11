@@ -7,12 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Sparkles } from "lucide-react";
 import logoXtri from "@/assets/logo-xtri.png";
 
+function GoogleIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+  );
+}
+
 export default function Login() {
-  const { user, loading, signIn } = useAuth();
+  const { user, loading, signIn, signInWithGoogle, signInWithApple } = useAuth();
+  const [showMatricula, setShowMatricula] = useState(false);
   const [matricula, setMatricula] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
 
   if (loading) {
     return (
@@ -23,6 +37,16 @@ export default function Login() {
   }
 
   if (user) return <Navigate to="/" replace />;
+
+  const handleGoogle = async () => {
+    setError("");
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      setError("Erro ao conectar com Google. Tente novamente.");
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,13 +59,13 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-primary/10 via-background to-accent/5 px-4">
-      {/* Logo + mascot area */}
-      <div className="animate-bounce-in mb-6 flex flex-col items-center">
+      {/* Logo */}
+      <div className="animate-bounce-in mb-8 flex flex-col items-center">
         <div className="animate-float mb-4">
-          <img src={logoXtri} alt="XTRI" className="h-20 w-20 drop-shadow-lg" />
+          <img src={logoXtri} alt="XTRI" className="h-24 w-24 drop-shadow-lg" />
         </div>
         <h1 className="text-3xl font-black text-foreground tracking-tight">
-          Portal do Aluno
+          Cronogramas XTRI
         </h1>
         <p className="text-sm font-semibold text-muted-foreground mt-1 flex items-center gap-1">
           <Sparkles className="h-4 w-4 text-accent" />
@@ -49,57 +73,110 @@ export default function Login() {
         </p>
       </div>
 
-      {/* Login card */}
-      <div className="w-full max-w-sm animate-bounce-in" style={{ animationDelay: "0.15s" }}>
-        <div className="rounded-2xl border-2 border-border bg-card p-6 shadow-[0_8px_30px_-12px_hsl(var(--primary)/0.25)]">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="matricula" className="text-sm font-bold">
-                🎓 Matrícula
-              </Label>
-              <Input
-                id="matricula"
-                type="text"
-                inputMode="numeric"
-                placeholder="Ex: 214140291"
-                value={matricula}
-                onChange={(e) => setMatricula(e.target.value)}
-                required
-                className="h-12 rounded-xl border-2 text-base font-semibold transition-all focus:border-primary focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-bold">
-                🔒 Senha
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-12 rounded-xl border-2 text-base font-semibold transition-all focus:border-primary focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
-            </div>
-            {error && (
-              <div className="rounded-xl bg-destructive/10 p-3 text-center">
-                <p className="text-sm font-bold text-destructive">{error}</p>
-              </div>
+      <div className="w-full max-w-sm space-y-4">
+        {/* Google — botão principal */}
+        <div className="animate-bounce-in" style={{ animationDelay: "0.1s" }}>
+          <button
+            onClick={handleGoogle}
+            disabled={googleLoading || submitting}
+            className="w-full h-14 flex items-center justify-center gap-3 rounded-2xl border-2 bg-card text-base font-black text-foreground shadow-[0_4px_0_0_hsl(var(--border))] hover:shadow-[0_2px_0_0_hsl(var(--border))] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50"
+          >
+            {googleLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <GoogleIcon className="h-5 w-5" />
+                Entrar com Google
+              </>
             )}
-            <Button
-              type="submit"
-              className="w-full h-12 rounded-xl text-base font-black uppercase tracking-wide shadow-[0_4px_0_0_hsl(199,100%,45%)] hover:shadow-[0_2px_0_0_hsl(199,100%,45%)] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px] transition-all"
-              disabled={submitting}
-            >
-              {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Entrar 🚀"}
-            </Button>
-          </form>
+          </button>
         </div>
+
+        {/* Apple */}
+        <div className="animate-bounce-in" style={{ animationDelay: "0.15s" }}>
+          <button
+            onClick={async () => {
+              setError("");
+              setAppleLoading(true);
+              const { error } = await signInWithApple();
+              if (error) { setError("Erro ao conectar com Apple."); setAppleLoading(false); }
+            }}
+            disabled={appleLoading || googleLoading || submitting}
+            className="w-full h-14 flex items-center justify-center gap-3 rounded-2xl border-2 bg-foreground text-base font-black text-background shadow-[0_4px_0_0_hsl(var(--border))] hover:shadow-[0_2px_0_0_hsl(var(--border))] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50"
+          >
+            {appleLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                </svg>
+                Entrar com Apple
+              </>
+            )}
+          </button>
+        </div>
+
+        {error && (
+          <div className="rounded-xl bg-destructive/10 p-3 text-center animate-bounce-in">
+            <p className="text-sm font-bold text-destructive">{error}</p>
+          </div>
+        )}
+
+        {/* Fallback — link discreto */}
+        {!showMatricula ? (
+          <div className="text-center animate-fade-in" style={{ animationDelay: "0.3s", animationFillMode: "both" }}>
+            <button
+              onClick={() => setShowMatricula(true)}
+              className="text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
+            >
+              Entrar com matrícula e senha →
+            </button>
+          </div>
+        ) : (
+          <div className="animate-bounce-in">
+            <div className="rounded-2xl border-2 bg-card p-5">
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="matricula" className="text-xs font-bold">Matrícula</Label>
+                  <Input
+                    id="matricula"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Ex: 214140291"
+                    value={matricula}
+                    onChange={(e) => setMatricula(e.target.value)}
+                    required
+                    autoFocus
+                    className="h-11 rounded-xl border-2 text-sm font-semibold"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-xs font-bold">Senha</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="h-11 rounded-xl border-2 text-sm font-semibold"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full h-11 rounded-xl text-sm font-black"
+                  disabled={submitting || googleLoading}
+                >
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Footer */}
-      <p className="mt-6 text-xs font-semibold text-muted-foreground">
+      <p className="mt-8 text-xs font-semibold text-muted-foreground">
         Feito com 💙 por XTRI
       </p>
     </div>

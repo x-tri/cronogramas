@@ -7,6 +7,8 @@ interface AuthContextType {
   readonly session: Session | null;
   readonly loading: boolean;
   readonly signIn: (matricula: string, password: string) => Promise<{ error: AuthError | null }>;
+  readonly signInWithGoogle: () => Promise<{ error: AuthError | null }>;
+  readonly signInWithApple: () => Promise<{ error: AuthError | null }>;
   readonly signOut: () => Promise<void>;
 }
 
@@ -24,12 +26,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-
-      // Sessão expirou ou foi invalidada
-      if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
-        setSession(session);
-        setUser(session?.user ?? null);
-      }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -47,12 +43,32 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     return { error };
   };
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    return { error };
+  };
+
+  const signInWithApple = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    return { error };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signInWithGoogle, signInWithApple, signOut }}>
       {children}
     </AuthContext.Provider>
   );
