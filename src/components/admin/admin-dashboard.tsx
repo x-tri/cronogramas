@@ -107,11 +107,23 @@ function renderPage(page: AdminPage, params: {
         />
       );
     case "performance":
-      return <AdminPerformance embedded />;
+      return (
+        <AdminPerformance
+          embedded
+          userRole={params.userRole}
+          userSchoolId={params.userSchoolId}
+        />
+      );
     case "content_mapping":
       return <AdminGlinerOps embedded />;
     case "pdfs":
-      return <AdminPdfs onBack={embeddedBack} />;
+      return (
+        <AdminPdfs
+          onBack={embeddedBack}
+          userRole={params.userRole}
+          userSchoolId={params.userSchoolId}
+        />
+      );
     case "audit":
       return (
         <AuditLog
@@ -130,19 +142,18 @@ function renderPage(page: AdminPage, params: {
 
 function getAvailablePages(userRole: string | null | undefined): AdminPage[] {
   if (userRole === "coordinator") {
-    return ["performance", "content_mapping"];
+    return ["control", "performance", "pdfs"];
   }
 
+  // super_admin — tudo exceto GLiNER e API Monitor (dev-only)
   return [
     "overview",
     "coordinators",
     "schedules",
     "control",
     "performance",
-    "content_mapping",
     "pdfs",
     "audit",
-    "api",
   ];
 }
 
@@ -163,6 +174,7 @@ export function AdminDashboard({
         availablePages={availablePages}
         onNavigate={setCurrentPage}
         userName={user.name}
+        userRole={userRole}
         onLogout={onLogout}
         onExit={onExit}
       />

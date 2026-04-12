@@ -6,6 +6,7 @@ interface AdminSidebarProps {
   availablePages: ReadonlyArray<AdminPage>;
   onNavigate: (page: AdminPage) => void;
   userName: string;
+  userRole?: string | null;
   onLogout: () => void;
   onExit?: () => void;
 }
@@ -139,6 +140,7 @@ export function AdminSidebar({
   availablePages,
   onNavigate,
   userName,
+  userRole,
   onLogout,
   onExit,
 }: AdminSidebarProps) {
@@ -155,7 +157,7 @@ export function AdminSidebar({
       <div className="flex items-center gap-2.5 px-5 py-5 border-b border-[#e5e7eb]">
         <img src="/logo-xtri.png" alt="XTRI" className="h-8 w-auto" />
         <span className="text-sm font-semibold text-[#1d1d1f] hidden md:inline">
-          XTRI Admin
+          {userRole === "coordinator" ? "Painel Coordenador" : "XTRI Admin"}
         </span>
       </div>
 

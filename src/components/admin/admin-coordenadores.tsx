@@ -18,6 +18,8 @@ interface ProjectUser {
   allowed_series: string[] | null;
   is_active: boolean;
   created_at: string;
+  invite_code: string | null;
+  invite_used_at: string | null;
   school: School | null;
 }
 
@@ -268,6 +270,9 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b]">
                       Escola
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b]">
+                      Código
+                    </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#64748b]">
                       Acoes
                     </th>
@@ -286,6 +291,27 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
                         <span className="inline-block rounded-full bg-[#fef3c7] px-2.5 py-0.5 text-xs font-medium text-[#92400e]">
                           {inv.school?.name ?? "-"}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {inv.invite_code ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(inv.invite_code!);
+                              alert("Código copiado: " + inv.invite_code);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#dbeafe] bg-[#eff6ff] px-2.5 py-1 text-xs font-mono font-bold text-[#2563eb] transition-colors hover:bg-[#dbeafe]"
+                            title="Clique para copiar"
+                          >
+                            {inv.invite_code}
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2" />
+                              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" strokeWidth="2" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <span className="text-xs text-[#94a3b8]">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -333,6 +359,7 @@ function AddUserModal({
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [showPasswordField, setShowPasswordField] = useState(false);
   const [schoolId, setSchoolId] = useState("");
   const [role, setRole] = useState("coordinator");
   const [allowedSeries, setAllowedSeries] = useState<string[]>(["3º Ano"]);
@@ -340,6 +367,7 @@ function AddUserModal({
   const [result, setResult] = useState<{
     success: boolean;
     message: string;
+    invite_code?: string;
   } | null>(null);
 
   const seriesOptions = ["1º Ano", "2º Ano", "3º Ano"];
@@ -389,8 +417,8 @@ function AddUserModal({
       return;
     }
 
-    const res = data as { success: boolean; message: string };
-    setResult({ success: res.success, message: res.message });
+    const res = data as { success: boolean; message: string; invite_code?: string };
+    setResult({ success: res.success, message: res.message, invite_code: res.invite_code ?? undefined });
     setSubmitting(false);
 
     if (res.success) {
@@ -452,20 +480,39 @@ function AddUserModal({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-[#374151]">
-              Senha temporaria
-            </label>
-            <input
-              type="text"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimo 6 caracteres"
-              className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:border-[#93c5fd] focus:ring-2 focus:ring-[#bfdbfe]"
-            />
-            <p className="text-xs text-[#94a3b8]">
-              Se preenchida, a conta de login sera criada automaticamente. O usuario devera trocar a senha no primeiro acesso.
+          <div className="rounded-lg border border-[#e5e7eb] bg-[#f8fafc] px-3 py-2.5">
+            <p className="text-xs text-[#64748b]">
+              O coordenador receberá um <strong className="text-[#1d1d1f]">código de convite</strong> e poderá logar com Google.
             </p>
+            {!showPasswordField ? (
+              <button
+                type="button"
+                onClick={() => setShowPasswordField(true)}
+                className="mt-1.5 text-[11px] text-[#94a3b8] underline hover:text-[#64748b] transition-colors"
+              >
+                Prefiro criar com senha manual
+              </button>
+            ) : (
+              <div className="mt-2 space-y-1.5">
+                <label className="text-xs font-medium text-[#374151]">
+                  Senha temporária
+                </label>
+                <input
+                  type="text"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:border-[#93c5fd] focus:ring-2 focus:ring-[#bfdbfe]"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setPassword(""); setShowPasswordField(false); }}
+                  className="text-[11px] text-[#94a3b8] underline hover:text-[#64748b] transition-colors"
+                >
+                  Cancelar — usar código de convite
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -542,7 +589,26 @@ function AddUserModal({
                   : "border border-[#fecaca] bg-[#fef2f2] text-[#b91c1c]"
               }`}
             >
-              {result.message}
+              <p>{result.message}</p>
+              {result.invite_code && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-[#64748b]">Código de convite:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(result.invite_code!);
+                      alert("Código copiado!");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#dbeafe] bg-white px-3 py-1.5 text-sm font-mono font-bold text-[#2563eb] transition-colors hover:bg-[#eff6ff]"
+                  >
+                    {result.invite_code}
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2" />
+                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" strokeWidth="2" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

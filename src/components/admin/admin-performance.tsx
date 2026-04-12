@@ -38,6 +38,8 @@ type DetailState = {
 interface AdminPerformanceProps {
   onBack?: () => void
   embedded?: boolean
+  userRole?: string | null
+  userSchoolId?: string | null
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -142,11 +144,12 @@ function SectionCard(props: {
   )
 }
 
-export function AdminPerformance({ onBack, embedded }: AdminPerformanceProps) {
+export function AdminPerformance({ onBack, embedded, userRole, userSchoolId }: AdminPerformanceProps) {
+  const isCoordinator = userRole === 'coordinator' && !!userSchoolId
   const [items, setItems] = useState<PerformanceOverviewItem[]>([])
   const [topics, setTopics] = useState<ContentTopic[]>([])
   const [schools, setSchools] = useState<School[]>([])
-  const [selectedSchool, setSelectedSchool] = useState('')
+  const [selectedSchool, setSelectedSchool] = useState(isCoordinator ? userSchoolId! : '')
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedTurma, setSelectedTurma] = useState('')
   const [selectedWeek, setSelectedWeek] = useState('')
@@ -386,18 +389,20 @@ export function AdminPerformance({ onBack, embedded }: AdminPerformanceProps) {
 
         <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={selectedSchool}
-              onChange={(event) => setSelectedSchool(event.target.value)}
-              className="rounded-lg border border-[#dbe5f3] px-3 py-2 text-sm text-[#1d1d1f]"
-            >
-              <option value="">Todas as escolas</option>
-              {schools.map((school) => (
-                <option key={school.id} value={school.id}>
-                  {school.name}
-                </option>
-              ))}
-            </select>
+            {!isCoordinator && (
+              <select
+                value={selectedSchool}
+                onChange={(event) => setSelectedSchool(event.target.value)}
+                className="rounded-lg border border-[#dbe5f3] px-3 py-2 text-sm text-[#1d1d1f]"
+              >
+                <option value="">Todas as escolas</option>
+                {schools.map((school) => (
+                  <option key={school.id} value={school.id}>
+                    {school.name}
+                  </option>
+                ))}
+              </select>
+            )}
 
             <select
               value={selectedTurma}

@@ -154,6 +154,14 @@ export function login(_user: User): void {
   void _user;
 }
 
+export async function signInWithGoogle(): Promise<{ error: Error | null }> {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: window.location.origin },
+  });
+  return { error: error ? new Error(error.message) : null };
+}
+
 export async function logout(): Promise<void> {
   if (!isSupabaseConfigured()) return;
   await Promise.allSettled([

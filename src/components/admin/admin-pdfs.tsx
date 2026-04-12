@@ -25,6 +25,8 @@ interface PdfRecord {
 interface AdminPdfsProps {
   onBack: () => void;
   embedded?: boolean;
+  userRole?: string | null;
+  userSchoolId?: string | null;
 }
 
 const BUCKET_URL_BASE = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/cronogramas-pdf`;
@@ -42,27 +44,34 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function AdminPdfs({ onBack, embedded }: AdminPdfsProps) {
+export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdfsProps) {
+  const isCoordinator = userRole === "coordinator" && !!userSchoolId;
   const [records, setRecords] = useState<PdfRecord[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
-  const [selectedSchool, setSelectedSchool] = useState("");
+  const [selectedSchool, setSelectedSchool] = useState(isCoordinator ? userSchoolId! : "");
   const [filterTurma, setFilterTurma] = useState("");
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    let pdfsQuery = supabase
+      .from("pdf_history")
+      .select("*, school:schools(id, name)")
+      .order("created_at", { ascending: false });
+
+    if (isCoordinator) {
+      pdfsQuery = pdfsQuery.eq("school_id", userSchoolId!);
+    }
+
     const [pdfsRes, schoolsRes] = await Promise.all([
-      supabase
-        .from("pdf_history")
-        .select("*, school:schools(id, name)")
-        .order("created_at", { ascending: false }),
+      pdfsQuery,
       supabase.from("schools").select("id, name").order("name"),
     ]);
     setRecords(pdfsRes.data ?? []);
     setSchools(schoolsRes.data ?? []);
     setLoading(false);
-  }, []);
+  }, [isCoordinator, userSchoolId]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -146,7 +155,7 @@ export function AdminPdfs({ onBack, embedded }: AdminPdfsProps) {
                 <div className="h-4 w-px bg-[#e5e7eb]" />
                 <h1 className="text-sm font-medium text-[#1d1d1f]">PDFs e entregas</h1>
               </div>
-              {filtered.length > 0 && (
+              {filtered.length > 0 && !isCoordinator && (
                 <button
                   onClick={handleDeleteAll}
                   disabled={deleting}
@@ -194,19 +203,21 @@ export function AdminPdfs({ onBack, embedded }: AdminPdfsProps) {
 
         {/* Filters */}
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-[#64748b]">Escola:</label>
-            <select
-              value={selectedSchool}
-              onChange={(e) => setSelectedSchool(e.target.value)}
-              className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs text-[#1d1d1f] min-w-[180px]"
-            >
-              <option value="">Todas</option>
-              {schools.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
+          {!isCoordinator && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-[#64748b]">Escola:</label>
+              <select
+                value={selectedSchool}
+                onChange={(e) => setSelectedSchool(e.target.value)}
+                className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs text-[#1d1d1f] min-w-[180px]"
+              >
+                <option value="">Todas</option>
+                {schools.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <label className="text-xs text-[#64748b]">Turma:</label>
             <select

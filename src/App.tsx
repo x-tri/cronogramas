@@ -13,6 +13,7 @@ import { getWeekBounds } from "./components/week-utils";
 import { getCurrentUser, logout, type User } from "./lib/auth";
 import { LoginForm } from "./components/login-form";
 import { ChangePasswordForm } from "./components/change-password-form";
+import { LinkInviteCode } from "./components/link-invite-code";
 import { TimelineView } from "./components/kanban/timeline-view";
 import {
   clearCurrentProjectUserCache,
@@ -202,7 +203,19 @@ function AppContent() {
     );
   }
 
-  if (userRole === "super_admin") {
+  // Google user sem project_users vinculado → tela de código de convite
+  if (user && !userRole) {
+    return (
+      <LinkInviteCode
+        userName={user.name}
+        userEmail={user.email}
+        onSuccess={handleLoginSuccess}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  if (userRole === "super_admin" || userRole === "coordinator") {
     return (
       <Suspense fallback={
         <main className="flex min-h-svh items-center justify-center bg-[#fafafa]">
