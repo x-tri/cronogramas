@@ -4,7 +4,8 @@ import { useGamification } from "@/hooks/useGamification";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Zap, Flame, ArrowRight, Trophy } from "lucide-react";
+import { Zap, Flame, ArrowRight } from "lucide-react";
+import { MascotAvatar } from "@/components/MascotAvatar";
 
 const COLOR_MAP = {
   primary: {
@@ -61,37 +62,34 @@ export default function Avisos() {
   return (
     <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto">
 
-      {/* XP Status Card */}
-      <div className="rounded-2xl border-2 bg-card p-4 animate-bounce-in">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", LEVEL_BG[level])}>
-              <Trophy className={cn("h-5 w-5", LEVEL_COLORS[level])} />
-            </div>
-            <div>
-              <p className="text-sm font-black text-foreground">{title}</p>
-              <p className="text-[10px] font-bold text-muted-foreground">Nível {level}</p>
-            </div>
+      {/* Mascote + XP Status Card */}
+      <div className="rounded-2xl border-2 bg-card overflow-hidden animate-bounce-in">
+        {/* Mascote centralizado */}
+        <div className="flex flex-col items-center pt-4 pb-2">
+          <MascotAvatar level={level} animation="idle" size={160} className="drop-shadow-lg" />
+          <p className={cn("text-lg font-black mt-1", LEVEL_COLORS[level])}>{title}</p>
+          <p className="text-[10px] font-bold text-muted-foreground">Nível {level} de 5</p>
+        </div>
+
+        {/* Stats row */}
+        <div className="flex items-center justify-center gap-3 pb-3">
+          <div className="flex items-center gap-1 rounded-full bg-accent/10 px-3 py-1.5">
+            <Flame className="h-4 w-4 text-accent" />
+            <span className="text-xs font-black text-accent">{streak} sem.</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-0.5 rounded-full bg-accent/10 px-2.5 py-1">
-              <Flame className="h-3.5 w-3.5 text-accent" />
-              <span className="text-[11px] font-black text-accent">{streak}</span>
-            </div>
-            <div className="flex items-center gap-0.5 rounded-full bg-primary/10 px-2.5 py-1">
-              <Zap className="h-3.5 w-3.5 text-primary" />
-              <span className="text-[11px] font-black text-primary">{xp}</span>
-            </div>
+          <div className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1.5">
+            <Zap className="h-4 w-4 text-primary" />
+            <span className="text-xs font-black text-primary">{xp} XP</span>
           </div>
         </div>
 
         {/* XP Progress Bar */}
-        <div className="space-y-1">
+        <div className="px-4 pb-4 space-y-1">
           <div className="flex justify-between items-center">
             <span className="text-[9px] font-bold text-muted-foreground">{xp} XP</span>
             <span className="text-[9px] font-bold text-muted-foreground">{xpNext} XP</span>
           </div>
-          <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+          <div className="h-3 rounded-full bg-muted overflow-hidden">
             <div
               className={cn("h-full rounded-full transition-all duration-1000 ease-out", LEVEL_COLORS[level] ? `bg-current ${LEVEL_COLORS[level]}` : "bg-primary")}
               style={{ width: `${Math.max(xpProgress, 2)}%` }}

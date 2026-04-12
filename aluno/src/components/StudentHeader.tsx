@@ -10,15 +10,16 @@ export default function StudentHeader() {
   const { data: student } = useStudentProfile();
   const studentKey = student?.matricula || student?.id;
   const { data: gamification } = useGamification(studentKey);
+  const level = gamification?.level ?? 1;
 
   return (
     <header className="sticky top-0 z-40 border-b-2 bg-card/95 backdrop-blur px-4 py-2.5">
       <div className="flex items-center justify-between max-w-lg mx-auto">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <img src={logoXtri} alt="XTRI" className="h-8 w-8" />
           <div>
             <h1 className="text-sm font-black text-foreground leading-tight">
-              {student?.name || "Aluno"} 👋
+              {student?.name || "Aluno"}
             </h1>
             <p className="text-[11px] font-bold text-muted-foreground">
               {student?.turma || ""} {student?.matricula ? `• ${student.matricula}` : ""}

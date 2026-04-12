@@ -5,6 +5,8 @@ import { CheckCircle, XCircle, RotateCcw, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStudentProfile } from "@/hooks/useStudentData";
+import { useGamification } from "@/hooks/useGamification";
+import { MascotAvatarWithReaction, type MascotAnimation } from "@/components/MascotAvatar";
 
 interface Props {
   questoes: QuestaoRecomendada[];
@@ -49,8 +51,12 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
   const [selected, setSelected] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [xpAwarded, setXpAwarded] = useState<number | null>(null);
+  const [mascotReaction, setMascotReaction] = useState<MascotAnimation | null>(null);
   const { data: student } = useStudentProfile();
+  const studentKey = student?.matricula || student?.id;
+  const { data: gamification } = useGamification(studentKey);
   const queryClient = useQueryClient();
+  const level = gamification?.level ?? 1;
 
   const answered = selected !== null;
   const correct = selected === questao.gabarito;
@@ -62,11 +68,13 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
       const xp = isCorrect ? XP_CORRECT : XP_WRONG;
       setXpAwarded(xp);
 
-      // Celebração no acerto
+      // Mascote + celebração
+      setMascotReaction(isCorrect ? "jump" : "hit");
       if (isCorrect) {
         setShowCelebration(true);
         setTimeout(() => setShowCelebration(false), 2000);
       }
+      setTimeout(() => setMascotReaction(null), 1500);
 
       // Salvar resposta + invalidar cache de gamificação
       const studentKey = student?.matricula || student?.id;
@@ -95,11 +103,11 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
       )}
       style={{ animationDelay: `${index * 0.05}s`, animationFillMode: "both" }}
     >
-      {/* Celebração — confetti + XP popup */}
+      {/* Celebração — mascote + XP popup */}
       {showCelebration && (
         <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
           <div className="animate-bounce-in flex flex-col items-center">
-            <span className="text-4xl animate-pop">🎉</span>
+            <MascotAvatarWithReaction level={level} reaction="jump" size={80} />
             <div className="mt-1 flex items-center gap-1 bg-primary rounded-full px-3 py-1 shadow-lg animate-wiggle">
               <Zap className="h-4 w-4 text-white" />
               <span className="text-sm font-black text-white">+{XP_CORRECT} XP</span>
@@ -199,6 +207,9 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
 
       {answered && (
         <div className="flex items-center justify-between gap-2">
+          {!showCelebration && (
+            <MascotAvatarWithReaction level={level} reaction={mascotReaction} size={36} className="flex-shrink-0" />
+          )}
           <div
             className={cn(
               "text-[11px] font-bold p-2 rounded-lg text-center flex-1 flex items-center justify-center gap-1.5",

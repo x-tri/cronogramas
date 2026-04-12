@@ -1348,6 +1348,8 @@ async function computeQuestoesRecomendadas(
       }
       const topHab = habs[0]
       const habNums = habs.map(h => h.numeroHabilidade).filter(n => n > 0)
+      // Fallback: se todas as habs têm numero 0 (topic-backed), buscar por área inteira
+      const useAreaFallback = habNums.length === 0 && habs.length > 0
       const topHabFallbackLabel = getConteudoDidatico(topHab.identificador)
       const topHabFocus = derivePedagogicalFocusForSkill({
         erro: topHab,
@@ -1378,25 +1380,47 @@ async function computeQuestoesRecomendadas(
       }
 
       // ── Passo 1: Cruzamento individualizado (habilidade → INEP → questão com texto) ──
-      if (habNums.length > 0 && topHab.totalErros > 0) {
-        // 1a. Buscar co_items para as habilidades que o aluno errou, no range de dificuldade
-        const { data: itensTRI } = await inepClient
-          .from('enem_itens')
-          .select('co_item, param_dificuldade, numero_habilidade')
-          .eq('area', area)
-          .in('numero_habilidade', habNums)
-          .gte('param_dificuldade', paramBMin)
-          .lte('param_dificuldade', paramBMax)
+      // Se habNums vazio mas tem habs (topic-backed), buscar por área inteira no INEP
+      const effectiveHabNums = useAreaFallback
+        ? habs.map(h => h.numeroHabilidade) // inclui 0, mas usaremos query diferente
+        : habNums
 
-        // 1b. Se faixarestrita não retornou nada, buscar sem filtro de dificuldade
+      if ((effectiveHabNums.length > 0 || useAreaFallback) && topHab.totalErros > 0) {
+        // 1a. Buscar co_items — por habilidade ou por área inteira (fallback)
+        const itensQuery = useAreaFallback
+          ? inepClient
+              .from('enem_itens')
+              .select('co_item, param_dificuldade, numero_habilidade')
+              .eq('area', area)
+              .gte('param_dificuldade', paramBMin)
+              .lte('param_dificuldade', paramBMax)
+              .limit(60)
+          : inepClient
+              .from('enem_itens')
+              .select('co_item, param_dificuldade, numero_habilidade')
+              .eq('area', area)
+              .in('numero_habilidade', habNums)
+              .gte('param_dificuldade', paramBMin)
+              .lte('param_dificuldade', paramBMax)
+
+        const { data: itensTRI } = await itensQuery
+
+        // 1b. Se faixa restrita não retornou nada, buscar sem filtro de dificuldade
         const itensParaUsar = (itensTRI && itensTRI.length > 0)
           ? itensTRI
           : await (async () => {
-              const { data } = await inepClient
-                .from('enem_itens')
-                .select('co_item, param_dificuldade, numero_habilidade')
-                .eq('area', area)
-                .in('numero_habilidade', habNums)
+              const fallbackQuery = useAreaFallback
+                ? inepClient
+                    .from('enem_itens')
+                    .select('co_item, param_dificuldade, numero_habilidade')
+                    .eq('area', area)
+                    .limit(60)
+                : inepClient
+                    .from('enem_itens')
+                    .select('co_item, param_dificuldade, numero_habilidade')
+                    .eq('area', area)
+                    .in('numero_habilidade', habNums)
+              const { data } = await fallbackQuery
               return data ?? []
             })()
 
@@ -1618,7 +1642,9 @@ async function computeQuestoesRecomendadas(
       // Sem isso, "Onde Investir" subdimensiona os erros do aluno — mostra só o topHab
       // e ignora as demais. O total por área somado pela UI precisa bater com o simulado.
       // Apenas as top habilidades (que passaram pela calibração TRI) recebem questoesRecomendadas.
-      const topHabNumSet = new Set(habNums)
+      const topHabNumSet = useAreaFallback
+        ? new Set(habs.map(h => h.numeroHabilidade)) // incluir todas (inclusive 0)
+        : new Set(habNums)
       const todasHabsDaArea = habComScore
         .filter(h => h.area === area && h.totalErros > 0)
         .sort((a, b) => b.score - a.score)
@@ -1661,7 +1687,9 @@ async function computeQuestoesRecomendadas(
           score: Math.round(hab.score * 100) / 100,
           questoesRecomendadas: topHabNumSet.has(hab.numeroHabilidade)
             ? dedupeQuestoes(questoesByHab.get(hab.numeroHabilidade) ?? [])
-            : [],
+            : useAreaFallback
+              ? dedupeQuestoes(questoesByHab.get(0) ?? recomendadas.slice(0, TARGET_QUESTOES_POR_AREA))
+              : [],
         }
       })
     })
