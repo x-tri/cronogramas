@@ -40,6 +40,7 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
         .from("project_users")
         .select("*, school:schools(id, name, slug)")
         .eq("is_active", true)
+        .in("role", ["super_admin", "coordinator", "viewer"])
         .order("role")
         .order("name"),
       supabase.from("schools").select("*").order("name"),
