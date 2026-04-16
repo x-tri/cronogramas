@@ -15,18 +15,34 @@ export default function StudentLayout() {
   const [passwordChanged, setPasswordChanged] = useState(false);
 
   // Verificar se tem student vinculado a este auth user
-  const { data: studentLink, isLoading: loadingStudent } = useQuery({
+  const { data: studentLink, isLoading: loadingStudent, error: studentError } = useQuery({
     queryKey: ["student-link", user?.id],
     queryFn: async () => {
+      // Tentar refresh da sessão antes da query para evitar JWT expirado
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        await supabase.auth.refreshSession();
+      }
+
       const { data, error } = await supabase
         .from("students")
         .select("id, matricula, name")
         .eq("profile_id", user!.id)
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        // 401 = JWT inválido → forçar re-login
+        if ("code" in error && (error.code === "401" || error.code === "PGRST301")) {
+          await supabase.auth.signOut();
+          return null;
+        }
+        // Outros erros: tratar como "não vinculado" em vez de crashar
+        console.warn("[student-link]", error.message);
+        return null;
+      }
       return data;
     },
     enabled: !!user,
+    retry: 1,
   });
 
   // Verificar project_users (para must_change_password)
@@ -38,10 +54,15 @@ export default function StudentLayout() {
         .select("must_change_password")
         .eq("auth_uid", user!.id)
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        // Não crashar — aluno Google pode não ter project_users
+        console.warn("[project-user-self]", error.message);
+        return null;
+      }
       return data;
     },
     enabled: !!user,
+    retry: 1,
   });
 
   if (loading || loadingStudent || loadingPU) {
@@ -68,8 +89,11 @@ export default function StudentLayout() {
   }
 
   // Forçar troca de senha (apenas para login por matrícula, não Google)
-  const isGoogleUser = user.app_metadata?.provider === "google";
-  if (!isGoogleUser && projectUser?.must_change_password && !passwordChanged) {
+  const authProvider = typeof user.app_metadata?.provider === "string"
+    ? user.app_metadata.provider
+    : null;
+  const isSocialUser = authProvider === "google" || authProvider === "apple";
+  if (!isSocialUser && projectUser?.must_change_password && !passwordChanged) {
     return (
       <ChangePassword
         onComplete={() => {

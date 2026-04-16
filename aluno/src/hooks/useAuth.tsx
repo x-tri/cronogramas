@@ -16,23 +16,28 @@ const EMAIL_DOMAIN = "aluno.xtri.com";
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
+function getStudentAuthRedirectUrl(): string {
+  const currentUrl = new URL(window.location.href);
+  currentUrl.hash = "";
+  currentUrl.search = "";
+  return currentUrl.toString();
+}
+
 export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // Padrão recomendado Supabase v2: APENAS onAuthStateChange
+    // Não usar getSession() separado — causa race condition com OAuth callback
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        setLoading(false);
+      },
+    );
 
     return () => subscription.unsubscribe();
   }, []);
@@ -47,7 +52,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: getStudentAuthRedirectUrl(),
       },
     });
     return { error };
@@ -57,7 +62,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "apple",
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: getStudentAuthRedirectUrl(),
       },
     });
     return { error };

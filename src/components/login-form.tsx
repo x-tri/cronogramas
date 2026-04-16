@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authenticate, login, signInWithGoogle } from "../lib/auth";
 
 interface LoginFormProps {
@@ -6,40 +6,111 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onLoginSuccess }: LoginFormProps) {
+  const [emailLogin, setEmailLogin] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [showEmailLogin, setShowEmailLogin] = useState(false);
+
+  useEffect(() => {
+    const resetLoadingState = () => {
+      setIsGoogleLoading(false);
+      setIsPasswordLoading(false);
+    };
+
+    resetLoadingState();
+    window.addEventListener("pageshow", resetLoadingState);
+    return () => window.removeEventListener("pageshow", resetLoadingState);
+  }, []);
+
+  async function withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    message: string,
+  ): Promise<T> {
+    let timeoutId: number | null = null;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        reject(new Error(message));
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    }
+  }
 
   async function handleGoogleLogin() {
     setError("");
-    setIsLoading(true);
-    const { error: googleError } = await signInWithGoogle();
-    if (googleError) {
-      setError("Erro ao conectar com Google. Tente novamente.");
-      setIsLoading(false);
+    setIsPasswordLoading(false);
+    setIsGoogleLoading(true);
+
+    try {
+      const { error: googleError } = await withTimeout(
+        signInWithGoogle(),
+        15000,
+        "A conexão com Google demorou demais. Tente novamente.",
+      );
+
+      if (googleError) {
+        setError("Erro ao conectar com Google. Tente novamente.");
+        setIsGoogleLoading(false);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao conectar com Google.");
+      setIsGoogleLoading(false);
     }
-    // Redirect acontece automaticamente — não precisa setIsLoading(false) no sucesso
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setIsLoading(true);
+    setIsGoogleLoading(false);
+    setIsPasswordLoading(true);
 
-    await new Promise((r) => setTimeout(r, 400));
+    try {
+      await new Promise((r) => setTimeout(r, 400));
 
-    const user = await authenticate(username, password);
+      const identifier = emailLogin.trim() || username.trim();
+      const user = await withTimeout(
+        authenticate(identifier, password),
+        15000,
+        "O login demorou demais. Verifique a conexão e tente novamente.",
+      );
 
-    if (user) {
-      login(user);
-      onLoginSuccess();
-    } else {
-      setError("Email ou senha incorretos.");
+      if (user) {
+        login(user);
+        onLoginSuccess();
+      } else {
+        setError("Email ou senha incorretos.");
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Erro ao fazer login. Tente novamente.",
+      );
+    } finally {
+      setIsPasswordLoading(false);
     }
+  }
 
-    setIsLoading(false);
+  const isAnyLoading = isGoogleLoading || isPasswordLoading;
+
+  const handleIdentifierChange = (value: string) => {
+    setUsername(value);
+    setEmailLogin(value);
+    if (error) setError("");
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    if (error) setError("");
   }
 
   return (
@@ -72,7 +143,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
           <button
             type="button"
             onClick={handleGoogleLogin}
-            disabled={isLoading}
+            disabled={isAnyLoading}
             className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-[#e5e7eb] bg-white text-sm font-semibold text-[#1d1d1f] shadow-sm transition-all hover:bg-[#f8fafc] hover:shadow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -81,7 +152,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
             </svg>
-            {isLoading ? "Conectando..." : "Entrar com Google"}
+            {isGoogleLoading ? "Conectando..." : "Entrar com Google"}
           </button>
 
           {/* Divider */}
@@ -109,12 +180,14 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                 </label>
                 <input
                   id="username"
-                  type="text"
+                  name="username"
+                  type="email"
+                  autoComplete="username"
                   className="w-full rounded-lg border border-[#d1d5db] bg-[#fafafa] px-3 py-2.5 text-sm text-[#1d1d1f] outline-none transition-all placeholder:text-[#9ca3af] focus:border-[#2563eb] focus:bg-white focus:ring-2 focus:ring-[#2563eb]/20"
-                  placeholder="Digite seu usuário"
+                  placeholder="Digite seu email"
                   required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  value={emailLogin}
+                  onChange={(e) => handleIdentifierChange(e.target.value)}
                 />
               </div>
 
@@ -124,11 +197,13 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                 </label>
                 <input
                   id="password"
+                  name="password"
                   type="password"
+                  autoComplete="current-password"
                   className="w-full rounded-lg border border-[#d1d5db] bg-[#fafafa] px-3 py-2.5 text-sm text-[#1d1d1f] outline-none transition-all placeholder:text-[#9ca3af] focus:border-[#2563eb] focus:bg-white focus:ring-2 focus:ring-[#2563eb]/20"
                   placeholder="Digite sua senha"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => handlePasswordChange(e.target.value)}
                   required
                 />
               </div>
@@ -136,9 +211,9 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
               <button
                 className="mt-1 inline-flex h-10 w-full items-center justify-center rounded-lg bg-[#2563eb] text-sm font-semibold text-white transition-colors hover:bg-[#1d4ed8] active:bg-[#1e40af] disabled:cursor-not-allowed disabled:opacity-60"
                 type="submit"
-                disabled={isLoading}
+                disabled={isAnyLoading}
               >
-                {isLoading ? (
+                {isPasswordLoading ? (
                   <span className="flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                     Entrando...
