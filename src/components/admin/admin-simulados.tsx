@@ -15,6 +15,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "../../lib/supabase";
+import { ConfirmDialog } from "./simulado-actions/confirm-dialog";
+import { ResponsesDrawer } from "./simulado-actions/responses-drawer";
 import { SimuladoWizard } from "./simulado-wizard";
 
 type SimuladoStatus = "draft" | "published" | "closed";
@@ -86,6 +88,16 @@ export function AdminSimulados({
   const [wizardOpen, setWizardOpen] = useState<boolean>(false);
   const [reloadTick, setReloadTick] = useState<number>(0);
 
+  // Fase 3.3: acoes nos cards.
+  type PendingAction =
+    | { readonly kind: "publish"; readonly simulado: SimuladoRow }
+    | { readonly kind: "close"; readonly simulado: SimuladoRow }
+    | { readonly kind: "delete"; readonly simulado: SimuladoRow };
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [drawerSimulado, setDrawerSimulado] = useState<SimuladoRow | null>(null);
+
   // super_admin: carrega lista de escolas para filtro.
   useEffect(() => {
     if (isSchoolScoped) return;
@@ -149,6 +161,49 @@ export function AdminSimulados({
   };
 
   const handleWizardCreated = (): void => {
+    setReloadTick((n) => n + 1);
+  };
+
+  const closePendingAction = (): void => {
+    setPendingAction(null);
+    setActionError(null);
+    setActionLoading(false);
+  };
+
+  const runAction = async (action: PendingAction): Promise<void> => {
+    setActionLoading(true);
+    setActionError(null);
+
+    const simId = action.simulado.id;
+    let queryError: { message: string } | null = null;
+
+    if (action.kind === "publish") {
+      const { error: e } = await supabase
+        .from("simulados")
+        .update({ status: "published" })
+        .eq("id", simId);
+      queryError = e;
+    } else if (action.kind === "close") {
+      const { error: e } = await supabase
+        .from("simulados")
+        .update({ status: "closed" })
+        .eq("id", simId);
+      queryError = e;
+    } else if (action.kind === "delete") {
+      const { error: e } = await supabase
+        .from("simulados")
+        .delete()
+        .eq("id", simId);
+      queryError = e;
+    }
+
+    if (queryError) {
+      setActionLoading(false);
+      setActionError(queryError.message);
+      return;
+    }
+
+    closePendingAction();
     setReloadTick((n) => n + 1);
   };
 
@@ -254,6 +309,16 @@ export function AdminSimulados({
               <SimuladoCard
                 simulado={sim}
                 schoolName={schoolNameById[sim.school_id] ?? "—"}
+                onPublish={() =>
+                  setPendingAction({ kind: "publish", simulado: sim })
+                }
+                onClose={() =>
+                  setPendingAction({ kind: "close", simulado: sim })
+                }
+                onDelete={() =>
+                  setPendingAction({ kind: "delete", simulado: sim })
+                }
+                onViewResponses={() => setDrawerSimulado(sim)}
               />
             </li>
           ))}
@@ -267,6 +332,47 @@ export function AdminSimulados({
         schools={schools}
         isSchoolScoped={isSchoolScoped}
         lockedSchoolId={isSchoolScoped ? (userSchoolId ?? null) : null}
+      />
+
+      <ConfirmDialog
+        open={pendingAction !== null}
+        title={
+          pendingAction?.kind === "publish"
+            ? "Publicar simulado?"
+            : pendingAction?.kind === "close"
+              ? "Encerrar simulado?"
+              : "Excluir simulado?"
+        }
+        message={
+          pendingAction?.kind === "publish"
+            ? `"${pendingAction.simulado.title}" sera visivel aos alunos para responderem. Publicar um simulado exige que os 180 itens estejam cadastrados (45 por area).`
+            : pendingAction?.kind === "close"
+              ? `"${pendingAction.simulado.title}" deixara de aceitar novas respostas. Dados ja recebidos continuam disponiveis para consulta.`
+              : pendingAction?.kind === "delete"
+                ? `"${pendingAction.simulado.title}" sera APAGADO permanentemente junto com todas as respostas recebidas. Esta acao nao pode ser desfeita.`
+                : ""
+        }
+        confirmLabel={
+          pendingAction?.kind === "publish"
+            ? "Publicar"
+            : pendingAction?.kind === "close"
+              ? "Encerrar"
+              : "Excluir definitivamente"
+        }
+        tone={pendingAction?.kind === "delete" ? "danger" : "default"}
+        loading={actionLoading}
+        errorMessage={actionError}
+        onConfirm={() => {
+          if (pendingAction) void runAction(pendingAction);
+        }}
+        onCancel={closePendingAction}
+      />
+
+      <ResponsesDrawer
+        open={drawerSimulado !== null}
+        simuladoId={drawerSimulado?.id ?? null}
+        simuladoTitle={drawerSimulado?.title ?? ""}
+        onClose={() => setDrawerSimulado(null)}
       />
     </div>
   );
@@ -308,15 +414,29 @@ function EmptyState({ onCreate }: EmptyStateProps) {
 interface SimuladoCardProps {
   readonly simulado: SimuladoRow;
   readonly schoolName: string;
+  readonly onPublish: () => void;
+  readonly onClose: () => void;
+  readonly onDelete: () => void;
+  readonly onViewResponses: () => void;
 }
 
-function SimuladoCard({ simulado, schoolName }: SimuladoCardProps) {
+function SimuladoCard({
+  simulado,
+  schoolName,
+  onPublish,
+  onClose,
+  onDelete,
+  onViewResponses,
+}: SimuladoCardProps) {
   const style = STATUS_STYLES[simulado.status];
   const respostas = countRespostas(simulado);
   const turmasLabel =
     simulado.turmas.length === 0
       ? "Todas as turmas"
       : simulado.turmas.join(", ");
+
+  const isDraft = simulado.status === "draft";
+  const isPublished = simulado.status === "published";
 
   return (
     <article className="flex h-full flex-col rounded-lg border border-[#e5e7eb] bg-white p-4 shadow-sm">
@@ -347,18 +467,59 @@ function SimuladoCard({ simulado, schoolName }: SimuladoCardProps) {
         </div>
       </dl>
 
-      <footer className="mt-4 flex items-center justify-between border-t border-[#f4f4f5] pt-3">
-        <span className="text-xs text-[#71717a]">
-          <span
-            className="font-semibold text-[#1d1d1f]"
-            aria-label={`${respostas} respostas recebidas`}
+      <footer className="mt-4 flex flex-col gap-2 border-t border-[#f4f4f5] pt-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[#71717a]">
+            <span
+              className="font-semibold text-[#1d1d1f]"
+              aria-label={`${respostas} respostas recebidas`}
+            >
+              {respostas}
+            </span>{" "}
+            resposta{respostas === 1 ? "" : "s"}
+          </span>
+          <button
+            type="button"
+            onClick={onViewResponses}
+            className="text-xs font-medium text-[#2563eb] hover:underline"
+            aria-label={`Ver respostas de ${simulado.title}`}
           >
-            {respostas}
-          </span>{" "}
-          resposta{respostas === 1 ? "" : "s"}
-        </span>
-        {/* Acoes (Publicar/Fechar/Ver respostas) entram na Fase 3.3 */}
-        <span className="text-xs text-[#94a3b8]">Fase 3.3</span>
+            Ver respostas
+          </button>
+        </div>
+
+        {/* Botoes de estado */}
+        <div className="flex items-center gap-2">
+          {isDraft && (
+            <button
+              type="button"
+              onClick={onPublish}
+              className="flex-1 rounded-md bg-[#16a34a] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#15803d]"
+              aria-label={`Publicar ${simulado.title}`}
+            >
+              Publicar
+            </button>
+          )}
+          {isPublished && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-1.5 text-xs font-medium text-[#9a3412] hover:bg-[#ffedd5]"
+              aria-label={`Encerrar ${simulado.title}`}
+            >
+              Encerrar
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="rounded-md border border-[#fecaca] px-2.5 py-1.5 text-xs font-medium text-[#dc2626] hover:bg-[#fef2f2]"
+            aria-label={`Excluir ${simulado.title}`}
+            title="Excluir simulado"
+          >
+            Excluir
+          </button>
+        </div>
       </footer>
     </article>
   );

@@ -285,6 +285,119 @@ describe('AdminSimulados', () => {
     expect(calls.find((c) => c.col === 'status')).toBeUndefined()
   })
 
+  it('draft card: renderiza botao Publicar + Excluir (sem Encerrar)', async () => {
+    mockSupabaseWith((state) => {
+      if (state.table === 'schools') return { data: SCHOOLS, error: null }
+      if (state.table === 'simulados') {
+        return { data: [SIMULADOS_FIXTURE[0]], error: null } // draft
+      }
+      return { data: [], error: null }
+    })
+    const Comp = await importComponent()
+    render(<Comp userRole="super_admin" />)
+
+    await screen.findByText('ENEM Simulado 1')
+    expect(screen.getByRole('button', { name: /^Publicar ENEM Simulado 1$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Excluir ENEM Simulado 1$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Encerrar ENEM Simulado 1$/ })).not.toBeInTheDocument()
+  })
+
+  it('published card: renderiza botao Encerrar + Excluir (sem Publicar)', async () => {
+    mockSupabaseWith((state) => {
+      if (state.table === 'schools') return { data: SCHOOLS, error: null }
+      if (state.table === 'simulados') {
+        return { data: [SIMULADOS_FIXTURE[1]], error: null } // published
+      }
+      return { data: [], error: null }
+    })
+    const Comp = await importComponent()
+    render(<Comp userRole="super_admin" />)
+
+    await screen.findByText('ENEM Simulado 2')
+    expect(screen.getByRole('button', { name: /^Encerrar ENEM Simulado 2$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Publicar ENEM Simulado 2$/ })).not.toBeInTheDocument()
+  })
+
+  it('closed card: apenas Excluir + Ver respostas (sem Publicar nem Encerrar)', async () => {
+    mockSupabaseWith((state) => {
+      if (state.table === 'schools') return { data: SCHOOLS, error: null }
+      if (state.table === 'simulados') {
+        return { data: [SIMULADOS_FIXTURE[2]], error: null } // closed
+      }
+      return { data: [], error: null }
+    })
+    const Comp = await importComponent()
+    render(<Comp userRole="super_admin" />)
+
+    await screen.findByText(/ENEM Simulado 3/)
+    expect(screen.queryByRole('button', { name: /Publicar ENEM/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Encerrar ENEM/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Excluir ENEM Simulado 3/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Ver respostas de ENEM Simulado 3/i })).toBeInTheDocument()
+  })
+
+  it('clicar Publicar abre ConfirmDialog com tone default', async () => {
+    const user = userEvent.setup()
+    mockSupabaseWith((state) => {
+      if (state.table === 'schools') return { data: SCHOOLS, error: null }
+      if (state.table === 'simulados') return { data: [SIMULADOS_FIXTURE[0]], error: null }
+      return { data: [], error: null }
+    })
+    const Comp = await importComponent()
+    render(<Comp userRole="super_admin" />)
+
+    await screen.findByText('ENEM Simulado 1')
+    await user.click(screen.getByRole('button', { name: /^Publicar ENEM Simulado 1$/ }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent(/Publicar simulado/i)
+    expect(dialog).toHaveTextContent(/ENEM Simulado 1/)
+  })
+
+  it('clicar Excluir abre ConfirmDialog com mensagem permanente', async () => {
+    const user = userEvent.setup()
+    mockSupabaseWith((state) => {
+      if (state.table === 'schools') return { data: SCHOOLS, error: null }
+      if (state.table === 'simulados') return { data: [SIMULADOS_FIXTURE[1]], error: null }
+      return { data: [], error: null }
+    })
+    const Comp = await importComponent()
+    render(<Comp userRole="super_admin" />)
+
+    await screen.findByText('ENEM Simulado 2')
+    await user.click(screen.getByRole('button', { name: /^Excluir ENEM Simulado 2$/ }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent(/Excluir simulado/i)
+    expect(dialog).toHaveTextContent(/APAGADO permanentemente/i)
+    expect(dialog).toHaveTextContent(/nao pode ser desfeita/i)
+  })
+
+  it('Ver respostas abre drawer com titulo', async () => {
+    const user = userEvent.setup()
+    mockSupabaseWith((state) => {
+      if (state.table === 'schools') return { data: SCHOOLS, error: null }
+      if (state.table === 'simulados') return { data: [SIMULADOS_FIXTURE[1]], error: null }
+      if (state.table === 'simulado_respostas') return { data: [], error: null }
+      return { data: [], error: null }
+    })
+    const Comp = await importComponent()
+    render(<Comp userRole="super_admin" />)
+
+    await screen.findByText('ENEM Simulado 2')
+    await user.click(screen.getByRole('button', { name: /Ver respostas de ENEM Simulado 2/i }))
+
+    await waitFor(() => {
+      const dialogs = screen.getAllByRole('dialog')
+      // O drawer tem aria-label com o titulo do simulado
+      const respostasDrawer = dialogs.find((d) =>
+        d.getAttribute('aria-label')?.includes('ENEM Simulado 2'),
+      )
+      expect(respostasDrawer).toBeDefined()
+      expect(respostasDrawer).toHaveTextContent(/Respostas recebidas/i)
+    })
+  })
+
   it('fireEvent no filtro de escola altera o fetch', async () => {
     const schoolFilters: string[] = []
 
