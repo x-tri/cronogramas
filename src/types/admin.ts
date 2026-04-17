@@ -70,6 +70,7 @@ export type AdminPage =
   | "coordinators"
   | "schedules"
   | "control"
+  | "simulados"
   | "performance"
   | "content_mapping"
   | "pdfs"

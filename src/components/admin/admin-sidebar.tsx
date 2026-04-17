@@ -74,6 +74,19 @@ const NAV_ITEMS: readonly NavItem[] = [
     ),
   },
   {
+    page: "simulados",
+    label: "Simulados ENEM",
+    icon: (
+      <svg {...iconProps} viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+        <line x1="9" y1="14" x2="13" y2="14" />
+        <line x1="9" y1="17" x2="11" y2="17" />
+        <path d="M15 14l1.5 1.5L19 13" />
+      </svg>
+    ),
+  },
+  {
     page: "performance",
     label: "Planos & Mentoria",
     icon: (
