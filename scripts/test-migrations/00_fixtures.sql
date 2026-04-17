@@ -27,6 +27,37 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT ALL ON FUNCTIONS TO service_role;
 
 -- ---------------------------------------------------------------------------
+-- Fixtures em auth.users para suportar FKs em simulados.created_by,
+-- project_users.auth_uid, students.profile_id. Supabase start ja cria o
+-- schema auth; aqui so inserimos os UUIDs que usamos nos testes.
+-- ---------------------------------------------------------------------------
+INSERT INTO auth.users (
+  id, instance_id, aud, role, email,
+  encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change, email_change_token_new,
+  email_change_token_current, phone_change, phone_change_token,
+  reauthentication_token, is_sso_user, is_anonymous
+) VALUES
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'super@test.local',
+   '', now(), '{}'::jsonb, '{}'::jsonb, now(), now(),
+   '', '', '', '', '', '', '', '', false, false),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'coord@test.local',
+   '', now(), '{}'::jsonb, '{}'::jsonb, now(), now(),
+   '', '', '', '', '', '', '', '', false, false),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'aluno-a@test.local',
+   '', now(), '{}'::jsonb, '{}'::jsonb, now(), now(),
+   '', '', '', '', '', '', '', '', false, false),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'aluno-b@test.local',
+   '', now(), '{}'::jsonb, '{}'::jsonb, now(), now(),
+   '', '', '', '', '', '', '', '', false, false)
+ON CONFLICT (id) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
 -- Tabelas base (mock minimo — em prod vem de migrations fora deste folder)
 -- ---------------------------------------------------------------------------
 CREATE TABLE public.schools (

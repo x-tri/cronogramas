@@ -18,21 +18,25 @@ TEST_DIR="${ROOT}/scripts/test-migrations"
 echo ">>> Container: ${CONTAINER}"
 docker exec "${CONTAINER}" psql -U postgres -d postgres -c "SELECT now();" >/dev/null
 
-echo ">>> [1/5] Applying fixtures (00_fixtures.sql)"
+echo ">>> [1/6] Applying fixtures (00_fixtures.sql)"
 ${PSQL} < "${TEST_DIR}/00_fixtures.sql"
 
-echo ">>> [2/5] Applying 015_create_simulados_tables.sql"
+echo ">>> [2/6] Applying 015_create_simulados_tables.sql"
 ${PSQL} < "${MIG_DIR}/015_create_simulados_tables.sql"
 
-echo ">>> [3/5] Applying 016_simulados_rls.sql"
+echo ">>> [3/6] Applying 016_simulados_rls.sql"
 ${PSQL} < "${MIG_DIR}/016_simulados_rls.sql"
 
-echo ">>> [4/5] Applying 017_simulados_rpcs.sql"
+echo ">>> [4/6] Applying 017_simulados_rpcs.sql"
 ${PSQL} < "${MIG_DIR}/017_simulados_rpcs.sql"
 
-echo ">>> [5/5] Running assertions (90_assertions.sql + 91_rpc_assertions.sql)"
+echo ">>> [5/6] Applying 018_simulado_create_rpc.sql"
+${PSQL} < "${MIG_DIR}/018_simulado_create_rpc.sql"
+
+echo ">>> [6/6] Running assertions (90 + 91 + 92)"
 ${PSQL} < "${TEST_DIR}/90_assertions.sql"
 ${PSQL} < "${TEST_DIR}/91_rpc_assertions.sql"
+${PSQL} < "${TEST_DIR}/92_create_rpc_assertions.sql"
 
 echo ""
 echo "=== VALIDATION COMPLETE ==="
