@@ -215,7 +215,10 @@ function AppContent() {
     );
   }
 
-  if (userRole === "super_admin") {
+  // super_admin e coordinator acessam AdminDashboard. Coordinator ve um
+  // subconjunto das paginas (scoped a sua escola) via getAvailablePages em
+  // admin-dashboard.tsx.
+  if (userRole === "super_admin" || userRole === "coordinator") {
     return (
       <Suspense fallback={
         <main className="flex min-h-svh items-center justify-center bg-[#fafafa]">

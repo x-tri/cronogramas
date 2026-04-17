@@ -6,6 +6,9 @@ import { resolve } from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // base: './' garante paths relativos no bundle — funciona tanto em root
+  // quanto em subdir quando o build e subido via Hostinger file manager.
+  base: './',
   // Carrega .env do diretório pai (onde ficam as chaves compartilhadas)
   envDir: '..',
   server: {
