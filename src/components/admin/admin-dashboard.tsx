@@ -152,8 +152,11 @@ function renderPage(page: AdminPage, params: {
 }
 
 function getAvailablePages(userRole: string | null | undefined): AdminPage[] {
+  // Coordinator NAO cai neste dashboard (roteamento em App.tsx manda para
+  // o painel de mentor). Esta funcao existe apenas para super_admin hoje,
+  // mas manter branch de coordinator e util caso super_admin impersone.
   if (userRole === "coordinator") {
-    return ["control", "simulados", "performance", "pdfs"];
+    return ["control", "performance", "pdfs"];
   }
 
   // super_admin — tudo exceto GLiNER e API Monitor (dev-only)
