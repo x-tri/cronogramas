@@ -11,6 +11,9 @@ import Cronograma from "@/pages/Cronograma";
 import Desempenho from "@/pages/Desempenho";
 import Analise from "@/pages/Analise";
 import Avisos from "@/pages/Avisos";
+import Simulados from "@/pages/Simulados";
+import SimuladoResponder from "@/pages/SimuladoResponder";
+import SimuladoResultado from "@/pages/SimuladoResultado";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient({
@@ -37,6 +40,9 @@ const App = () => (
                 <Route path="/desempenho" element={<Desempenho />} />
                 <Route path="/analise" element={<Analise />} />
                 <Route path="/avisos" element={<Avisos />} />
+                <Route path="/simulados" element={<Simulados />} />
+                <Route path="/simulados/:id/responder" element={<SimuladoResponder />} />
+                <Route path="/simulados/:id/resultado" element={<SimuladoResultado />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
