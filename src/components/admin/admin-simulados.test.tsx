@@ -218,21 +218,24 @@ describe('AdminSimulados', () => {
     expect(within(schoolSelect).getByRole('option', { name: 'Todas as escolas' })).toBeInTheDocument()
   })
 
-  it('click em "Criar simulado" mostra alert stub (Fase 3.2)', async () => {
+  it('click em "Criar simulado" abre o wizard (Fase 3.2)', async () => {
     const user = userEvent.setup()
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
 
     mockSupabaseWith(() => ({ data: [], error: null }))
     const Comp = await importComponent()
     render(<Comp userRole="super_admin" />)
 
     await screen.findByText(/Nenhum simulado encontrado/i)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
     const createBtns = screen.getAllByRole('button', { name: /criar simulado/i })
     await user.click(createBtns[0]!)
 
-    expect(alertSpy).toHaveBeenCalledOnce()
-    expect(alertSpy.mock.calls[0]?.[0]).toMatch(/Fase 3\.2/i)
-    alertSpy.mockRestore()
+    // Wizard modal deve aparecer
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-label', 'Criar simulado ENEM')
   })
 
   it('mostra mensagem de erro se o fetch de simulados falhar', async () => {

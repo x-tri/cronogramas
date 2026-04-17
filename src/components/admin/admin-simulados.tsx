@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "../../lib/supabase";
+import { SimuladoWizard } from "./simulado-wizard";
 
 type SimuladoStatus = "draft" | "published" | "closed";
 
@@ -82,6 +83,8 @@ export function AdminSimulados({
   const [simulados, setSimulados] = useState<ReadonlyArray<SimuladoRow>>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState<boolean>(false);
+  const [reloadTick, setReloadTick] = useState<number>(0);
 
   // super_admin: carrega lista de escolas para filtro.
   useEffect(() => {
@@ -139,18 +142,14 @@ export function AdminSimulados({
     return () => {
       cancelled = true;
     };
-  }, [effectiveSchoolId, selectedStatus]);
+  }, [effectiveSchoolId, selectedStatus, reloadTick]);
 
   const handleCreate = (): void => {
-    // Fase 3.2 implementara o wizard. Por ora avisa o usuario.
-    window.alert(
-      "Criacao de simulado esta em implementacao na Fase 3.2.\n\n" +
-        "Entregaveis previstos:\n" +
-        "- Nome, escola e turmas alvo\n" +
-        "- Planilha 180 itens (gabarito + dificuldade Angoff)\n" +
-        "- Import/Upload CSV\n" +
-        "- Preview e salvamento como rascunho",
-    );
+    setWizardOpen(true);
+  };
+
+  const handleWizardCreated = (): void => {
+    setReloadTick((n) => n + 1);
   };
 
   const schoolNameById = useMemo<Record<string, string>>(() => {
@@ -260,6 +259,15 @@ export function AdminSimulados({
           ))}
         </ul>
       )}
+
+      <SimuladoWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onCreated={handleWizardCreated}
+        schools={schools}
+        isSchoolScoped={isSchoolScoped}
+        lockedSchoolId={isSchoolScoped ? (userSchoolId ?? null) : null}
+      />
     </div>
   );
 }
