@@ -16,9 +16,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useSimuladoResultado } from "@/hooks/useSimulados";
 import { useStudentProfile } from "@/hooks/useStudentData";
 import { useGamification } from "@/hooks/useGamification";
+import { useSisuGoal } from "@/hooks/useSisuGoal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MascotAvatar } from "@/components/MascotAvatar";
 import { SpeechBubble } from "@/components/SpeechBubble";
+import { SisuThermometer } from "@/components/SisuThermometer";
 import { ArrowLeft, XCircle, Info, Target, TrendingUp } from "lucide-react";
 import {
   AREA_LABELS,
@@ -26,6 +28,12 @@ import {
   type AreaKey,
   type SimuladoResultadoItem,
 } from "@/types/simulado";
+import {
+  buildThermometerData,
+  getUniversidade,
+  mediaEnemComRedacao,
+  REDACAO_HARDCODED,
+} from "@/services/sisu-data";
 
 const AREAS: readonly AreaKey[] = ["LC", "CH", "CN", "MT"];
 
@@ -274,7 +282,7 @@ function Hero({
             <MascotAvatar
               level={level}
               animation={mascot.animation}
-              size={84}
+              size={112}
             />
           </div>
         </div>
@@ -293,6 +301,12 @@ function Hero({
                   /1000
                 </p>
               </div>
+              <p
+                className="text-[9px] font-semibold text-muted-foreground"
+                title={`Média ENEM = (LC + CH + CN + MT + Redação ${REDACAO_HARDCODED}) / 5`}
+              >
+                c/ redação {REDACAO_HARDCODED}
+              </p>
 
               <button
                 type="button"
@@ -482,15 +496,33 @@ export default function SimuladoResultado() {
   const { data: student } = useStudentProfile();
   const studentKey = student?.matricula || student?.id;
   const { data: gamification } = useGamification(studentKey);
+  const { data: sisuGoal } = useSisuGoal(student?.id);
   const level = gamification?.level ?? 1;
 
   const [tierInfoOpen, setTierInfoOpen] = useState(false);
 
-  const topTopicos = useMemo(() => {
-    if (!data?.resposta?.erros_por_topico) return [];
-    return Object.entries(data.resposta.erros_por_topico)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+  // Top topico errado POR area (1 por area em vez de global)
+  const topPorArea = useMemo<
+    ReadonlyArray<{ area: AreaKey; topico: string; count: number }>
+  >(() => {
+    if (!data?.itens) return [];
+    const byArea = new Map<AreaKey, Map<string, number>>();
+    for (const it of data.itens) {
+      if (it.correto || it.branco) continue;
+      const t = (it.topico ?? "").trim();
+      if (!t) continue;
+      if (!byArea.has(it.area)) byArea.set(it.area, new Map());
+      const m = byArea.get(it.area)!;
+      m.set(t, (m.get(t) ?? 0) + 1);
+    }
+    return AREAS.flatMap((area) => {
+      const m = byArea.get(area);
+      if (!m || m.size === 0) return [];
+      const sorted = [...m.entries()].sort((a, b) => b[1] - a[1]);
+      const top = sorted[0];
+      if (!top) return [];
+      return [{ area, topico: top[0], count: top[1] }];
+    });
   }, [data]);
 
   const erroItens = useMemo<readonly SimuladoResultadoItem[]>(() => {
@@ -552,26 +584,31 @@ export default function SimuladoResultado() {
       resposta.branco_cn +
       resposta.branco_mt,
   };
-  const triScores = [
-    resposta.tri_lc,
-    resposta.tri_ch,
-    resposta.tri_cn,
-    resposta.tri_mt,
-  ].filter((x): x is number => x != null);
-  const mediaGeral =
-    triScores.length === 0
-      ? null
-      : triScores.reduce((a, b) => a + b, 0) / triScores.length;
+  // Media ENEM oficial: 4 areas + redacao (hardcoded 900 pra comparar com SISU)
+  const mediaGeral = mediaEnemComRedacao({
+    lc: resposta.tri_lc,
+    ch: resposta.tri_ch,
+    cn: resposta.tri_cn,
+    mt: resposta.tri_mt,
+  });
   const mediaTier = tierOf(mediaGeral);
   const mediaGap = nextLevelGap(mediaGeral);
   const mascot = simuladoMascotMessage(mediaGeral, totais);
   const muitosEmBranco = totais.branco > 30;
 
+  // Dados do termometro SISU (se aluno tem meta cadastrada e universidade reconhecida)
+  const sisuUni = getUniversidade(
+    sisuGoal?.sisu_universidade ?? null,
+    sisuGoal?.sisu_uf ?? null,
+  );
+  const thermometer =
+    sisuUni && sisuGoal?.sisu_curso_nome && sisuGoal.sisu_nota_corte && mediaGeral != null
+      ? buildThermometerData(sisuUni, mediaGeral)
+      : null;
+
   const totalResp = totais.acertos + totais.erros + totais.branco;
   const pctAcertos = (totais.acertos / totalResp) * 100;
   const pctErros = (totais.erros / totalResp) * 100;
-
-  const rankingEmojis = ["🔥", "💥", "⚡", "📌", "📎"] as const;
 
   return (
     <div className="pb-24 max-w-lg mx-auto">
@@ -713,39 +750,50 @@ export default function SimuladoResultado() {
           </div>
         </div>
 
-        {/* Top tópicos errados com ranking */}
-        {topTopicos.length > 0 && (
+        {/* Termometro SISU — meta do aluno (se cadastrada) */}
+        {thermometer && sisuGoal?.sisu_curso_nome && sisuGoal.sisu_nota_corte && (
+          <SisuThermometer
+            data={thermometer}
+            mediaEnem={mediaGeral ?? 0}
+            metaCurso={sisuGoal.sisu_curso_nome}
+            metaNotaCorte={Number(sisuGoal.sisu_nota_corte)}
+          />
+        )}
+
+        {/* Top topico errado por AREA (1 card por area) */}
+        {topPorArea.length > 0 && (
           <div className="rounded-2xl border-2 bg-card p-4">
             <div className="flex items-center gap-1.5 mb-3">
               <span className="text-lg">🎯</span>
               <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                Onde você mais errou
+                Maior erro em cada área
               </p>
             </div>
-            <ul className="space-y-2">
-              {topTopicos.map(([topico, count], idx) => {
-                const max = topTopicos[0]![1];
-                const pct = (count / max) * 100;
+            <ul className="space-y-2.5">
+              {topPorArea.map((row) => {
+                const meta = AREA_META[row.area];
                 return (
-                  <li key={topico} className="flex items-center gap-2">
-                    <span className="text-lg flex-shrink-0">
-                      {rankingEmojis[idx]}
+                  <li
+                    key={row.area}
+                    className={`flex items-start gap-2 rounded-xl border-l-4 ${meta.borderClass} ${meta.bgClass} p-2.5`}
+                  >
+                    <span className="text-xl flex-shrink-0 leading-none mt-0.5">
+                      {meta.emoji}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between text-xs gap-2">
-                        <span className="truncate font-bold text-foreground">
-                          {topico}
-                        </span>
-                        <span className="font-black text-red-600 flex-shrink-0">
-                          {count}
+                      <div className="flex items-center justify-between gap-2">
+                        <p
+                          className={`text-[10px] font-black uppercase tracking-wider ${meta.accentClass}`}
+                        >
+                          {row.area} · {meta.short}
+                        </p>
+                        <span className="text-[10px] font-black text-red-600 flex-shrink-0">
+                          {row.count} erro{row.count === 1 ? "" : "s"}
                         </span>
                       </div>
-                      <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-orange-400 to-red-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
+                      <p className="mt-0.5 text-xs font-bold text-foreground leading-tight">
+                        {row.topico}
+                      </p>
                     </div>
                   </li>
                 );
