@@ -67,6 +67,7 @@ export function StepItems({ items, onChange }: StepItemsProps) {
   const [rawText, setRawText] = useState<string>("");
   const [parseErrors, setParseErrors] = useState<ReadonlyArray<ParseError>>([]);
   const [page, setPage] = useState<number>(1);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   const summary = useMemo(() => summarizeItems(items), [items]);
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -88,6 +89,7 @@ export function StepItems({ items, onChange }: StepItemsProps) {
   };
 
   const handleFile = (file: File): void => {
+    setUploadedFileName(file.name);
     const reader = new FileReader();
     reader.onload = (): void => {
       const text = typeof reader.result === "string" ? reader.result : "";
@@ -110,6 +112,8 @@ export function StepItems({ items, onChange }: StepItemsProps) {
   const clearAll = (): void => {
     setRawText("");
     setParseErrors([]);
+    setUploadedFileName(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     onChange([]);
     setPage(1);
   };
@@ -149,18 +153,60 @@ export function StepItems({ items, onChange }: StepItemsProps) {
           </code>
         </p>
 
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleFile(f);
-            }}
-            aria-label="Upload de arquivo CSV"
-            className="text-xs"
-          />
+        {/* Input escondido + botao custom */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFile(f);
+          }}
+          aria-label="Upload de arquivo CSV"
+          className="sr-only"
+        />
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-2 rounded-md border-2 border-dashed border-[#2563eb] bg-[#eff6ff] px-4 py-2 text-xs font-semibold text-[#2563eb] hover:bg-[#dbeafe] transition-colors"
+            aria-label="Selecionar arquivo CSV"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Enviar arquivo CSV
+          </button>
+          {uploadedFileName && (
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-[#f0fdf4] px-2.5 py-1 text-xs font-medium text-[#166534]">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              {uploadedFileName}
+            </span>
+          )}
+          <span className="text-xs text-[#94a3b8]">
+            ou cole o conteudo abaixo ↓
+          </span>
         </div>
 
         <textarea
