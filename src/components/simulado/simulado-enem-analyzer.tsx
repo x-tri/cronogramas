@@ -23,7 +23,9 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 interface SimuladoEnemAnalyzerProps {
-  readonly studentId: string;
+  /** Matricula do aluno selecionado. O componente resolve o students.id
+   *  internamente (currentStudent.id do store e a matricula, nao UUID). */
+  readonly matricula: string;
   readonly variant?: "default" | "compact";
 }
 
@@ -85,7 +87,7 @@ function triToGaugePercent(score: number | null): number {
 }
 
 export function SimuladoEnemAnalyzer({
-  studentId,
+  matricula,
   variant = "default",
 }: SimuladoEnemAnalyzerProps) {
   const [respostas, setRespostas] = useState<ReadonlyArray<RespostaRow>>([]);
@@ -94,47 +96,74 @@ export function SimuladoEnemAnalyzer({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [open, setOpen] = useState<boolean>(false);
 
+  // Resolve UUID real do students.id a partir da matricula, depois busca
+  // respostas. O store cronograma-store usa matricula como Aluno.id (legacy),
+  // mas simulado_respostas.student_id e FK UUID p/ students.id — precisamos
+  // fazer o lookup aqui pra nao quebrar queries de cronograma em outro lugar.
   useEffect(() => {
-    if (!studentId) return;
+    if (!matricula) return;
     let cancelled = false;
     setLoading(true);
+    setError(null);
 
-    supabase
-      .from("simulado_respostas")
-      .select(
-        "id, simulado_id, tri_lc, tri_ch, tri_cn, tri_mt, " +
-          "acertos_lc, erros_lc, branco_lc, " +
-          "acertos_ch, erros_ch, branco_ch, " +
-          "acertos_cn, erros_cn, branco_cn, " +
-          "acertos_mt, erros_mt, branco_mt, " +
-          "erros_por_topico, submitted_at, " +
-          "simulados:simulado_id (title, published_at)",
-      )
-      .eq("student_id", studentId)
-      .order("submitted_at", { ascending: false })
-      .then(({ data, error: queryError }) => {
-        if (cancelled) return;
-        if (queryError) {
-          setError(queryError.message);
-          setRespostas([]);
-        } else {
-          setError(null);
-          setRespostas((data ?? []) as unknown as RespostaRow[]);
-          // Auto-seleciona o mais recente
-          if (data && data.length > 0 && !selectedId) {
-            const first = data[0] as unknown as { id?: string } | null;
-            if (first?.id) setSelectedId(first.id);
-          }
-        }
+    (async () => {
+      const { data: studentRow, error: lookupErr } = await supabase
+        .from("students")
+        .select("id")
+        .eq("matricula", matricula)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (lookupErr) {
+        setError(lookupErr.message);
+        setRespostas([]);
         setLoading(false);
-      });
+        return;
+      }
+      if (!studentRow?.id) {
+        // Aluno avulso ou sem vinculo no banco primary — nao tem simulados
+        // novos possiveis. Estado vazio legitimo, sem erro.
+        setRespostas([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: queryError } = await supabase
+        .from("simulado_respostas")
+        .select(
+          "id, simulado_id, tri_lc, tri_ch, tri_cn, tri_mt, " +
+            "acertos_lc, erros_lc, branco_lc, " +
+            "acertos_ch, erros_ch, branco_ch, " +
+            "acertos_cn, erros_cn, branco_cn, " +
+            "acertos_mt, erros_mt, branco_mt, " +
+            "erros_por_topico, submitted_at, " +
+            "simulados:simulado_id (title, published_at)",
+        )
+        .eq("student_id", studentRow.id)
+        .order("submitted_at", { ascending: false });
+
+      if (cancelled) return;
+
+      if (queryError) {
+        setError(queryError.message);
+        setRespostas([]);
+      } else {
+        const rows = (data ?? []) as unknown as RespostaRow[];
+        setRespostas(rows);
+        if (rows.length > 0 && !selectedId) {
+          setSelectedId(rows[0]!.id);
+        }
+      }
+      setLoading(false);
+    })();
 
     return () => {
       cancelled = true;
     };
-    // selectedId intencionalmente fora das deps para nao recarregar ao trocar selecao
+    // selectedId fora das deps para nao recarregar ao trocar selecao
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studentId]);
+  }, [matricula]);
 
   const selected = useMemo<RespostaRow | null>(() => {
     if (!selectedId) return null;

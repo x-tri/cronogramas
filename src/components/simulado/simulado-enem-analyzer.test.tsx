@@ -10,12 +10,15 @@ import userEvent from "@testing-library/user-event";
 // --- Mock do supabase ------------------------------------------------
 
 interface QueryState {
+  readonly table: string;
   readonly filters: Array<{ col: string; value: unknown }>;
 }
 
 type Resolver = (
   state: QueryState,
-) => { data: unknown[] | null; error: { message: string } | null };
+) =>
+  | { data: unknown; error: { message: string } | null }
+  | { data: unknown[] | null; error: { message: string } | null };
 
 function makeQueryBuilder(state: QueryState, resolver: Resolver) {
   const qb: Record<string, unknown> = {
@@ -25,6 +28,7 @@ function makeQueryBuilder(state: QueryState, resolver: Resolver) {
       state = { ...state, filters: [...state.filters, { col, value }] };
       return qb;
     }),
+    maybeSingle: vi.fn(() => Promise.resolve(resolver(state))),
     then: (onFulfilled: (r: ReturnType<Resolver>) => unknown) =>
       Promise.resolve(resolver(state)).then(onFulfilled),
   };
@@ -34,7 +38,9 @@ function makeQueryBuilder(state: QueryState, resolver: Resolver) {
 function mockSupabaseWith(resolver: Resolver) {
   vi.doMock("../../lib/supabase", () => ({
     supabase: {
-      from: vi.fn(() => makeQueryBuilder({ filters: [] }, resolver)),
+      from: vi.fn((table: string) =>
+        makeQueryBuilder({ table, filters: [] }, resolver),
+      ),
     },
   }));
 }
@@ -85,27 +91,47 @@ describe("SimuladoEnemAnalyzer", () => {
     vi.clearAllMocks();
   });
 
+  /** Resolver que encadeia: 1o students.id lookup + 2o simulado_respostas */
+  function makeResolver(options: {
+    studentId?: string | null;
+    respostas: unknown[];
+    lookupError?: { message: string } | null;
+    respostasError?: { message: string } | null;
+  }): Resolver {
+    return (state) => {
+      if (state.table === "students") {
+        if (options.lookupError) return { data: null, error: options.lookupError };
+        return { data: options.studentId ? { id: options.studentId } : null, error: null };
+      }
+      if (state.table === "simulado_respostas") {
+        if (options.respostasError) return { data: null, error: options.respostasError };
+        return { data: options.respostas, error: null };
+      }
+      return { data: [], error: null };
+    };
+  }
+
   it("compact: mostra estado 'Carregando' ao iniciar", async () => {
     mockSupabaseWith(
       () =>
         new Promise(() => {}) as unknown as ReturnType<Resolver>,
     );
     const Comp = await importComponent();
-    render(<Comp studentId="aluno-1" variant="compact" />);
+    render(<Comp matricula="12345" variant="compact" />);
     expect(screen.getByText(/Carregando/i)).toBeInTheDocument();
   });
 
   it("compact: 'Nenhum respondido' quando lista vazia", async () => {
-    mockSupabaseWith(() => ({ data: [], error: null }));
+    mockSupabaseWith(makeResolver({ studentId: "uuid-1", respostas: [] }));
     const Comp = await importComponent();
-    render(<Comp studentId="aluno-1" variant="compact" />);
+    render(<Comp matricula="12345" variant="compact" />);
     expect(await screen.findByText(/Nenhum respondido/i)).toBeInTheDocument();
   });
 
   it("compact: botao tem aria-expanded=false quando fechado", async () => {
-    mockSupabaseWith(() => ({ data: [RESPOSTA_FIXTURE], error: null }));
+    mockSupabaseWith(makeResolver({ studentId: "uuid-1", respostas: [RESPOSTA_FIXTURE] }));
     const Comp = await importComponent();
-    render(<Comp studentId="aluno-1" variant="compact" />);
+    render(<Comp matricula="12345" variant="compact" />);
     await screen.findByText(/1 respondido/i);
     const btn = screen.getByRole("button", {
       name: /Simulados ENEM/i,
@@ -115,9 +141,9 @@ describe("SimuladoEnemAnalyzer", () => {
 
   it("compact: click no botao expande e mostra TRI + top topicos", async () => {
     const user = userEvent.setup();
-    mockSupabaseWith(() => ({ data: [RESPOSTA_FIXTURE], error: null }));
+    mockSupabaseWith(makeResolver({ studentId: "uuid-1", respostas: [RESPOSTA_FIXTURE] }));
     const Comp = await importComponent();
-    render(<Comp studentId="aluno-1" variant="compact" />);
+    render(<Comp matricula="12345" variant="compact" />);
 
     await screen.findByText(/1 respondido/i);
     await user.click(
@@ -138,41 +164,52 @@ describe("SimuladoEnemAnalyzer", () => {
     expect(screen.getByText("Geometria analítica")).toBeInTheDocument();
   });
 
-  it("query usa eq com student_id correto", async () => {
-    let capturedFilters: QueryState["filters"] = [];
+  it("resolve students.id via matricula + usa UUID em student_id", async () => {
+    const allFilters: QueryState["filters"] = [];
     mockSupabaseWith((state) => {
-      capturedFilters = state.filters;
+      allFilters.push(...state.filters.map((f) => ({ ...f })));
+      if (state.table === "students") {
+        return { data: { id: "uuid-resolved-xyz" }, error: null };
+      }
       return { data: [], error: null };
     });
     const Comp = await importComponent();
-    render(<Comp studentId="aluno-abc-123" variant="compact" />);
+    render(<Comp matricula="matric-abc-123" variant="compact" />);
 
     await screen.findByText(/Nenhum respondido/i);
-    expect(capturedFilters).toContainEqual({
-      col: "student_id",
-      value: "aluno-abc-123",
-    });
+    expect(allFilters).toContainEqual({ col: "matricula", value: "matric-abc-123" });
+    expect(allFilters).toContainEqual({ col: "student_id", value: "uuid-resolved-xyz" });
   });
 
-  it("expoe erro se query falhar", async () => {
-    mockSupabaseWith(() => ({
-      data: null,
-      error: { message: "permission denied" },
-    }));
+  it("expoe erro se query de simulado_respostas falhar", async () => {
+    mockSupabaseWith((state) => {
+      if (state.table === "students") return { data: { id: "uuid-1" }, error: null };
+      return { data: null, error: { message: "permission denied" } };
+    });
     const Comp = await importComponent();
-    // Variant compact nao mostra erro ate abrir — forco default
-    render(<Comp studentId="aluno-1" variant="default" />);
+    render(<Comp matricula="12345" variant="default" />);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/permission denied/);
   });
 
-  it("default: abre panel imediatamente (sem click)", async () => {
-    mockSupabaseWith(() => ({ data: [RESPOSTA_FIXTURE], error: null }));
+  it("student lookup retorna null: estado vazio sem erro (avulso)", async () => {
+    mockSupabaseWith((state) => {
+      if (state.table === "students") return { data: null, error: null };
+      return { data: [], error: null };
+    });
     const Comp = await importComponent();
-    render(<Comp studentId="aluno-1" variant="default" />);
+    render(<Comp matricula="matric-sem-vinculo" variant="compact" />);
+    expect(await screen.findByText(/Nenhum respondido/i)).toBeInTheDocument();
+  });
 
-    // Ja mostra o painel com TRI sem interacao
+  it("default: abre panel imediatamente (sem click)", async () => {
+    mockSupabaseWith((state) => {
+      if (state.table === "students") return { data: { id: "uuid-1" }, error: null };
+      return { data: [RESPOSTA_FIXTURE], error: null };
+    });
+    const Comp = await importComponent();
+    render(<Comp matricula="12345" variant="default" />);
     await screen.findByText("620");
     expect(screen.getByText(/Simulados ENEM do aluno/i)).toBeInTheDocument();
   });
@@ -194,35 +231,37 @@ describe("SimuladoEnemAnalyzer", () => {
       simulados: { title: "ENEM Simulado 2", published_at: null },
     };
 
-    let fetchCount = 0;
-    mockSupabaseWith(() => {
-      fetchCount++;
-      return { data: [RESPOSTA_FIXTURE, RESPOSTA2], error: null };
+    let respFetchCount = 0;
+    mockSupabaseWith((state) => {
+      if (state.table === "students") return { data: { id: "uuid-1" }, error: null };
+      if (state.table === "simulado_respostas") {
+        respFetchCount++;
+        return { data: [RESPOSTA_FIXTURE, RESPOSTA2], error: null };
+      }
+      return { data: [], error: null };
     });
     const Comp = await importComponent();
-    render(<Comp studentId="aluno-1" variant="default" />);
+    render(<Comp matricula="12345" variant="default" />);
 
     await screen.findByText("620");
-    expect(fetchCount).toBe(1);
+    expect(respFetchCount).toBe(1);
 
     const select = screen.getByLabelText(/Simulado:/i);
     await user.selectOptions(select, "resp-2");
 
     await waitFor(() => {
-      // Total LC do RESPOSTA2 = 450
       expect(screen.getAllByText("450").length).toBeGreaterThan(0);
     });
-    // Nao refetched
-    expect(fetchCount).toBe(1);
+    expect(respFetchCount).toBe(1);
   });
 
   it("sem erros_por_topico mostra mensagem de sem erros", async () => {
-    mockSupabaseWith(() => ({
-      data: [{ ...RESPOSTA_FIXTURE, erros_por_topico: {} }],
-      error: null,
-    }));
+    mockSupabaseWith((state) => {
+      if (state.table === "students") return { data: { id: "uuid-1" }, error: null };
+      return { data: [{ ...RESPOSTA_FIXTURE, erros_por_topico: {} }], error: null };
+    });
     const Comp = await importComponent();
-    render(<Comp studentId="aluno-1" variant="default" />);
+    render(<Comp matricula="12345" variant="default" />);
 
     expect(
       await screen.findByText(/Sem erros nesse simulado/i),

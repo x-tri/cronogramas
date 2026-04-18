@@ -371,7 +371,7 @@ function AppContent() {
                   </Suspense>
                   <Suspense fallback={null}>
                     <SimuladoEnemAnalyzer
-                      studentId={currentStudent.id}
+                      matricula={currentStudent.matricula}
                       variant="compact"
                     />
                   </Suspense>

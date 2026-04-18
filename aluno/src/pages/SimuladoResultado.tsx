@@ -15,11 +15,8 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useSimuladoResultado } from "@/hooks/useSimulados";
 import { useStudentProfile } from "@/hooks/useStudentData";
-import { useGamification } from "@/hooks/useGamification";
 import { useSisuGoal } from "@/hooks/useSisuGoal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MascotAvatar } from "@/components/MascotAvatar";
-import { SpeechBubble } from "@/components/SpeechBubble";
 import { SisuThermometer } from "@/components/SisuThermometer";
 import { ArrowLeft, XCircle, Info, Target, TrendingUp } from "lucide-react";
 import {
@@ -183,161 +180,79 @@ function formatScore(score: number | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Mascote + mensagem contextual baseada no desempenho
-// ---------------------------------------------------------------------------
-
-interface MascotMessage {
-  readonly message: string;
-  readonly variant: "default" | "success" | "error";
-  readonly animation: "idle" | "jump" | "hit";
-}
-
-function simuladoMascotMessage(
-  media: number | null,
-  totais: { acertos: number; erros: number; branco: number },
-): MascotMessage {
-  if (media == null) {
-    return {
-      message: "Bora analisar seus acertos! 📊",
-      variant: "default",
-      animation: "idle",
-    };
-  }
-  if (totais.branco > 60) {
-    return {
-      message: "Muita questão em branco! Chutar é melhor que deixar em branco 😉",
-      variant: "error",
-      animation: "hit",
-    };
-  }
-  if (media >= 650) {
-    return {
-      message: "Tu é MONSTRO! 🏆 Tá no nível dos melhores do Brasil!",
-      variant: "success",
-      animation: "jump",
-    };
-  }
-  if (media >= 550) {
-    return {
-      message: "Ótimo desempenho! 💪 Bora pro Avançado juntos?",
-      variant: "success",
-      animation: "jump",
-    };
-  }
-  if (media >= 450) {
-    return {
-      message: "Tá no caminho! 📚 Próximo nível é o Adequado!",
-      variant: "default",
-      animation: "idle",
-    };
-  }
-  return {
-    message: "Cada erro é um XP. Bora treinar os pontos fracos! 🎯",
-    variant: "default",
-    animation: "idle",
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Hero: speech bubble + mascote grande + nota gigante
 // ---------------------------------------------------------------------------
 
 interface HeroProps {
-  readonly level: number;
   readonly mediaGeral: number | null;
   readonly mediaTier: ProficiencyTier | null;
   readonly mediaGap: { points: number; tier: ProficiencyTier } | null;
-  readonly mascot: MascotMessage;
   readonly onInfo: () => void;
 }
 
 function Hero({
-  level,
   mediaGeral,
   mediaTier,
   mediaGap,
-  mascot,
   onInfo,
 }: HeroProps) {
   const heroBg = mediaTier?.heroBg ?? "bg-gradient-to-br from-primary/5 to-accent/5";
   return (
     <div
-      className={`relative overflow-hidden rounded-3xl border-2 ${heroBg} px-3 py-3`}
+      className={`relative overflow-hidden rounded-3xl border-2 ${heroBg} px-4 py-4`}
     >
       {/* Decoracao canto sutil */}
-      <div className="absolute -top-3 -right-3 text-5xl opacity-[0.08] rotate-12 select-none pointer-events-none">
+      <div className="absolute -top-3 -right-3 text-6xl opacity-[0.08] rotate-12 select-none pointer-events-none">
         {mediaTier?.emoji ?? "📚"}
       </div>
 
-      <div className="relative flex items-center gap-3">
-        {/* Esquerda: mascote com bubble compacto em cima */}
-        <div className="flex flex-col items-center gap-0 flex-shrink-0">
-          <div className="scale-[0.82] origin-bottom">
-            <SpeechBubble
-              message={mascot.message}
-              variant={mascot.variant}
-            />
+      {mediaGeral != null && (
+        <div className="relative flex flex-col items-center text-center gap-1.5">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+            Sua nota TRI
+          </p>
+
+          <div className="flex items-baseline gap-1 leading-none">
+            <p className={`text-6xl font-black tracking-tight ${mediaTier?.color}`}>
+              {mediaGeral.toFixed(0)}
+            </p>
+            <p className="text-xs font-bold text-muted-foreground">/1000</p>
           </div>
-          <div className="-mt-1">
-            <MascotAvatar
-              level={level}
-              animation={mascot.animation}
-              size={112}
-            />
-          </div>
-        </div>
+          <p
+            className="text-[10px] font-semibold text-muted-foreground"
+            title={`Média ENEM = (LC + CH + CN + MT + Redação ${REDACAO_HARDCODED}) / 5`}
+          >
+            c/ redação {REDACAO_HARDCODED}
+          </p>
 
-        {/* Direita: score + tier + gap empilhados */}
-        <div className="flex-1 min-w-0 flex flex-col items-end gap-1.5">
-          {mediaGeral != null && (
-            <>
-              <div className="flex items-baseline gap-1 leading-none">
-                <p
-                  className={`text-5xl font-black tracking-tight ${mediaTier?.color}`}
-                >
-                  {mediaGeral.toFixed(0)}
-                </p>
-                <p className="text-[10px] font-bold text-muted-foreground">
-                  /1000
-                </p>
-              </div>
-              <p
-                className="text-[9px] font-semibold text-muted-foreground"
-                title={`Média ENEM = (LC + CH + CN + MT + Redação ${REDACAO_HARDCODED}) / 5`}
-              >
-                c/ redação {REDACAO_HARDCODED}
-              </p>
+          <button
+            type="button"
+            onClick={onInfo}
+            aria-label="Entenda os níveis de proficiência"
+            className={`mt-0.5 inline-flex items-center gap-1.5 rounded-full px-3 py-1 ${mediaTier?.bg} shadow-sm hover:scale-105 active:scale-95 transition-transform`}
+          >
+            <span className="text-base">{mediaTier?.emoji}</span>
+            <span className="text-xs font-black text-white">
+              {mediaTier?.label}
+            </span>
+            <Info className="h-3 w-3 text-white/90" />
+          </button>
 
-              <button
-                type="button"
-                onClick={onInfo}
-                aria-label="Entenda os níveis de proficiência"
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 ${mediaTier?.bg} shadow-sm hover:scale-105 active:scale-95 transition-transform`}
-              >
-                <span className="text-sm">{mediaTier?.emoji}</span>
-                <span className="text-[11px] font-black text-white whitespace-nowrap">
-                  {mediaTier?.label}
-                </span>
-                <Info className="h-3 w-3 text-white/90" />
-              </button>
-
-              {mediaGap && (
-                <p className="text-[10px] font-bold text-foreground/80 flex items-center gap-0.5">
-                  <Target className="h-3 w-3 text-primary flex-shrink-0" />
-                  <span>
-                    +
-                    <strong className={`${mediaGap.tier.color} font-black`}>
-                      {mediaGap.points}pts
-                    </strong>{" "}
-                    pra {mediaGap.tier.emoji}{" "}
-                    <span className="font-black">{mediaGap.tier.label}</span>
-                  </span>
-                </p>
-              )}
-            </>
+          {mediaGap && (
+            <p className="text-[11px] font-bold text-foreground/80 flex items-center gap-1">
+              <Target className="h-3 w-3 text-primary flex-shrink-0" />
+              <span>
+                +
+                <strong className={`${mediaGap.tier.color} font-black`}>
+                  {mediaGap.points}pts
+                </strong>{" "}
+                pra {mediaGap.tier.emoji}{" "}
+                <span className="font-black">{mediaGap.tier.label}</span>
+              </span>
+            </p>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -494,10 +409,7 @@ export default function SimuladoResultado() {
   const navigate = useNavigate();
   const { data, isLoading, error } = useSimuladoResultado(simuladoId);
   const { data: student } = useStudentProfile();
-  const studentKey = student?.matricula || student?.id;
-  const { data: gamification } = useGamification(studentKey);
   const { data: sisuGoal } = useSisuGoal(student?.id);
-  const level = gamification?.level ?? 1;
 
   const [tierInfoOpen, setTierInfoOpen] = useState(false);
 
@@ -593,7 +505,6 @@ export default function SimuladoResultado() {
   });
   const mediaTier = tierOf(mediaGeral);
   const mediaGap = nextLevelGap(mediaGeral);
-  const mascot = simuladoMascotMessage(mediaGeral, totais);
   const muitosEmBranco = totais.branco > 30;
 
   // Dados do termometro SISU (se aluno tem meta cadastrada e universidade reconhecida)
@@ -633,13 +544,11 @@ export default function SimuladoResultado() {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Hero — mascote + score compacto */}
+        {/* Hero — score + tier + gap (sem mascote, conforme feedback) */}
         <Hero
-          level={level}
           mediaGeral={mediaGeral}
           mediaTier={mediaTier}
           mediaGap={mediaGap}
-          mascot={mascot}
           onInfo={() => setTierInfoOpen(true)}
         />
 
