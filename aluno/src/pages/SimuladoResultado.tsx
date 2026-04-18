@@ -1,19 +1,28 @@
 /**
- * Pagina de resultado do simulado do aluno (Fase 4).
+ * Pagina de resultado do simulado do aluno (Fase 4 + Batch 1 improvements).
  *
  * Consome RPC `get_student_simulado_resultado` e renderiza:
- * - 4 gauges TRI por area (escala ENEM 200-1000)
- * - Totais gerais (acertos/erros/branco) + media geral
- * - Top topicos errados (bar chart simples)
- * - Link para revisar questao por questao (itens com gabarito pos-submit)
+ * - Mascote XTRI com fala contextual no topo (depende do desempenho)
+ * - Alerta "branco é pior que erro no ENEM" se muitos em branco
+ * - Média geral + nível proficiência INEP (com tooltip explicativo)
+ * - 4 cards TRI por área com:
+ *   - Gauge com bands INEP coloridas (450/550/650)
+ *   - Meta até próximo nível ("Faltam 32pts para Básico")
+ * - Resumo totais acertos/erros/branco
+ * - Top 5 tópicos errados (bar chart)
+ * - Details colapsavel com gabarito questao-a-questao
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useSimuladoResultado } from "@/hooks/useSimulados";
+import { useStudentProfile } from "@/hooks/useStudentData";
+import { useGamification } from "@/hooks/useGamification";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, CheckCircle, XCircle } from "lucide-react";
+import { MascotAvatar } from "@/components/MascotAvatar";
+import { SpeechBubble } from "@/components/SpeechBubble";
+import { ArrowLeft, CheckCircle, XCircle, Info, AlertTriangle } from "lucide-react";
 import {
   AREA_LABELS,
   areaOfNumero,
@@ -26,6 +35,80 @@ const AREAS: readonly AreaKey[] = ["LC", "CH", "CN", "MT"];
 const TRI_MIN = 200;
 const TRI_MAX = 1000;
 
+// ---------------------------------------------------------------------------
+// Niveis de proficiencia INEP
+// ---------------------------------------------------------------------------
+
+interface ProficiencyTier {
+  readonly key: "abaixo" | "basico" | "adequado" | "avancado";
+  readonly label: string;
+  readonly min: number;
+  readonly max: number;
+  readonly color: string;
+  readonly bg: string;
+  readonly desc: string;
+}
+
+const PROFICIENCY_TIERS: ReadonlyArray<ProficiencyTier> = [
+  {
+    key: "abaixo",
+    label: "Abaixo do Básico",
+    min: 0,
+    max: 449,
+    color: "text-red-600",
+    bg: "bg-red-500",
+    desc: "Não demonstra domínio mínimo das competências esperadas. Foco em fundamentos.",
+  },
+  {
+    key: "basico",
+    label: "Básico",
+    min: 450,
+    max: 549,
+    color: "text-orange-600",
+    bg: "bg-orange-500",
+    desc: "Nível associado à certificação de conclusão do Ensino Médio. Domínio elementar.",
+  },
+  {
+    key: "adequado",
+    label: "Adequado",
+    min: 550,
+    max: 649,
+    color: "text-blue-600",
+    bg: "bg-blue-500",
+    desc: "Domínio satisfatório. Consegue aplicar conhecimento em situações diversas.",
+  },
+  {
+    key: "avancado",
+    label: "Avançado",
+    min: 650,
+    max: 1000,
+    color: "text-emerald-600",
+    bg: "bg-emerald-500",
+    desc: "Domínio pleno. Análise, reflexão e integração em alto nível de complexidade.",
+  },
+];
+
+function tierOf(score: number | null): ProficiencyTier | null {
+  if (score == null) return null;
+  return (
+    PROFICIENCY_TIERS.find((t) => score >= t.min && score <= t.max) ??
+    PROFICIENCY_TIERS[0]
+  );
+}
+
+/** Mensagem "faltam Xpts para {proximo nivel}". Null se ja no topo. */
+function nextLevelGap(
+  score: number | null,
+): { readonly points: number; readonly tier: ProficiencyTier } | null {
+  if (score == null) return null;
+  const current = tierOf(score);
+  if (!current || current.key === "avancado") return null;
+  const nextIdx = PROFICIENCY_TIERS.findIndex((t) => t.key === current.key) + 1;
+  const next = PROFICIENCY_TIERS[nextIdx];
+  if (!next) return null;
+  return { points: Math.ceil(next.min - score), tier: next };
+}
+
 function triToGaugePercent(score: number | null): number {
   if (score == null) return 0;
   const clamped = Math.max(TRI_MIN, Math.min(TRI_MAX, score));
@@ -36,31 +119,67 @@ function formatScore(score: number | null): string {
   return typeof score === "number" ? score.toFixed(0) : "—";
 }
 
-function proficiencyLabel(score: number | null): string {
-  if (score == null) return "—";
-  if (score < 450) return "Abaixo do Básico";
-  if (score < 550) return "Básico";
-  if (score < 650) return "Adequado";
-  return "Avançado";
+// ---------------------------------------------------------------------------
+// Mascote + mensagem contextual baseada no desempenho
+// ---------------------------------------------------------------------------
+
+interface MascotMessage {
+  readonly message: string;
+  readonly variant: "default" | "success" | "error";
+  readonly animation: "idle" | "jump" | "hit";
 }
 
-function proficiencyColor(score: number | null): string {
-  if (score == null) return "text-muted-foreground";
-  if (score < 450) return "text-red-600";
-  if (score < 550) return "text-orange-600";
-  if (score < 650) return "text-blue-600";
-  return "text-emerald-600";
+function simuladoMascotMessage(
+  media: number | null,
+  totais: { acertos: number; erros: number; branco: number },
+): MascotMessage {
+  if (media == null) {
+    return { message: "Vamos analisar seus acertos! 📊", variant: "default", animation: "idle" };
+  }
+  if (totais.branco > 60) {
+    return {
+      message: "Muita questão em branco 😮 No ENEM, chute é melhor que branco!",
+      variant: "error",
+      animation: "hit",
+    };
+  }
+  if (media >= 650) {
+    return { message: "Avançado! Você mandou MUITO bem! 🏆", variant: "success", animation: "jump" };
+  }
+  if (media >= 550) {
+    return { message: "Adequado! Está no caminho, bora pro Avançado! 🚀", variant: "success", animation: "jump" };
+  }
+  if (media >= 450) {
+    return { message: "Básico! Próximo passo é o Adequado 💪", variant: "default", animation: "idle" };
+  }
+  return {
+    message: "Vamos treinar juntos. Cada erro é um aprendizado 📚",
+    variant: "default",
+    animation: "idle",
+  };
 }
 
-interface SummaryCardProps {
+// ---------------------------------------------------------------------------
+// AreaCard com gauge INEP bands + meta próximo nível
+// ---------------------------------------------------------------------------
+
+interface AreaCardProps {
   readonly area: AreaKey;
   readonly score: number | null;
   readonly acertos: number;
 }
 
-function AreaCard({ area, score, acertos }: SummaryCardProps) {
+// Marcadores 450/550/650 na escala TRI_MIN..TRI_MAX para overlay no gauge
+const INEP_TICKS = [450, 550, 650] as const;
+
+function AreaCard({ area, score, acertos }: AreaCardProps) {
   const pct = triToGaugePercent(score);
-  const colorClass = proficiencyColor(score);
+  const tier = tierOf(score);
+  const gap = nextLevelGap(score);
+  // Estima acertos necessarios: 1 acerto ≈ (max-min)/45 pontos para area.
+  // Aproximacao grosseira mas util pedagogicamente.
+  const extraAcertos = gap ? Math.max(1, Math.ceil(gap.points / 9)) : 0;
+
   return (
     <div className="rounded-2xl border-2 bg-card p-3">
       <div className="flex items-center justify-between">
@@ -73,7 +192,7 @@ function AreaCard({ area, score, acertos }: SummaryCardProps) {
           </p>
         </div>
         <div className="text-right">
-          <p className={`text-2xl font-black ${colorClass}`}>
+          <p className={`text-2xl font-black ${tier?.color ?? "text-muted-foreground"}`}>
             {formatScore(score)}
           </p>
           <p className="text-[9px] font-bold text-muted-foreground">
@@ -81,23 +200,126 @@ function AreaCard({ area, score, acertos }: SummaryCardProps) {
           </p>
         </div>
       </div>
-      <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-400 to-emerald-500"
-          style={{ width: `${pct}%` }}
-        />
+
+      {/* Gauge com INEP bands */}
+      <div className="relative mt-2 h-2.5">
+        <div className="absolute inset-0 rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-400 to-emerald-500 transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {/* Tick marks INEP (450 / 550 / 650) */}
+        {INEP_TICKS.map((t) => {
+          const x = triToGaugePercent(t);
+          return (
+            <div
+              key={t}
+              aria-hidden="true"
+              className="absolute top-0 h-2.5 w-px bg-background/90"
+              style={{ left: `${x}%` }}
+            />
+          );
+        })}
       </div>
-      <p className={`mt-1 text-[10px] font-bold ${colorClass}`}>
-        {proficiencyLabel(score)}
+
+      {/* Labels dos niveis abaixo do gauge */}
+      <div className="mt-1 flex justify-between text-[8px] font-bold text-muted-foreground">
+        <span>B.</span>
+        <span>bás</span>
+        <span>ad</span>
+        <span>av</span>
+      </div>
+
+      {/* Nivel atual */}
+      <p className={`mt-1.5 text-[10px] font-bold ${tier?.color ?? "text-muted-foreground"}`}>
+        {tier?.label ?? "—"}
       </p>
+
+      {/* Meta proximo nivel */}
+      {gap && (
+        <div className="mt-1.5 rounded-md bg-muted/50 px-2 py-1">
+          <p className="text-[9px] font-semibold text-muted-foreground leading-tight">
+            Faltam <strong className={`${gap.tier.color}`}>{gap.points}pts</strong> para{" "}
+            <span className="font-black">{gap.tier.label}</span>
+          </p>
+          <p className="text-[9px] text-muted-foreground leading-tight">
+            ≈ <strong>{extraAcertos}</strong> acerto{extraAcertos === 1 ? "" : "s"} a mais
+          </p>
+        </div>
+      )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// ProficiencyInfoButton — tooltip (mobile-friendly via click)
+// ---------------------------------------------------------------------------
+
+function ProficiencyInfoButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        aria-label="O que significam os níveis de proficiência?"
+        aria-expanded={open}
+        className="rounded-full p-1 text-muted-foreground hover:bg-muted active:bg-muted/70"
+      >
+        <Info className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            role="tooltip"
+            className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border-2 bg-card p-3 shadow-xl"
+          >
+            <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-2">
+              Níveis de proficiência (INEP)
+            </p>
+            <ul className="space-y-2">
+              {PROFICIENCY_TIERS.map((t) => (
+                <li key={t.key} className="flex items-start gap-2">
+                  <span className={`mt-0.5 h-2 w-2 flex-shrink-0 rounded-full ${t.bg}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[11px] font-black ${t.color}`}>
+                      {t.label}{" "}
+                      <span className="font-semibold text-muted-foreground">
+                        ({t.min}–{t.max})
+                      </span>
+                    </p>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      {t.desc}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pagina principal
+// ---------------------------------------------------------------------------
 
 export default function SimuladoResultado() {
   const { id: simuladoId } = useParams();
   const navigate = useNavigate();
   const { data, isLoading, error } = useSimuladoResultado(simuladoId);
+  const { data: student } = useStudentProfile();
+  const studentKey = student?.matricula || student?.id;
+  const { data: gamification } = useGamification(studentKey);
+  const level = gamification?.level ?? 1;
 
   const topTopicos = useMemo(() => {
     if (!data?.resposta?.erros_por_topico) return [];
@@ -133,8 +355,7 @@ export default function SimuladoResultado() {
         >
           <p className="font-bold">Resultado indisponível.</p>
           <p className="mt-1 text-xs">
-            {error?.message ??
-              "Você ainda não submeteu este simulado."}
+            {error?.message ?? "Você ainda não submeteu este simulado."}
           </p>
           <button
             type="button"
@@ -176,6 +397,12 @@ export default function SimuladoResultado() {
     triScores.length === 0
       ? null
       : triScores.reduce((a, b) => a + b, 0) / triScores.length;
+  const mediaTier = tierOf(mediaGeral);
+  const mediaGap = nextLevelGap(mediaGeral);
+  const mascot = simuladoMascotMessage(mediaGeral, totais);
+
+  // Threshold pedagogico: >30 branco significa ~17% da prova em branco
+  const muitosEmBranco = totais.branco > 30;
 
   return (
     <div className="p-4 pb-24 max-w-lg mx-auto space-y-4">
@@ -199,20 +426,57 @@ export default function SimuladoResultado() {
         </div>
       </div>
 
-      {/* Media geral */}
+      {/* Mascote com fala contextual */}
+      <div className="flex items-start gap-3 rounded-2xl border-2 bg-gradient-to-br from-primary/5 to-accent/5 p-3">
+        <div className="flex-shrink-0">
+          <MascotAvatar level={level} animation={mascot.animation} size={72} />
+        </div>
+        <div className="flex-1 min-w-0 pt-1">
+          <SpeechBubble message={mascot.message} variant={mascot.variant} />
+        </div>
+      </div>
+
+      {/* Alerta branco é pior que erro */}
+      {muitosEmBranco && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-2xl border-2 border-amber-300 bg-amber-50 p-3"
+        >
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-600 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-black text-amber-900">
+              {totais.branco} questões em branco
+            </p>
+            <p className="mt-0.5 text-[11px] font-semibold text-amber-800 leading-tight">
+              No ENEM, deixar em branco e errar dão o mesmo resultado (zero). Mas
+              <strong> chutar em branco dá 20% de chance </strong>
+              de acertar. Da próxima, marque algo em TODAS as questões!
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Media geral com tooltip */}
       {mediaGeral != null && (
-        <div className="rounded-2xl border-2 bg-gradient-to-br from-primary/5 to-accent/5 p-4 text-center">
+        <div className="rounded-2xl border-2 bg-gradient-to-br from-primary/5 to-accent/5 p-4 text-center relative">
+          <div className="absolute top-2 right-2">
+            <ProficiencyInfoButton />
+          </div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Média geral
           </p>
-          <p
-            className={`text-4xl font-black ${proficiencyColor(mediaGeral)}`}
-          >
+          <p className={`text-4xl font-black ${mediaTier?.color ?? "text-muted-foreground"}`}>
             {mediaGeral.toFixed(0)}
           </p>
-          <p className="text-xs font-bold text-muted-foreground">
-            {proficiencyLabel(mediaGeral)}
+          <p className={`text-xs font-bold ${mediaTier?.color ?? "text-muted-foreground"}`}>
+            {mediaTier?.label ?? "—"}
           </p>
+          {mediaGap && (
+            <p className="mt-1 text-[10px] font-semibold text-muted-foreground">
+              Faltam <strong className={mediaGap.tier.color}>{mediaGap.points}pts</strong>{" "}
+              para <span className="font-black">{mediaGap.tier.label}</span>
+            </p>
+          )}
         </div>
       )}
 
@@ -251,24 +515,16 @@ export default function SimuladoResultado() {
         </p>
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
-            <p className="text-2xl font-black text-emerald-600">
-              {totais.acertos}
-            </p>
-            <p className="text-[10px] font-bold text-muted-foreground">
-              Acertos
-            </p>
+            <p className="text-2xl font-black text-emerald-600">{totais.acertos}</p>
+            <p className="text-[10px] font-bold text-muted-foreground">Acertos</p>
           </div>
           <div>
             <p className="text-2xl font-black text-red-600">{totais.erros}</p>
             <p className="text-[10px] font-bold text-muted-foreground">Erros</p>
           </div>
           <div>
-            <p className="text-2xl font-black text-muted-foreground">
-              {totais.branco}
-            </p>
-            <p className="text-[10px] font-bold text-muted-foreground">
-              Branco
-            </p>
+            <p className="text-2xl font-black text-muted-foreground">{totais.branco}</p>
+            <p className="text-[10px] font-bold text-muted-foreground">Branco</p>
           </div>
         </div>
       </div>
@@ -286,18 +542,11 @@ export default function SimuladoResultado() {
               return (
                 <li key={topico}>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="truncate font-semibold text-foreground">
-                      {topico}
-                    </span>
-                    <span className="font-black text-red-600 ml-2">
-                      {count}
-                    </span>
+                    <span className="truncate font-semibold text-foreground">{topico}</span>
+                    <span className="font-black text-red-600 ml-2">{count}</span>
                   </div>
                   <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full bg-red-400"
-                      style={{ width: `${pct}%` }}
-                    />
+                    <div className="h-full bg-red-400" style={{ width: `${pct}%` }} />
                   </div>
                 </li>
               );
@@ -306,7 +555,7 @@ export default function SimuladoResultado() {
         </div>
       )}
 
-      {/* Itens com erro (detalhado, colapsado visualmente) */}
+      {/* Details gabarito das erradas */}
       {erroItens.length > 0 && (
         <details className="rounded-2xl border-2 bg-card p-3">
           <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -326,23 +575,18 @@ export default function SimuladoResultado() {
                 <span className="font-semibold text-muted-foreground">
                   {it.resposta_aluno ?? "—"}
                 </span>
-                <span className="font-black text-emerald-600">
-                  {it.gabarito}
-                </span>
+                <span className="font-black text-emerald-600">{it.gabarito}</span>
               </li>
             ))}
           </ul>
         </details>
       )}
 
-      {/* CTA acertou corretas */}
       {data.itens && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 flex items-center gap-2">
           <CheckCircle className="h-5 w-5 flex-shrink-0 text-emerald-600" />
           <p className="text-xs font-semibold text-emerald-700">
-            Você acertou{" "}
-            <strong className="font-black">{totais.acertos}</strong> de 180
-            questões.
+            Você acertou <strong className="font-black">{totais.acertos}</strong> de 180 questões.
           </p>
         </div>
       )}
