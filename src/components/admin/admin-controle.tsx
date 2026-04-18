@@ -323,42 +323,27 @@ export function AdminControle({
 
     setUnlinkingMatricula(matricula);
 
-    // Buscar profile_id atual
-    const { data: student } = await supabase
-      .from("students")
-      .select("profile_id")
-      .eq("matricula", matricula)
-      .single();
+    // CRITICAL 3: usa RPC SECURITY DEFINER transacional (migration 016).
+    // Antes executávamos 3 ops sequenciais sem transação — falha intermediária
+    // deixava vínculo corrompido. A RPC garante atomicidade.
+    const { error } = await supabase.rpc("unlink_google_student", {
+      p_matricula: matricula,
+    });
 
-    if (student?.profile_id) {
-      // Remover project_user do Google
-      await supabase
-        .from("project_users")
-        .delete()
-        .eq("auth_uid", student.profile_id)
-        .eq("role", "student");
-
-      // Remover profile do Google
-      await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", student.profile_id)
-        .not("email", "like", "%@aluno.xtri.com");
-
-      // Limpar profile_id do student
-      await supabase
-        .from("students")
-        .update({ profile_id: null })
-        .eq("matricula", matricula);
-
-      logAudit("update_block", "student_google_unlink", matricula, { nome });
-
-      setGoogleLinkedStudents((prev) => {
-        const next = new Set(prev);
-        next.delete(matricula);
-        return next;
-      });
+    if (error) {
+      console.error("[admin-controle] Falha ao desvincular Google:", error);
+      alert(`Erro ao desvincular: ${error.message}`);
+      setUnlinkingMatricula(null);
+      return;
     }
+
+    logAudit("update_block", "student_google_unlink", matricula, { nome });
+
+    setGoogleLinkedStudents((prev) => {
+      const next = new Set(prev);
+      next.delete(matricula);
+      return next;
+    });
 
     setUnlinkingMatricula(null);
   }, []);
