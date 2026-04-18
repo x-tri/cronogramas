@@ -43,11 +43,30 @@ export default function LinkMatricula({ onLinked }: LinkMatriculaProps) {
       return;
     }
 
+    // Garantir sessão fresca antes do RPC
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        setError("Sessão expirada. Faça login novamente.");
+        setSubmitting(false);
+        setTimeout(() => signOut(), 1500);
+        return;
+      }
+    }
+
     const { data, error: rpcError } = await supabase.rpc("link_google_to_student", {
       p_matricula: trimmed,
     });
 
     if (rpcError) {
+      // 401 = sessão inválida
+      if (rpcError.message?.includes("401") || rpcError.code === "401") {
+        setError("Sessão expirada. Faça login novamente.");
+        setSubmitting(false);
+        setTimeout(() => signOut(), 1500);
+        return;
+      }
       setError("Erro ao vincular. Tente novamente.");
       setSubmitting(false);
       return;
