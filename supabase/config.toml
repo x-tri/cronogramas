@@ -1,0 +1,9 @@
+# Supabase project config — overrides per-function defaults.
+#
+# submit-simulado: verify_jwt=false porque o Supabase migrou o formato das
+# anon keys para ES256 (assimétrico), mas o gateway padrão só valida HS256
+# e rejeita antes do handler com UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM.
+# A função tem validação JWT interna (auth.getUser(jwt) no index.ts),
+# então é seguro desativar o gate do gateway.
+[functions.submit-simulado]
+verify_jwt = false
