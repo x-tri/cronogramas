@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "../../lib/supabase";
 import { ConfirmDialog } from "./simulado-actions/confirm-dialog";
-import { ResponsesDrawer } from "./simulado-actions/responses-drawer";
+import { SimuladoRanking } from "./simulado-actions/simulado-ranking";
 import { SimuladoWizard } from "./simulado-wizard";
 
 type SimuladoStatus = "draft" | "published" | "closed";
@@ -368,10 +368,12 @@ export function AdminSimulados({
         onCancel={closePendingAction}
       />
 
-      <ResponsesDrawer
+      <SimuladoRanking
         open={drawerSimulado !== null}
         simuladoId={drawerSimulado?.id ?? null}
         simuladoTitle={drawerSimulado?.title ?? ""}
+        schoolId={drawerSimulado?.school_id ?? null}
+        turmasAlvo={drawerSimulado?.turmas ?? []}
         onClose={() => setDrawerSimulado(null)}
       />
     </div>

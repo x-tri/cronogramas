@@ -373,12 +373,13 @@ describe('AdminSimulados', () => {
     expect(dialog).toHaveTextContent(/nao pode ser desfeita/i)
   })
 
-  it('Ver respostas abre drawer com titulo', async () => {
+  it('Ver respostas abre painel de ranking full-screen com titulo', async () => {
     const user = userEvent.setup()
     mockSupabaseWith((state) => {
       if (state.table === 'schools') return { data: SCHOOLS, error: null }
       if (state.table === 'simulados') return { data: [SIMULADOS_FIXTURE[1]], error: null }
       if (state.table === 'simulado_respostas') return { data: [], error: null }
+      if (state.table === 'students') return { data: [], error: null }
       return { data: [], error: null }
     })
     const Comp = await importComponent()
@@ -389,12 +390,12 @@ describe('AdminSimulados', () => {
 
     await waitFor(() => {
       const dialogs = screen.getAllByRole('dialog')
-      // O drawer tem aria-label com o titulo do simulado
-      const respostasDrawer = dialogs.find((d) =>
-        d.getAttribute('aria-label')?.includes('ENEM Simulado 2'),
+      // O ranking panel tem aria-label com 'Ranking de {titulo}'
+      const rankingPanel = dialogs.find((d) =>
+        d.getAttribute('aria-label')?.includes('Ranking de ENEM Simulado 2'),
       )
-      expect(respostasDrawer).toBeDefined()
-      expect(respostasDrawer).toHaveTextContent(/Respostas recebidas/i)
+      expect(rankingPanel).toBeDefined()
+      expect(rankingPanel).toHaveTextContent(/Ranking pedag[oó]gico/i)
     })
   })
 
