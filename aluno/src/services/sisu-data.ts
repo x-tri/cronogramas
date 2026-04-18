@@ -100,6 +100,13 @@ export function buildThermometerData(
  */
 export const REDACAO_HARDCODED = 900;
 
+/**
+ * Retorna a media ENEM SOMENTE quando as 4 areas estao preenchidas.
+ * Com TRI parcial (ex: edge function timeout em uma area), retornar uma
+ * "media" menor com denominador reduzido enganaria o aluno mostrando-o
+ * em faixa mais alta do que a real — e faria o termometro SISU sugerir
+ * cursos que ele nao alcanca de fato.
+ */
 export function mediaEnemComRedacao(
   tri: {
     readonly lc: number | null;
@@ -109,10 +116,7 @@ export function mediaEnemComRedacao(
   },
   redacao: number = REDACAO_HARDCODED,
 ): number | null {
-  const scores = [tri.lc, tri.ch, tri.cn, tri.mt].filter(
-    (x): x is number => x != null,
-  );
-  if (scores.length === 0) return null;
-  const soma = scores.reduce((a, b) => a + b, 0) + redacao;
-  return soma / (scores.length + 1);
+  const { lc, ch, cn, mt } = tri;
+  if (lc == null || ch == null || cn == null || mt == null) return null;
+  return (lc + ch + cn + mt + redacao) / 5;
 }

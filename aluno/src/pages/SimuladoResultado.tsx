@@ -455,7 +455,7 @@ export default function SimuladoResultado() {
     );
   }
 
-  if (error || !data?.submitted) {
+  if (error || !data?.submitted || !data.resposta) {
     return (
       <div className="p-4 pb-24 max-w-lg mx-auto">
         <div
@@ -478,7 +478,8 @@ export default function SimuladoResultado() {
     );
   }
 
-  const resposta = data.resposta!;
+  // Guarda acima garante que resposta nao e null aqui
+  const resposta = data.resposta;
   const totais = {
     acertos:
       resposta.acertos_lc +
@@ -517,7 +518,9 @@ export default function SimuladoResultado() {
       ? buildThermometerData(sisuUni, mediaGeral)
       : null;
 
-  const totalResp = totais.acertos + totais.erros + totais.branco;
+  // Math.max(1, ...) evita division-by-zero em respostas corrompidas/vazias
+  // — NaN%% no CSS e silenciosamente ignorado, mas quebra o visual.
+  const totalResp = Math.max(1, totais.acertos + totais.erros + totais.branco);
   const pctAcertos = (totais.acertos / totalResp) * 100;
   const pctErros = (totais.erros / totalResp) * 100;
 

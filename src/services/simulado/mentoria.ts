@@ -146,6 +146,9 @@ export async function getMentoriaSimuladoResult(
   if (simResult.error || !simResult.data) return null
   if (respostaResult.error || !respostaResult.data) return null
   if (itensResult.error || !itensResult.data) return null
+  // Sanity: simulado sem itens cadastrados gera resultado vazio sem sentido
+  // (todos os 180 respostas entram como erradas vs gabarito ''). Bail.
+  if (itensResult.data.length === 0) return null
 
   const simulado = simResult.data as SimuladoRow
   const itens = itensResult.data as ItemRow[]
