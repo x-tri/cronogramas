@@ -4,6 +4,33 @@ import { getCurrentProjectUser } from "../lib/project-user";
 
 const BUCKET = "cronogramas-pdf";
 
+// Signed URL TTL (1h). Suficiente para o fluxo "copiar link e enviar via WhatsApp"
+// mantendo o link expirável (o bucket é privado — CRITICAL 1).
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+/**
+ * Gera signed URL temporária para um PDF do bucket privado `cronogramas-pdf`.
+ * Retorna null em caso de erro (ex.: path inexistente ou falha de RLS).
+ */
+export async function getSignedPdfUrl(
+  storagePath: string,
+  ttlSeconds: number = SIGNED_URL_TTL_SECONDS,
+): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(storagePath, ttlSeconds);
+
+  if (error || !data?.signedUrl) {
+    console.error("[pdf-storage] Falha ao gerar signed URL:", {
+      storagePath,
+      error: error?.message,
+    });
+    return null;
+  }
+
+  return data.signedUrl;
+}
+
 interface UploadPdfParams {
   blob: Blob;
   filename: string;
@@ -112,10 +139,9 @@ export async function uploadPdf({
     return null;
   }
 
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from(BUCKET)
-    .getPublicUrl(storagePath);
+  // Gera signed URL (bucket é privado — CRITICAL 1).
+  // Se falhar, segue com upload registrado, retornando URL vazia em último caso.
+  const signedUrl = await getSignedPdfUrl(storagePath);
 
   // Register in history (ignore errors - storage is the priority)
   const { error: historyError } = await supabase.from("pdf_history").insert({
@@ -147,7 +173,7 @@ export async function uploadPdf({
     tipo,
   });
 
-  return { url: urlData.publicUrl, path: storagePath };
+  return { url: signedUrl ?? "", path: storagePath };
 }
 
 /**
