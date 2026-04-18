@@ -51,7 +51,33 @@ const VALID_GABARITOS = new Set(['A', 'B', 'C', 'D', 'E'])
 // Tokenizer minimalista RFC 4180-ish (sem suporte a newlines em quoted).
 // ---------------------------------------------------------------------------
 
-function splitCsvLine(line: string): string[] {
+/**
+ * Auto-detecta o delimitador em uma linha (virgula vs ponto-e-virgula).
+ * Excel BR salva CSVs com ';' porque ',' e separador decimal.
+ * Se a linha tiver igual ou mais ';' que ',' fora de aspas, usa ';'.
+ */
+function detectDelimiter(line: string): ',' | ';' {
+  let commas = 0
+  let semicolons = 0
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      // "" -> literal aspas
+      if (inQuotes && line[i + 1] === '"') {
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (!inQuotes) {
+      if (ch === ',') commas++
+      else if (ch === ';') semicolons++
+    }
+  }
+  return semicolons > commas ? ';' : ','
+}
+
+function splitCsvLine(line: string, delimiter: ',' | ';' = ','): string[] {
   const out: string[] = []
   let cur = ''
   let inQuotes = false
@@ -71,7 +97,7 @@ function splitCsvLine(line: string): string[] {
         cur += ch
       }
     } else {
-      if (ch === ',') {
+      if (ch === delimiter) {
         out.push(cur)
         cur = ''
       } else if (ch === '"' && cur === '') {
@@ -120,9 +146,11 @@ export function parseSimuladoCsv(
     return { ok: false, errors: [{ line: 1, message: 'CSV vazio' }] }
   }
 
-  // Cabecalho
+  // Detecta delimitador a partir do cabecalho (Excel BR usa ';')
   const headerEntry = nonEmpty[0]!
-  const headers = splitCsvLine(headerEntry.content).map(normalizeHeader)
+  const delimiter = detectDelimiter(headerEntry.content)
+
+  const headers = splitCsvLine(headerEntry.content, delimiter).map(normalizeHeader)
   const missing = REQUIRED_HEADERS.filter((h) => !headers.includes(h))
   if (missing.length > 0) {
     return {
@@ -147,7 +175,7 @@ export function parseSimuladoCsv(
   const numerosVistos = new Map<number, number>()
 
   for (const { content, line } of nonEmpty.slice(1)) {
-    const cols = splitCsvLine(content)
+    const cols = splitCsvLine(content, delimiter)
 
     // numero
     const numeroRaw = (cols[idx.numero] ?? '').trim()

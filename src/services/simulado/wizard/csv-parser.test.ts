@@ -196,6 +196,53 @@ describe('countByArea', () => {
 })
 
 // ----------------------------------------------------------------------
+// Delimitador auto-detect (Excel BR usa ;)
+// ----------------------------------------------------------------------
+
+describe('parseSimuladoCsv — auto-detect delimitador', () => {
+  it('detecta ; como delimitador quando ha mais ; que ,', () => {
+    const csv = [
+      'numero;conteudo;gabarito;dificuldade',
+      '1;"Funcao, logaritmo";A;3',
+      '2;Geometria;B;4',
+    ].join('\n')
+    const r = parseSimuladoCsv(csv)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items).toHaveLength(2)
+    expect(r.items[0]!.topico).toBe('Funcao, logaritmo')
+    expect(r.items[0]!.gabarito).toBe('A')
+    expect(r.items[1]!.topico).toBe('Geometria')
+  })
+
+  it('continua aceitando , quando predominante', () => {
+    const csv = [
+      'numero,conteudo,gabarito,dificuldade',
+      '1,Funcao exponencial,A,3',
+    ].join('\n')
+    const r = parseSimuladoCsv(csv)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items[0]!.topico).toBe('Funcao exponencial')
+  })
+
+  it('Excel BR com acentuacao + ; roda sem problema', () => {
+    const csv = [
+      'numero;conteudo;gabarito;dificuldade',
+      '1;Inglês - Compreensão de texto;B;3',
+      '2;História - Revolução Francesa;D;4',
+      '3;Matemática - Funções exponenciais;A;5',
+    ].join('\n')
+    const r = parseSimuladoCsv(csv)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items[0]!.topico).toBe('Inglês - Compreensão de texto')
+    expect(r.items[1]!.topico).toBe('História - Revolução Francesa')
+    expect(r.items[2]!.topico).toBe('Matemática - Funções exponenciais')
+  })
+})
+
+// ----------------------------------------------------------------------
 // Line tracking
 // ----------------------------------------------------------------------
 

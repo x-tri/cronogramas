@@ -90,13 +90,25 @@ export function StepItems({ items, onChange }: StepItemsProps) {
 
   const handleFile = (file: File): void => {
     setUploadedFileName(file.name);
+    // Le como ArrayBuffer e tenta UTF-8 com fatal=true primeiro.
+    // Se falhar (Excel BR salva em Windows-1252/ISO-8859-1), decodifica
+    // como Windows-1252 — cobre acentuacao em portugues sem mojibake.
     const reader = new FileReader();
     reader.onload = (): void => {
-      const text = typeof reader.result === "string" ? reader.result : "";
+      const buf = reader.result;
+      if (!(buf instanceof ArrayBuffer)) return;
+      const bytes = new Uint8Array(buf);
+      let text = "";
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch {
+        // Fallback para Windows-1252 (Excel BR default)
+        text = new TextDecoder("windows-1252").decode(bytes);
+      }
       setRawText(text);
       handleParse(text);
     };
-    reader.readAsText(file, "UTF-8");
+    reader.readAsArrayBuffer(file);
   };
 
   const handleItemChange = (
