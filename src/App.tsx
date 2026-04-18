@@ -33,6 +33,14 @@ const SimuladoAnalyzer = lazy(() =>
   })),
 );
 
+// Complementar ao SimuladoAnalyzer legacy: le os NOVOS simulados ENEM
+// (banco primary) contextualizados ao aluno selecionado pelo coord.
+const SimuladoEnemAnalyzer = lazy(() =>
+  import("./components/simulado/simulado-enem-analyzer").then((mod) => ({
+    default: mod.SimuladoEnemAnalyzer,
+  })),
+);
+
 const AdminDashboard = lazy(() =>
   import("./components/admin/admin-dashboard").then((mod) => ({
     default: mod.AdminDashboard,
@@ -358,6 +366,12 @@ function AppContent() {
                   <Suspense fallback={null}>
                     <SimuladoAnalyzer
                       matricula={currentStudent.matricula}
+                      variant="compact"
+                    />
+                  </Suspense>
+                  <Suspense fallback={null}>
+                    <SimuladoEnemAnalyzer
+                      studentId={currentStudent.id}
                       variant="compact"
                     />
                   </Suspense>
