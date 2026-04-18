@@ -19,6 +19,7 @@ import {
   type ParseError,
   type SimuladoItemDraft,
 } from "../../../services/simulado/wizard/csv-parser";
+import { decodeCsvBytes } from "../../../services/simulado/wizard/decode-csv";
 import {
   formatGapsMessage,
   summarizeItems,
@@ -90,21 +91,18 @@ export function StepItems({ items, onChange }: StepItemsProps) {
 
   const handleFile = (file: File): void => {
     setUploadedFileName(file.name);
-    // Le como ArrayBuffer e tenta UTF-8 com fatal=true primeiro.
-    // Se falhar (Excel BR salva em Windows-1252/ISO-8859-1), decodifica
-    // como Windows-1252 — cobre acentuacao em portugues sem mojibake.
+    // Decoding inteligente multi-encoding:
+    // 1. Tenta UTF-8 com fatal=true (failhando se nao-UTF-8 valido).
+    // 2. Se falhar, decodifica nos 3 encodings latinos comuns no Brasil e
+    //    escolhe o que produz MAIS caracteres validos em portugues
+    //    (heuristica robusta contra: Excel BR Windows-1252, LibreOffice
+    //    ISO-8859-1, Excel Mac antigo Mac Roman).
     const reader = new FileReader();
     reader.onload = (): void => {
       const buf = reader.result;
       if (!(buf instanceof ArrayBuffer)) return;
       const bytes = new Uint8Array(buf);
-      let text = "";
-      try {
-        text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-      } catch {
-        // Fallback para Windows-1252 (Excel BR default)
-        text = new TextDecoder("windows-1252").decode(bytes);
-      }
+      const text = decodeCsvBytes(bytes);
       setRawText(text);
       handleParse(text);
     };
