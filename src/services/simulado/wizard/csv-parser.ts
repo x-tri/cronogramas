@@ -112,7 +112,18 @@ function splitCsvLine(line: string, delimiter: ',' | ';' = ','): string[] {
 }
 
 function normalizeHeader(h: string): string {
-  return h.trim().toLowerCase()
+  // Remove BOM (\uFEFF), zero-width chars e whitespace alem de lowercase.
+  // Excel BR as vezes salva CSVs com UTF-8 BOM na primeira coluna.
+  return h
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u200B-\u200D\u2060]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+/** Remove BOM do inicio do texto (UTF-8 BOM = \uFEFF). */
+function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
 }
 
 function indexOfHeader(headers: readonly string[], target: RequiredHeader): number {
@@ -137,7 +148,9 @@ export function parseSimuladoCsv(
 ): ParseResult {
   const errors: ParseError[] = []
 
-  const allLines = raw.split(/\r?\n/)
+  // Remove BOM se presente (UTF-8 BOM frequente em CSVs do Excel)
+  const cleanRaw = stripBom(raw)
+  const allLines = cleanRaw.split(/\r?\n/)
   const nonEmpty = allLines
     .map((content, index) => ({ content, line: index + 1 }))
     .filter((entry) => entry.content.trim().length > 0)

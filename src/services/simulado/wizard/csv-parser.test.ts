@@ -226,6 +226,28 @@ describe('parseSimuladoCsv — auto-detect delimitador', () => {
     expect(r.items[0]!.topico).toBe('Funcao exponencial')
   })
 
+  it('UTF-8 BOM no inicio nao quebra cabecalho', () => {
+    // \uFEFF = BOM UTF-8 (Excel BR as vezes salva com)
+    const csv = '\uFEFF' + [
+      'numero;conteudo;gabarito;dificuldade',
+      '1;Funcao;A;3',
+    ].join('\n')
+    const r = parseSimuladoCsv(csv)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items).toHaveLength(1)
+  })
+
+  it('headers com zero-width chars normalizam corretamente', () => {
+    // U+200B = zero-width space (pode aparecer em exports weird)
+    const csv = [
+      'numero\u200B;conteudo;gabarito;dificuldade',
+      '1;Topico;A;3',
+    ].join('\n')
+    const r = parseSimuladoCsv(csv)
+    expect(r.ok).toBe(true)
+  })
+
   it('Excel BR com acentuacao + ; roda sem problema', () => {
     const csv = [
       'numero;conteudo;gabarito;dificuldade',
