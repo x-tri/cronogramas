@@ -240,7 +240,6 @@ interface HeroProps {
   readonly mediaTier: ProficiencyTier | null;
   readonly mediaGap: { points: number; tier: ProficiencyTier } | null;
   readonly mascot: MascotMessage;
-  readonly simuladoTitle: string;
   readonly onInfo: () => void;
 }
 
@@ -250,73 +249,80 @@ function Hero({
   mediaTier,
   mediaGap,
   mascot,
-  simuladoTitle,
   onInfo,
 }: HeroProps) {
   const heroBg = mediaTier?.heroBg ?? "bg-gradient-to-br from-primary/5 to-accent/5";
   return (
     <div
-      className={`relative overflow-hidden rounded-3xl border-2 ${heroBg} p-5`}
+      className={`relative overflow-hidden rounded-3xl border-2 ${heroBg} px-3 py-3`}
     >
-      {/* Decoracao cantos */}
-      <div className="absolute -top-2 -right-2 text-5xl opacity-10 rotate-12 select-none pointer-events-none">
+      {/* Decoracao canto sutil */}
+      <div className="absolute -top-3 -right-3 text-5xl opacity-[0.08] rotate-12 select-none pointer-events-none">
         {mediaTier?.emoji ?? "📚"}
       </div>
-      <div className="absolute -bottom-2 -left-2 text-4xl opacity-10 -rotate-12 select-none pointer-events-none">
-        ✨
-      </div>
 
-      <div className="relative flex flex-col items-center gap-2 text-center">
-        <SpeechBubble message={mascot.message} variant={mascot.variant} />
-        <MascotAvatar level={level} animation={mascot.animation} size={128} />
+      <div className="relative flex items-center gap-3">
+        {/* Esquerda: mascote com bubble compacto em cima */}
+        <div className="flex flex-col items-center gap-0 flex-shrink-0">
+          <div className="scale-[0.82] origin-bottom">
+            <SpeechBubble
+              message={mascot.message}
+              variant={mascot.variant}
+            />
+          </div>
+          <div className="-mt-1">
+            <MascotAvatar
+              level={level}
+              animation={mascot.animation}
+              size={84}
+            />
+          </div>
+        </div>
 
-        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-          {simuladoTitle}
-        </p>
+        {/* Direita: score + tier + gap empilhados */}
+        <div className="flex-1 min-w-0 flex flex-col items-end gap-1.5">
+          {mediaGeral != null && (
+            <>
+              <div className="flex items-baseline gap-1 leading-none">
+                <p
+                  className={`text-5xl font-black tracking-tight ${mediaTier?.color}`}
+                >
+                  {mediaGeral.toFixed(0)}
+                </p>
+                <p className="text-[10px] font-bold text-muted-foreground">
+                  /1000
+                </p>
+              </div>
 
-        {mediaGeral != null && (
-          <div className="mt-1">
-            <div className="flex items-baseline justify-center gap-1">
-              <p
-                className={`text-6xl font-black leading-none ${mediaTier?.color}`}
+              <button
+                type="button"
+                onClick={onInfo}
+                aria-label="Entenda os níveis de proficiência"
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 ${mediaTier?.bg} shadow-sm hover:scale-105 active:scale-95 transition-transform`}
               >
-                {mediaGeral.toFixed(0)}
-              </p>
-              <p className="text-xs font-bold text-muted-foreground">
-                /1000
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onInfo}
-              aria-label="Entenda os níveis de proficiência"
-              className={`mt-1 inline-flex items-center gap-1 rounded-full px-3 py-1 ${mediaTier?.bg} shadow-sm hover:scale-105 active:scale-95 transition-transform`}
-            >
-              <span className="text-base">{mediaTier?.emoji}</span>
-              <span className="text-xs font-black text-white">
-                {mediaTier?.label}
-              </span>
-              <Info className="h-3 w-3 text-white/90" />
-            </button>
-          </div>
-        )}
+                <span className="text-sm">{mediaTier?.emoji}</span>
+                <span className="text-[11px] font-black text-white whitespace-nowrap">
+                  {mediaTier?.label}
+                </span>
+                <Info className="h-3 w-3 text-white/90" />
+              </button>
 
-        {mediaGap && (
-          <div className="mt-2 rounded-full border-2 border-dashed border-foreground/20 bg-background/60 px-3 py-1.5 backdrop-blur-sm">
-            <p className="text-xs font-bold flex items-center gap-1">
-              <Target className="h-3.5 w-3.5 text-primary" />
-              <span>
-                Faltam{" "}
-                <strong className={`${mediaGap.tier.color} font-black`}>
-                  {mediaGap.points}pts
-                </strong>{" "}
-                pra{" "}
-                <span className="font-black">{mediaGap.tier.label}</span>{" "}
-                {mediaGap.tier.emoji}
-              </span>
-            </p>
-          </div>
-        )}
+              {mediaGap && (
+                <p className="text-[10px] font-bold text-foreground/80 flex items-center gap-0.5">
+                  <Target className="h-3 w-3 text-primary flex-shrink-0" />
+                  <span>
+                    +
+                    <strong className={`${mediaGap.tier.color} font-black`}>
+                      {mediaGap.points}pts
+                    </strong>{" "}
+                    pra {mediaGap.tier.emoji}{" "}
+                    <span className="font-black">{mediaGap.tier.label}</span>
+                  </span>
+                </p>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -579,20 +585,24 @@ export default function SimuladoResultado() {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <p className="text-xs font-bold text-muted-foreground flex-1 truncate">
-          Resultado oficial (TRI)
-        </p>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-black text-foreground leading-tight truncate">
+            {data.simulado?.title ?? "Simulado"}
+          </p>
+          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider leading-tight">
+            Resultado oficial (TRI)
+          </p>
+        </div>
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Hero — mascote + score gigante */}
+        {/* Hero — mascote + score compacto */}
         <Hero
           level={level}
           mediaGeral={mediaGeral}
           mediaTier={mediaTier}
           mediaGap={mediaGap}
           mascot={mascot}
-          simuladoTitle={data.simulado?.title ?? "Simulado"}
           onInfo={() => setTierInfoOpen(true)}
         />
 
