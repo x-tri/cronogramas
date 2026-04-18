@@ -213,6 +213,14 @@ export function AdminSimulados({
     return m;
   }, [schools]);
 
+  // Estabiliza referencia do array pra evitar re-fetch redundante dentro do
+  // SimuladoRanking — sem isso, `drawerSimulado?.turmas ?? []` gera novo array
+  // a cada render e dispara useEffect desnecessariamente.
+  const rankingTurmas = useMemo<ReadonlyArray<string>>(
+    () => drawerSimulado?.turmas ?? [],
+    [drawerSimulado?.id],
+  );
+
   return (
     <div className="space-y-6">
       {/* Filtros + acao */}
@@ -373,7 +381,7 @@ export function AdminSimulados({
         simuladoId={drawerSimulado?.id ?? null}
         simuladoTitle={drawerSimulado?.title ?? ""}
         schoolId={drawerSimulado?.school_id ?? null}
-        turmasAlvo={drawerSimulado?.turmas ?? []}
+        turmasAlvo={rankingTurmas}
         onClose={() => setDrawerSimulado(null)}
       />
     </div>

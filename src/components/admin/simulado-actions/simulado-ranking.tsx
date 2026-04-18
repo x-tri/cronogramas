@@ -15,7 +15,7 @@
  * (testadas separadamente, 19 tests).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "../../../lib/supabase";
 import {
@@ -95,6 +95,18 @@ export function SimuladoRanking({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [turmaFiltro, setTurmaFiltro] = useState<string>("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // ESC fecha o dialog + move foco pro container quando abrir (focus trap leve).
+  useEffect(() => {
+    if (!open) return;
+    containerRef.current?.focus();
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   useEffect(() => {
     if (!open || !simuladoId) return;
@@ -160,10 +172,21 @@ export function SimuladoRanking({
         const studentsRes = await studentsQuery;
         if (cancelled) return;
 
-        const respondentes = new Set(normalizadas.map((r) => r.student_id));
-        const allStudents = (studentsRes.data ?? []) as StudentRow[];
-        const naoRespondem = allStudents.filter((s) => !respondentes.has(s.id));
-        setNaoResponderam(naoRespondem);
+        if (studentsRes.error) {
+          // Nao bloqueia o painel inteiro — ranking/stats/histograma ja estao
+          // prontos. Apenas avisa dev via console e limpa a lista.
+          // eslint-disable-next-line no-console
+          console.warn(
+            "Falha ao carregar alunos nao-respondentes:",
+            studentsRes.error.message,
+          );
+          setNaoResponderam([]);
+        } else {
+          const respondentes = new Set(normalizadas.map((r) => r.student_id));
+          const allStudents = (studentsRes.data ?? []) as StudentRow[];
+          const naoRespondem = allStudents.filter((s) => !respondentes.has(s.id));
+          setNaoResponderam(naoRespondem);
+        }
       }
 
       setLoading(false);
@@ -207,10 +230,12 @@ export function SimuladoRanking({
 
   return (
     <div
+      ref={containerRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label={`Ranking de ${simuladoTitle}`}
-      className="fixed inset-0 z-40 flex flex-col bg-[#f5f5f7]"
+      className="fixed inset-0 z-40 flex flex-col bg-[#f5f5f7] outline-none"
     >
       {/* Top bar */}
       <header className="flex items-center justify-between gap-4 border-b border-[#e5e7eb] bg-white px-6 py-3 flex-shrink-0">

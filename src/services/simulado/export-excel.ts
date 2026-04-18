@@ -8,6 +8,12 @@
  *
  * Função pura: recebe dados já calculados, sem efeitos colaterais além
  * do download do browser. Testável via check das estruturas de dados.
+ *
+ * ⚠️ Segurança — xlsx@0.18.5 tem CVE GHSA-4r6h-8v6p-xvh6 (prototype pollution
+ * no parse de arquivos maliciosos). O uso aqui é WRITE-ONLY (XLSX.writeFile)
+ * — sem input externo parseado via XLSX.read/readFile, então o vetor de
+ * ataque NÃO é aplicável. Reavaliar (migrar para exceljs) se no futuro for
+ * introduzido import/parse de .xlsx fornecido pelo usuário.
  */
 
 import * as XLSX from "xlsx";
