@@ -19,6 +19,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "../../../lib/supabase";
 import {
+  exportRankingExcel,
+} from "../../../services/simulado/export-excel";
+import {
   filtrarPorTurma,
   histogramaNotas,
   mediaAcertosPorArea,
@@ -188,6 +191,18 @@ export function SimuladoRanking({
     return naoResponderam.filter((s) => s.turma === turmaFiltro);
   }, [naoResponderam, turmaFiltro]);
 
+  function handleExport(): void {
+    exportRankingExcel({
+      simuladoTitle,
+      turmaLabel: turmaFiltro || "Todas",
+      ranked,
+      stats,
+      topTopicos: topicosErradosTurma(filtradas),   // todos os tópicos (sem limit) no Excel
+      mediaArea,
+      naoResponderam: naoResponderamFiltered,
+    });
+  }
+
   if (!open) return null;
 
   return (
@@ -220,29 +235,44 @@ export function SimuladoRanking({
           </div>
         </div>
 
-        {turmas.length > 1 && (
-          <div className="flex items-center gap-2">
-            <label
-              htmlFor="turma-filter"
-              className="text-xs font-semibold text-[#71717a]"
-            >
-              Turma:
-            </label>
-            <select
-              id="turma-filter"
-              value={turmaFiltro}
-              onChange={(e) => setTurmaFiltro(e.target.value)}
-              className="rounded-md border border-[#e5e7eb] bg-white px-3 py-1.5 text-sm"
-            >
-              <option value="">Todas ({respostas.length})</option>
-              {turmas.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {turmas.length > 1 && (
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="turma-filter"
+                className="text-xs font-semibold text-[#71717a]"
+              >
+                Turma:
+              </label>
+              <select
+                id="turma-filter"
+                value={turmaFiltro}
+                onChange={(e) => setTurmaFiltro(e.target.value)}
+                className="rounded-md border border-[#e5e7eb] bg-white px-3 py-1.5 text-sm"
+              >
+                <option value="">Todas ({respostas.length})</option>
+                {turmas.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={loading || ranked.length === 0}
+            aria-label="Exportar ranking em Excel"
+            className="flex items-center gap-1.5 rounded-lg border border-[#16a34a] bg-[#f0fdf4] px-3 py-1.5 text-xs font-semibold text-[#16a34a] hover:bg-[#dcfce7] disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M12 15V3m0 12-4-4m4 4 4-4M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Exportar Excel
+          </button>
+        </div>
       </header>
 
       {/* Body scrollable */}
@@ -277,13 +307,13 @@ export function SimuladoRanking({
                 emoji="📈"
               />
               <StatCard
-                label="Melhor"
+                label="Maior TRI"
                 value={formatScore(stats.melhor)}
                 emoji="🥇"
                 positive
               />
               <StatCard
-                label="Pior"
+                label="Menor TRI"
                 value={formatScore(stats.pior)}
                 emoji="📉"
                 negative
