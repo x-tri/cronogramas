@@ -1,0 +1,193 @@
+name: Deploy to Hostinger (shared hosting)
+
+# Trigger TEMPORÁRIO em chore/ci-deploy-hostinger para validação.
+# Após primeiro deploy bem-sucedido, trocar para: [main]
+on:
+  push:
+    branches: [main, chore/ci-deploy-hostinger]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "8.15.0"
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Job 1: CI gate — type-check + vitest. Roda SEMPRE (push, PR, dispatch).
+  # Se falhar, job "deploy" não roda.
+  # -------------------------------------------------------------------------
+  ci:
+    name: CI (type-check + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      # ADMIN
+      - name: Install admin deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check admin
+        run: pnpm exec tsc --noEmit
+
+      - name: Run admin tests (vitest)
+        run: pnpm test
+
+      # ALUNO
+      - name: Install aluno deps
+        working-directory: aluno
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check aluno
+        working-directory: aluno
+        run: pnpm exec tsc --noEmit
+
+  # -------------------------------------------------------------------------
+  # Job 2: Deploy — build + snapshot + rsync + verify.
+  # Só roda em push em main/chore-branch ou workflow_dispatch (nunca em PR).
+  # Bloqueado se ci falhar.
+  # -------------------------------------------------------------------------
+  deploy:
+    name: Build + deploy to shared hosting
+    needs: ci
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/chore/ci-deploy-hostinger'))
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-hostinger
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      # Build admin
+      - name: Install admin deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build admin
+        run: pnpm build
+
+      # Build aluno
+      - name: Install aluno deps
+        working-directory: aluno
+        run: pnpm install --frozen-lockfile
+
+      - name: Build aluno
+        working-directory: aluno
+        run: pnpm build
+
+      # Extrai hashes locais pra verificação pós-deploy
+      - name: Extract local bundle hashes
+        id: hashes
+        run: |
+          ADMIN_HASH=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' dist/index.html | head -1)
+          ALUNO_HASH=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' aluno/dist/index.html | head -1)
+          echo "admin=$ADMIN_HASH" >> "$GITHUB_OUTPUT"
+          echo "aluno=$ALUNO_HASH" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Local bundles::admin=$ADMIN_HASH aluno=$ALUNO_HASH"
+
+      # SSH setup com chave privada dedicada
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HOSTINGER_SSH_KEY }}
+
+      - name: Add Hostinger to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.HOSTINGER_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      # Snapshot antes do rsync (rollback em 1 comando via mv)
+      - name: Snapshot current public_html (keep last 3)
+        env:
+          HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+          USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          REMOTE_ADMIN: ${{ secrets.HOSTINGER_REMOTE_ADMIN }}
+        run: |
+          ssh -p "$PORT" "$USER@$HOST" bash -s <<'EOF'
+          set -e
+          REMOTE_ADMIN="${HOME}/domains/horariodeestudos.com/public_html"
+          cd "$(dirname "$REMOTE_ADMIN")"
+          TS=$(date +%Y%m%d-%H%M%S)
+          if [ -d public_html ]; then
+            cp -r public_html "public_html.bak-$TS"
+            echo "✓ snapshot: public_html.bak-$TS"
+          fi
+          # Mantém só os 3 snapshots mais recentes
+          ls -1dt public_html.bak-* 2>/dev/null | tail -n +4 | xargs -r rm -rf
+          echo "✓ snapshots remanescentes:"
+          ls -1dt public_html.bak-* 2>/dev/null || echo "  (nenhum)"
+          EOF
+
+      # Rsync admin (exclui aluno/ pra não apagar subpasta)
+      - name: Deploy admin (rsync)
+        env:
+          HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+          USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          REMOTE_ADMIN: ${{ secrets.HOSTINGER_REMOTE_ADMIN }}
+        run: |
+          rsync -avz --delete --delete-after --exclude=aluno/ \
+            -e "ssh -p $PORT" \
+            dist/ "$USER@$HOST:$REMOTE_ADMIN/"
+
+      # Rsync aluno
+      - name: Deploy aluno (rsync)
+        env:
+          HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+          USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          REMOTE_ALUNO: ${{ secrets.HOSTINGER_REMOTE_ALUNO }}
+        run: |
+          rsync -avz --delete --delete-after \
+            -e "ssh -p $PORT" \
+            aluno/dist/ "$USER@$HOST:$REMOTE_ALUNO/"
+
+      # Verify: hash servido tem que bater com hash buildado
+      - name: Verify deploy via bundle hash
+        env:
+          LOCAL_ADMIN: ${{ steps.hashes.outputs.admin }}
+          LOCAL_ALUNO: ${{ steps.hashes.outputs.aluno }}
+        run: |
+          sleep 3
+          SERVED_ADMIN=$(curl -sf https://horariodeestudos.com/ | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+          SERVED_ALUNO=$(curl -sf https://horariodeestudos.com/aluno/ | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+          echo "admin: local=$LOCAL_ADMIN served=$SERVED_ADMIN"
+          echo "aluno: local=$LOCAL_ALUNO served=$SERVED_ALUNO"
+          if [ "$LOCAL_ADMIN" != "$SERVED_ADMIN" ]; then
+            echo "::error::Bundle admin divergente: servido $SERVED_ADMIN, esperado $LOCAL_ADMIN"
+            exit 1
+          fi
+          if [ "$LOCAL_ALUNO" != "$SERVED_ALUNO" ]; then
+            echo "::error::Bundle aluno divergente: servido $SERVED_ALUNO, esperado $LOCAL_ALUNO"
+            exit 1
+          fi
+          echo "::notice::✅ Bundles em produção batem com o commit ${GITHUB_SHA:0:7}"
