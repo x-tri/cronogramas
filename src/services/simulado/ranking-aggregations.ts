@@ -159,6 +159,135 @@ export function topicosErradosTurma(
 }
 
 /**
+ * Mapeamento matéria → área do ENEM.
+ *
+ * O formato dos tópicos é "Matéria - Tema" ou "Matéria/Subárea - Tema".
+ * Ex: "Geografia - Fusos horários", "Matemática/Probabilidade - Eventos".
+ * Aqui classificamos a MATÉRIA raiz (antes de `/` ou ` - `) nas 4 áreas ENEM.
+ */
+const MATERIA_TO_AREA: Record<string, AreaKey> = {
+  // LC — Linguagens, Códigos e suas Tecnologias
+  Literatura: "LC",
+  Arte: "LC",
+  "Língua Portuguesa": "LC",
+  Inglês: "LC",
+  Espanhol: "LC",
+  "Produção de Texto": "LC",
+  Redação: "LC",
+  "Educação Física": "LC",
+
+  // CH — Ciências Humanas e suas Tecnologias
+  Geografia: "CH",
+  "Geografia urbana": "CH",
+  "Geografia física": "CH",
+  História: "CH",
+  "História do Brasil": "CH",
+  "História do Brasil Colonial": "CH",
+  "História Antiga": "CH",
+  Sociologia: "CH",
+  Filosofia: "CH",
+  Geopolítica: "CH",
+
+  // CN — Ciências da Natureza e suas Tecnologias
+  Biologia: "CN",
+  Química: "CN",
+  "Química Orgânica": "CN",
+  Física: "CN",
+
+  // MT — Matemática e suas Tecnologias
+  Matemática: "MT",
+  "Geometria plana": "MT",
+  "Geometria espacial": "MT",
+  "Análise combinatória": "MT",
+  Trigonometria: "MT",
+};
+
+/**
+ * Extrai a matéria raiz de um tópico do ENEM.
+ *
+ *   "Geografia - Fusos horários"           → "Geografia"
+ *   "Matemática/Probabilidade - Eventos"   → "Matemática"
+ *   "Sociologia/Política - Estado direito" → "Sociologia"
+ *
+ * Quando o tópico tem barra composta (ex: "Geografia/Sociologia"), retorna
+ * só o primeiro termo — que é a matéria principal para fins de classificação.
+ */
+export function extrairMateriaRaiz(topico: string): string {
+  const limpo = topico.trim();
+  // Encontra o primeiro separador — barra ou hífen com espaços
+  const idxBarra = limpo.indexOf("/");
+  const idxHifen = limpo.indexOf(" - ");
+  const candidatos = [idxBarra, idxHifen].filter((i) => i >= 0);
+  if (candidatos.length === 0) return limpo;
+  const fim = Math.min(...candidatos);
+  return limpo.slice(0, fim).trim();
+}
+
+/**
+ * Classifica um tópico em uma das 4 áreas do ENEM. Retorna `null` se a
+ * matéria raiz não bater com nenhuma conhecida (ex: tópico mal-formatado).
+ */
+export function areaDoTopico(topico: string): AreaKey | null {
+  const materia = extrairMateriaRaiz(topico);
+  return MATERIA_TO_AREA[materia] ?? null;
+}
+
+/**
+ * Retorna o tópico MAIS errado em cada uma das 4 áreas do ENEM.
+ *
+ * Útil quando o N de respondentes é baixo e o "top 5 geral" fica cheio de
+ * empates sem significado pedagógico. Com 1 tópico por área, o coordenador
+ * de cada disciplina identifica imediatamente onde focar o próximo reforço.
+ *
+ * Tópicos não-classificáveis (matéria fora do mapa) são ignorados.
+ * Áreas sem nenhum erro retornam `null`.
+ */
+export function topicoMaisErradoPorArea(
+  respostas: ReadonlyArray<RankingResposta>,
+): Record<AreaKey, { topico: string; totalErros: number; alunosAfetados: number } | null> {
+  // Agrega por tópico + já classifica
+  interface Acc {
+    readonly area: AreaKey;
+    total: number;
+    alunos: Set<string>;
+  }
+  const porTopico = new Map<string, Acc>();
+
+  for (const r of respostas) {
+    const topicos = r.erros_por_topico ?? {};
+    for (const [topico, n] of Object.entries(topicos)) {
+      const t = topico.trim();
+      if (!t || typeof n !== "number" || n <= 0) continue;
+      const area = areaDoTopico(t);
+      if (area == null) continue;
+      const prev = porTopico.get(t) ?? { area, total: 0, alunos: new Set() };
+      prev.total += n;
+      prev.alunos.add(r.student_id);
+      porTopico.set(t, prev);
+    }
+  }
+
+  // Agrupa por área e pega o maior de cada
+  const resultado: Record<
+    AreaKey,
+    { topico: string; totalErros: number; alunosAfetados: number } | null
+  > = { LC: null, CH: null, CN: null, MT: null };
+
+  for (const [topico, acc] of porTopico.entries()) {
+    const atual = resultado[acc.area];
+    if (atual == null || acc.total > atual.totalErros) {
+      resultado[acc.area] = {
+        topico,
+        totalErros: acc.total,
+        alunosAfetados: acc.alunos.size,
+      };
+    }
+  }
+
+  return resultado;
+}
+
+/**
  * Média de acertos por área da turma (0-45). Usado no mini bar chart
  * "Áreas mais fracas da turma".
  */

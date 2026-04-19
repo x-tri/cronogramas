@@ -18,7 +18,7 @@
 
 import * as XLSX from "xlsx";
 
-import type { GrupoStats, RankedStudent } from "./ranking-aggregations";
+import type { AreaKey, GrupoStats, RankedStudent } from "./ranking-aggregations";
 
 export interface NaoRespondeuRow {
   readonly id: string;
@@ -37,6 +37,10 @@ export interface ExportRankingPayload {
     totalErros: number;
     alunosAfetados: number;
   }>;
+  readonly topicoPorArea: Record<
+    AreaKey,
+    { topico: string; totalErros: number; alunosAfetados: number } | null
+  >;
   readonly mediaArea: {
     readonly LC: number;
     readonly CH: number;
@@ -150,6 +154,29 @@ function buildTopicosSheet(
 }
 
 // ---------------------------------------------------------------------------
+// Aba — Tópico mais errado por área (1 por área)
+// ---------------------------------------------------------------------------
+function buildTopicoPorAreaSheet(
+  topicoPorArea: Record<
+    AreaKey,
+    { topico: string; totalErros: number; alunosAfetados: number } | null
+  >,
+): XLSX.WorkSheet {
+  const header = ["Área", "Disciplina", "Tópico", "Total de Erros", "Alunos Afetados"];
+  const rows = (["LC", "CH", "CN", "MT"] as const).map((k) => {
+    const t = topicoPorArea[k];
+    return [
+      k,
+      AREA_NOMES[k],
+      t?.topico ?? "(sem erros registrados)",
+      t?.totalErros ?? 0,
+      t?.alunosAfetados ?? 0,
+    ];
+  });
+  return XLSX.utils.aoa_to_sheet([header, ...rows]);
+}
+
+// ---------------------------------------------------------------------------
 // Aba 4 — Acertos por área
 // ---------------------------------------------------------------------------
 function buildAreasSheet(mediaArea: {
@@ -201,8 +228,13 @@ export function exportRankingExcel(payload: ExportRankingPayload): void {
   );
   XLSX.utils.book_append_sheet(
     wb,
+    buildTopicoPorAreaSheet(payload.topicoPorArea),
+    "Tópico por Área",
+  );
+  XLSX.utils.book_append_sheet(
+    wb,
     buildTopicosSheet(payload.topTopicos),
-    "Tópicos Errados",
+    "Tópicos (Geral)",
   );
   XLSX.utils.book_append_sheet(
     wb,

@@ -1,12 +1,15 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  areaDoTopico,
+  extrairMateriaRaiz,
   filtrarPorTurma,
   histogramaNotas,
   mediaAcertosPorArea,
   mediaTriSimples,
   rankRespostas,
   statsGrupo,
+  topicoMaisErradoPorArea,
   topicosErradosTurma,
   totalAcertos,
   turmasPresentes,
@@ -199,6 +202,140 @@ describe("histogramaNotas", () => {
     const bin500 = bins.find((b) => b.min === 500);
     expect(bin420?.count).toBe(1);
     expect(bin500?.count).toBe(2);
+  });
+});
+
+describe("extrairMateriaRaiz", () => {
+  it("retorna a matéria antes do primeiro hífen", () => {
+    expect(extrairMateriaRaiz("Geografia - Fusos horários")).toBe("Geografia");
+  });
+
+  it("retorna a matéria antes da primeira barra", () => {
+    expect(extrairMateriaRaiz("Matemática/Probabilidade - Eventos")).toBe("Matemática");
+    expect(extrairMateriaRaiz("Sociologia/Política - Estado de direito")).toBe("Sociologia");
+  });
+
+  it("quando tem barra antes do hífen usa a barra", () => {
+    expect(extrairMateriaRaiz("Química/Soluções - Precipitação")).toBe("Química");
+  });
+
+  it("retorna tópico inteiro se não tem separador", () => {
+    expect(extrairMateriaRaiz("Matemática")).toBe("Matemática");
+  });
+
+  it("trim espaços", () => {
+    expect(extrairMateriaRaiz("  Geografia - Algo  ")).toBe("Geografia");
+  });
+});
+
+describe("areaDoTopico", () => {
+  it("classifica matérias LC", () => {
+    expect(areaDoTopico("Literatura - Cordel")).toBe("LC");
+    expect(areaDoTopico("Arte - Escultura")).toBe("LC");
+    expect(areaDoTopico("Língua Portuguesa - Variação")).toBe("LC");
+    expect(areaDoTopico("Inglês - Leitura")).toBe("LC");
+    expect(areaDoTopico("Educação Física - Esportes")).toBe("LC");
+  });
+
+  it("classifica matérias CH", () => {
+    expect(areaDoTopico("Geografia - Fusos")).toBe("CH");
+    expect(areaDoTopico("História - Reforma")).toBe("CH");
+    expect(areaDoTopico("Sociologia - Movimentos")).toBe("CH");
+    expect(areaDoTopico("Filosofia - Estoicismo")).toBe("CH");
+    expect(areaDoTopico("Geopolítica - Venezuela")).toBe("CH");
+    expect(areaDoTopico("História do Brasil - Revolta")).toBe("CH");
+  });
+
+  it("classifica matérias CN", () => {
+    expect(areaDoTopico("Biologia/Ecologia - Impacto")).toBe("CN");
+    expect(areaDoTopico("Química/Soluções - Precipitação")).toBe("CN");
+    expect(areaDoTopico("Física/Cinemática - MUV")).toBe("CN");
+    expect(areaDoTopico("Química Orgânica - IUPAC")).toBe("CN");
+  });
+
+  it("classifica matérias MT", () => {
+    expect(areaDoTopico("Matemática/Probabilidade - Eventos")).toBe("MT");
+    expect(areaDoTopico("Geometria plana - Triângulos")).toBe("MT");
+    expect(areaDoTopico("Geometria espacial - Cubo")).toBe("MT");
+    expect(areaDoTopico("Análise combinatória - Permutação")).toBe("MT");
+    expect(areaDoTopico("Trigonometria - Seno")).toBe("MT");
+  });
+
+  it("retorna null para matéria desconhecida", () => {
+    expect(areaDoTopico("Astrologia - Horóscopo")).toBeNull();
+    expect(areaDoTopico("XYZ - Coisa")).toBeNull();
+  });
+});
+
+describe("topicoMaisErradoPorArea", () => {
+  it("retorna o tópico mais errado em cada uma das 4 áreas", () => {
+    const respostas = [
+      makeResposta({
+        id: "r1",
+        student_id: "s1",
+        erros_por_topico: {
+          "Geografia - Fusos": 3, // CH → 3
+          "Sociologia - Cultura": 1, // CH → 1
+          "Literatura - Poesia": 2, // LC → 2
+          "Matemática - Funções": 4, // MT → 4
+          "Biologia - Ecologia": 5, // CN → 5
+        },
+      }),
+      makeResposta({
+        id: "r2",
+        student_id: "s2",
+        erros_por_topico: {
+          "Geografia - Fusos": 2, // CH → 3+2=5 (wins CH)
+          "Arte - Escultura": 3, // LC → 3 (wins LC)
+          "Química - Soluções": 1, // CN → 1
+        },
+      }),
+    ];
+
+    const top = topicoMaisErradoPorArea(respostas);
+    expect(top.CH?.topico).toBe("Geografia - Fusos");
+    expect(top.CH?.totalErros).toBe(5);
+    expect(top.CH?.alunosAfetados).toBe(2);
+
+    expect(top.LC?.topico).toBe("Arte - Escultura");
+    expect(top.LC?.totalErros).toBe(3);
+
+    expect(top.CN?.topico).toBe("Biologia - Ecologia");
+    expect(top.CN?.totalErros).toBe(5);
+
+    expect(top.MT?.topico).toBe("Matemática - Funções");
+    expect(top.MT?.totalErros).toBe(4);
+  });
+
+  it("retorna null em áreas sem erros registrados", () => {
+    const respostas = [
+      makeResposta({
+        erros_por_topico: { "Matemática - Funções": 3 },
+      }),
+    ];
+    const top = topicoMaisErradoPorArea(respostas);
+    expect(top.LC).toBeNull();
+    expect(top.CH).toBeNull();
+    expect(top.CN).toBeNull();
+    expect(top.MT?.topico).toBe("Matemática - Funções");
+  });
+
+  it("ignora tópicos com matéria desconhecida", () => {
+    const respostas = [
+      makeResposta({
+        erros_por_topico: {
+          "Astrologia - Horóscopo": 10,
+          "Geografia - Clima": 1,
+        },
+      }),
+    ];
+    const top = topicoMaisErradoPorArea(respostas);
+    expect(top.CH?.topico).toBe("Geografia - Clima");
+  });
+
+  it("array vazio retorna todas áreas null", () => {
+    const top = topicoMaisErradoPorArea([]);
+    expect(top).toEqual({ LC: null, CH: null, CN: null, MT: null });
   });
 });
 

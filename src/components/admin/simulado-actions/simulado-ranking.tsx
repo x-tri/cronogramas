@@ -27,6 +27,7 @@ import {
   mediaAcertosPorArea,
   rankRespostas,
   statsGrupo,
+  topicoMaisErradoPorArea,
   topicosErradosTurma,
   turmasPresentes,
   type RankingResposta,
@@ -204,7 +205,10 @@ export function SimuladoRanking({
   );
   const ranked = useMemo(() => rankRespostas(filtradas), [filtradas]);
   const stats = useMemo(() => statsGrupo(filtradas), [filtradas]);
-  const topTopicos = useMemo(() => topicosErradosTurma(filtradas, 5), [filtradas]);
+  const topicoPorArea = useMemo(
+    () => topicoMaisErradoPorArea(filtradas),
+    [filtradas],
+  );
   const mediaArea = useMemo(() => mediaAcertosPorArea(filtradas), [filtradas]);
   const histograma = useMemo(() => histogramaNotas(filtradas, 50), [filtradas]);
   const turmas = useMemo(() => turmasPresentes(respostas), [respostas]);
@@ -221,6 +225,7 @@ export function SimuladoRanking({
       ranked,
       stats,
       topTopicos: topicosErradosTurma(filtradas),   // todos os tópicos (sem limit) no Excel
+      topicoPorArea,
       mediaArea,
       naoResponderam: naoResponderamFiltered,
     });
@@ -438,38 +443,46 @@ export function SimuladoRanking({
             </section>
 
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Top tópicos da turma */}
+              {/* Tópico mais errado por área — 1 por área (pedagogicamente mais útil
+                  que top 5 geral quando o N de respondentes é baixo) */}
               <section className="rounded-xl border border-[#e5e7eb] bg-white p-4">
                 <h2 className="mb-3 text-sm font-bold text-[#1d1d1f]">
-                  🎯 Tópicos que a turma mais errou
+                  🎯 Tópico mais errado por área
                 </h2>
-                {topTopicos.length === 0 ? (
+                {(["LC", "CH", "CN", "MT"] as const).every((a) => topicoPorArea[a] == null) ? (
                   <p className="text-xs italic text-[#94a3b8]">
                     Sem dados de tópicos ainda.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
-                    {topTopicos.map((t, idx) => {
-                      const max = topTopicos[0]!.totalErros;
-                      const pct = (t.totalErros / max) * 100;
+                  <ul className="space-y-3">
+                    {(["LC", "CH", "CN", "MT"] as const).map((area) => {
+                      const t = topicoPorArea[area];
                       return (
-                        <li key={t.topico}>
-                          <div className="flex items-center justify-between gap-2 text-xs">
-                            <span className="truncate font-semibold text-[#1d1d1f]">
-                              {idx + 1}. {t.topico}
+                        <li key={area} className="border-l-2 border-[#e5e7eb] pl-3">
+                          <div className="flex items-baseline gap-2 mb-0.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#94a3b8]">
+                              {area}
                             </span>
-                            <span className="flex-shrink-0 text-[10px] text-[#71717a]">
-                              <strong className="text-red-600">{t.totalErros}</strong>{" "}
-                              erros · {t.alunosAfetados} aluno
-                              {t.alunosAfetados === 1 ? "" : "s"}
+                            <span className="text-[10px] text-[#71717a]">
+                              {AREA_LABELS[area]}
                             </span>
                           </div>
-                          <div className="mt-1 h-1.5 rounded-full bg-[#f4f4f5] overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-orange-400 to-red-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
+                          {t == null ? (
+                            <p className="text-xs italic text-[#c7c7c7]">
+                              Nenhum erro registrado nessa área
+                            </p>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span className="truncate font-semibold text-[#1d1d1f]">
+                                {t.topico}
+                              </span>
+                              <span className="flex-shrink-0 text-[10px] text-[#71717a]">
+                                <strong className="text-red-600">{t.totalErros}</strong>{" "}
+                                erros · {t.alunosAfetados} aluno
+                                {t.alunosAfetados === 1 ? "" : "s"}
+                              </span>
+                            </div>
+                          )}
                         </li>
                       );
                     })}
