@@ -3,7 +3,7 @@
 Monorepo do frontend XTRI — preparação ENEM baseada em TRI.
 
 - **`/`** — painel admin (super admin e coordenador) em `horariodeestudos.com`
-- **`/aluno`** — portal do aluno em `horariodeestudos.com/aluno`
+- **`/aluno`** — portal do aluno em `aluno.horariodeestudos.com`
 
 Stack: React 19 + TypeScript strict + Vite 7 + Supabase + pnpm.
 
