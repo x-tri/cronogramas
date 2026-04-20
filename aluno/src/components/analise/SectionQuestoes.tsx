@@ -6,7 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStudentProfile } from "@/hooks/useStudentData";
 import { useGamification } from "@/hooks/useGamification";
-import { MascotAvatarWithReaction, type MascotAnimation } from "@/components/MascotAvatar";
+import { MascotWithBubble } from "@/components/MascotWithBubble";
+import type { MascotAnimation } from "@/components/MascotAvatar";
 
 interface Props {
   questoes: QuestaoRecomendada[];
@@ -103,11 +104,11 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
       )}
       style={{ animationDelay: `${index * 0.05}s`, animationFillMode: "both" }}
     >
-      {/* Celebração — mascote + XP popup */}
+      {/* Celebração — mascote com speech bubble */}
       {showCelebration && (
         <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
           <div className="animate-bounce-in flex flex-col items-center">
-            <MascotAvatarWithReaction level={level} reaction="jump" size={80} />
+            <MascotWithBubble level={level} gamification={gamification} context="correct" size={100} />
             <div className="mt-1 flex items-center gap-1 bg-primary rounded-full px-3 py-1 shadow-lg animate-wiggle">
               <Zap className="h-4 w-4 text-white" />
               <span className="text-sm font-black text-white">+{XP_CORRECT} XP</span>
@@ -207,8 +208,8 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
 
       {answered && (
         <div className="flex items-center justify-between gap-2">
-          {!showCelebration && (
-            <MascotAvatarWithReaction level={level} reaction={mascotReaction} size={36} className="flex-shrink-0" />
+          {!showCelebration && !correct && mascotReaction === "hit" && (
+            <MascotWithBubble level={level} gamification={gamification} context="wrong" size={48} className="flex-shrink-0" />
           )}
           <div
             className={cn(

@@ -39,6 +39,14 @@ const AdminDashboard = lazy(() =>
   })),
 );
 
+// Usado pelo coordinator para alternar entre "Mentoria" e "Simulados ENEM"
+// sem sair do painel nativo do coord.
+const AdminSimulados = lazy(() =>
+  import("./components/admin/admin-simulados").then((mod) => ({
+    default: mod.AdminSimulados,
+  })),
+);
+
 type SlotSelection = {
   dia: DiaSemana;
   turno: Turno;
@@ -68,6 +76,9 @@ function AppContent() {
   );
   const [viewMode, setViewMode] = useState<"kanban" | "timeline">("timeline");
   const [showSearch, setShowSearch] = useState(false);
+  // Coord toggle: alterna entre painel de mentoria (kanban/timeline)
+  // e gestao de Simulados ENEM (lista + wizard + respostas).
+  const [coordView, setCoordView] = useState<"mentor" | "simulados">("mentor");
 
   const handleSlotClick = (
     dia: DiaSemana,
@@ -215,6 +226,8 @@ function AppContent() {
     );
   }
 
+  // super_admin (XTRI01) acessa o AdminDashboard completo — gerencia
+  // users, escolas, coordenadores, grades, simulados, auditoria, etc.
   if (userRole === "super_admin") {
     return (
       <Suspense fallback={
@@ -231,6 +244,11 @@ function AppContent() {
       </Suspense>
     );
   }
+
+  // coordinator (XTRI02) e role default caem no painel de mentor abaixo
+  // (StudentSearch + Kanban + SimuladoAnalyzer + HistoryPanel). Coordenador
+  // tem botao adicional no header que alterna entre "Mentoria" e
+  // "Simulados ENEM" sem sair do painel.
 
   const isSearchModalOpen = Boolean(currentStudent && showSearch);
 
@@ -255,6 +273,38 @@ function AppContent() {
               </div>
 
               <div className="ml-auto flex items-center gap-2">
+                {/* Toggle Mentoria | Simulados (coord only) */}
+                <div
+                  role="group"
+                  aria-label="Alternar entre Mentoria e Simulados"
+                  className="flex items-center gap-1 rounded-2xl border border-[#e5e7eb] bg-white/80 p-1 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.45)]"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setCoordView("mentor")}
+                    aria-pressed={coordView === "mentor"}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                      coordView === "mentor"
+                        ? "bg-[#2563eb] text-white shadow-sm"
+                        : "text-[#475569] hover:text-[#0f172a]"
+                    }`}
+                  >
+                    Mentoria
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCoordView("simulados")}
+                    aria-pressed={coordView === "simulados"}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                      coordView === "simulados"
+                        ? "bg-[#2563eb] text-white shadow-sm"
+                        : "text-[#475569] hover:text-[#0f172a]"
+                    }`}
+                  >
+                    Simulados ENEM
+                  </button>
+                </div>
+
                 <div className="hidden rounded-2xl border border-[#e5e7eb] bg-white/80 px-3 py-2 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.5)] sm:flex sm:flex-col sm:items-end">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
                     Coordenador ativo
@@ -275,7 +325,7 @@ function AppContent() {
               </div>
             </div>
 
-            {currentStudent && (
+            {coordView === "mentor" && currentStudent && (
               <div className="flex flex-col gap-2">
                 <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
                   <div className="flex min-w-0 items-center justify-between gap-3 rounded-[24px] border border-[#e5e7eb] bg-white/94 px-4 py-3 xl:w-[360px]">
@@ -306,6 +356,10 @@ function AppContent() {
 
                 <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
                   <Suspense fallback={null}>
+                    {/* SimuladoAnalyzer unificado: lista simulados legacy
+                        (banco dedicado: projetos + student_answers) E os
+                        novos via mentoria (banco primary simulado_respostas)
+                        no mesmo dropdown de Historico. */}
                     <SimuladoAnalyzer
                       matricula={currentStudent.matricula}
                       variant="compact"
@@ -322,7 +376,20 @@ function AppContent() {
         </div>
       </header>
 
-      {!currentStudent && (
+      {/* Simulados ENEM view (coord toggle) */}
+      {coordView === "simulados" && (
+        <main className="mx-auto max-w-[1440px] px-4 py-6">
+          <Suspense fallback={
+            <div className="flex items-center justify-center h-64">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent" />
+            </div>
+          }>
+            <AdminSimulados userRole={userRole} userSchoolId={userSchoolId} />
+          </Suspense>
+        </main>
+      )}
+
+      {coordView === "mentor" && !currentStudent && (
         <main className="mx-auto flex min-h-[calc(100vh-88px)] max-w-[860px] flex-col justify-center px-4 pb-12 pt-8">
           <section className="rounded-[32px] border border-[#e5e7eb] bg-white/95 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.4)] sm:p-8">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[20px] bg-[#f8fafc] text-[#2563eb]">
@@ -403,7 +470,7 @@ function AppContent() {
       {/* ============================================================
           MAIN CONTENT — Timetable direto, sem secoes intermediarias
           ============================================================ */}
-      {currentStudent && (
+      {coordView === "mentor" && currentStudent && (
         <main className="px-4 py-4 max-w-[1440px] mx-auto">
           {/* Toolbar: View toggle + title */}
           <div className="flex items-center justify-between mb-3">

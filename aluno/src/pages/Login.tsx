@@ -74,6 +74,20 @@ export default function Login() {
       </div>
 
       <div className="w-full max-w-sm space-y-4">
+        {/* Aviso de login pros alunos */}
+        <div
+          className="animate-bounce-in rounded-2xl border-2 border-primary/40 bg-primary/10 p-4"
+          style={{ animationDelay: "0.05s" }}
+          role="note"
+        >
+          <p className="text-sm font-semibold leading-snug text-foreground">
+            <span className="mr-1">👋</span>
+            <span className="font-black text-primary">Alunos(as):</span> clique no ícone do{" "}
+            <span className="font-black">Gmail</span> e, em seguida, digite sua{" "}
+            <span className="font-black">matrícula</span>.
+          </p>
+        </div>
+
         {/* Google — botão principal */}
         <div className="animate-bounce-in" style={{ animationDelay: "0.1s" }}>
           <button

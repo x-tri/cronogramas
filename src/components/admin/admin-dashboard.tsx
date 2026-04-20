@@ -16,6 +16,9 @@ const AdminHorarios = lazy(() =>
 const AdminControle = lazy(() =>
   import("./admin-controle").then((m) => ({ default: m.AdminControle }))
 );
+const AdminSimulados = lazy(() =>
+  import("./admin-simulados").then((m) => ({ default: m.AdminSimulados }))
+);
 const AdminPdfs = lazy(() =>
   import("./admin-pdfs").then((m) => ({ default: m.AdminPdfs }))
 );
@@ -47,6 +50,7 @@ const PAGE_TITLES: Readonly<Record<AdminPage, string>> = {
   coordinators: "Mentores & Acessos",
   schedules: "Grades Oficiais",
   control: "Cronogramas dos Alunos",
+  simulados: "Simulados ENEM",
   performance: "Planos & Mentoria",
   content_mapping: "GLiNER Ops",
   pdfs: "PDFs & Entregas",
@@ -106,6 +110,13 @@ function renderPage(page: AdminPage, params: {
           userSchoolId={params.userSchoolId}
         />
       );
+    case "simulados":
+      return (
+        <AdminSimulados
+          userRole={params.userRole}
+          userSchoolId={params.userSchoolId}
+        />
+      );
     case "performance":
       return (
         <AdminPerformance
@@ -141,6 +152,9 @@ function renderPage(page: AdminPage, params: {
 }
 
 function getAvailablePages(userRole: string | null | undefined): AdminPage[] {
+  // Coordinator NAO cai neste dashboard (roteamento em App.tsx manda para
+  // o painel de mentor). Esta funcao existe apenas para super_admin hoje,
+  // mas manter branch de coordinator e util caso super_admin impersone.
   if (userRole === "coordinator") {
     return ["control", "performance", "pdfs"];
   }
@@ -151,6 +165,7 @@ function getAvailablePages(userRole: string | null | undefined): AdminPage[] {
     "coordinators",
     "schedules",
     "control",
+    "simulados",
     "performance",
     "pdfs",
     "audit",

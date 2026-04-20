@@ -1,11 +1,13 @@
 import { useStudentProfile } from "@/hooks/useStudentData";
 import { useNotifications, type StudentNotification } from "@/hooks/useNotifications";
 import { useGamification } from "@/hooks/useGamification";
+import { useStudentPdfs, type StudentPdf } from "@/hooks/useStudentPdfs";
+import { useSimuladosPendentes } from "@/hooks/useSimulados";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Zap, Flame, ArrowRight } from "lucide-react";
-import { MascotAvatar } from "@/components/MascotAvatar";
+import { Zap, Flame, ArrowRight, FileText, Download, ClipboardList } from "lucide-react";
+import { MascotWithBubble } from "@/components/MascotWithBubble";
 
 const COLOR_MAP = {
   primary: {
@@ -42,6 +44,10 @@ export default function Avisos() {
   const studentKey = student?.matricula || student?.id;
   const { data: notifications, isLoading } = useNotifications(studentKey);
   const { data: gamification } = useGamification(studentKey);
+  const { data: pdfs } = useStudentPdfs(studentKey);
+  const { data: simulados } = useSimuladosPendentes();
+  const simuladoPendente = simulados?.find((s) => !s.ja_respondeu) ?? null;
+  const simuladoRespondido = simulados?.find((s) => s.ja_respondeu) ?? null;
 
   if (isLoading) {
     return (
@@ -64,9 +70,9 @@ export default function Avisos() {
 
       {/* Mascote + XP Status Card */}
       <div className="rounded-2xl border-2 bg-card overflow-hidden animate-bounce-in">
-        {/* Mascote centralizado */}
-        <div className="flex flex-col items-center pt-4 pb-2">
-          <MascotAvatar level={level} animation="idle" size={160} className="drop-shadow-lg" />
+        {/* Mascote com speech bubble */}
+        <div className="flex flex-col items-center pt-3 pb-2">
+          <MascotWithBubble level={level} gamification={gamification} size={160} />
           <p className={cn("text-lg font-black mt-1", LEVEL_COLORS[level])}>{title}</p>
           <p className="text-[10px] font-bold text-muted-foreground">Nível {level} de 5</p>
         </div>
@@ -98,6 +104,28 @@ export default function Avisos() {
         </div>
       </div>
 
+      {/* Banner de simulado disponivel (Fase 4) */}
+      {simuladoPendente && (
+        <SimuladoBanner
+          title={simuladoPendente.title}
+          onClick={() =>
+            (window.location.href = `/simulados/${simuladoPendente.id}/responder`)
+          }
+          ctaLabel="Preencher gabarito"
+          tone="accent"
+        />
+      )}
+      {!simuladoPendente && simuladoRespondido && (
+        <SimuladoBanner
+          title={simuladoRespondido.title}
+          onClick={() =>
+            (window.location.href = `/simulados/${simuladoRespondido.id}/resultado`)
+          }
+          ctaLabel="Ver meu resultado"
+          tone="success"
+        />
+      )}
+
       {/* Feed de Notificações */}
       {notifications && notifications.length > 0 ? (
         <div className="space-y-3">
@@ -115,6 +143,19 @@ export default function Avisos() {
           <p className="text-sm font-semibold text-muted-foreground mt-1">
             Continue estudando e suas conquistas aparecerão aqui.
           </p>
+        </div>
+      )}
+
+      {/* PDFs do Aluno */}
+      {pdfs && pdfs.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-black text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 px-1">
+            <FileText className="h-3.5 w-3.5" />
+            Suas listas e materiais
+          </h2>
+          {pdfs.map((pdf, idx) => (
+            <PdfCard key={pdf.id} pdf={pdf} index={idx} />
+          ))}
         </div>
       )}
 
@@ -141,6 +182,41 @@ export default function Avisos() {
         </div>
       </div>
     </div>
+  );
+}
+
+const PDF_TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
+  cronograma: { label: "Cronograma semanal", emoji: "📅" },
+  plano_estudo: { label: "Plano de estudo", emoji: "📋" },
+  relatorio: { label: "Relatório de desempenho", emoji: "📊" },
+  caderno_questoes: { label: "Caderno de questões", emoji: "📝" },
+};
+
+function PdfCard({ pdf, index }: { pdf: StudentPdf; index: number }) {
+  const typeInfo = PDF_TYPE_LABELS[pdf.tipo] ?? { label: pdf.tipo.replace("_", " "), emoji: "📄" };
+  const date = pdf.created_at
+    ? new Date(pdf.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+    : "";
+
+  return (
+    <a
+      href={pdf.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 rounded-2xl border-2 bg-card p-3.5 transition-all active:scale-[0.98] hover:border-primary/30 animate-fade-in"
+      style={{ animationDelay: `${index * 0.08}s`, animationFillMode: "both" }}
+    >
+      <span className="text-2xl flex-shrink-0">{typeInfo.emoji}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-black text-foreground leading-tight truncate">
+          {typeInfo.label}
+        </p>
+        <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">
+          {date}
+        </p>
+      </div>
+      <Download className="h-5 w-5 text-primary flex-shrink-0" />
+    </a>
   );
 }
 
@@ -198,6 +274,74 @@ function NotificationCard({ notification, index }: { notification: StudentNotifi
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SimuladoBanner — destaque no topo do feed quando ha simulado disponivel
+// ---------------------------------------------------------------------------
+
+interface SimuladoBannerProps {
+  readonly title: string;
+  readonly onClick: () => void;
+  readonly ctaLabel: string;
+  readonly tone: "accent" | "success";
+}
+
+function SimuladoBanner({ title, onClick, ctaLabel, tone }: SimuladoBannerProps) {
+  const toneStyles =
+    tone === "accent"
+      ? {
+          border: "border-accent",
+          bg: "bg-accent/10",
+          ctaBg: "bg-accent text-white hover:bg-accent/90",
+          iconBg: "bg-accent/20 text-accent",
+        }
+      : {
+          border: "border-emerald-500/40",
+          bg: "bg-emerald-500/10",
+          ctaBg: "bg-emerald-600 text-white hover:bg-emerald-700",
+          iconBg: "bg-emerald-500/20 text-emerald-600",
+        };
+
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border-2 p-4 animate-bounce-in",
+        toneStyles.border,
+        toneStyles.bg,
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl",
+            toneStyles.iconBg,
+          )}
+        >
+          <ClipboardList className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+            Simulado ENEM
+          </p>
+          <p className="mt-0.5 text-sm font-black text-foreground leading-tight">
+            {title}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-black shadow-sm transition-all active:scale-[0.98]",
+          toneStyles.ctaBg,
+        )}
+      >
+        {ctaLabel}
+        <ArrowRight className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

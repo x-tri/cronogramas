@@ -1,23 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
+import { z } from "zod";
 import { supabase } from "../../lib/supabase";
 import { simuladoSupabase } from "../../lib/simulado-supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface DashboardStats {
-  readonly total_schools: number;
-  readonly total_coordinators: number;
-  readonly total_students: number;
+// Zod schema para validar payload do RPC get_admin_dashboard_stats.
+// Campos numéricos podem vir como number ou string (JSON numbers de pg_rpc).
+// CRITICAL 2: usar schema evita cast cego (`as unknown as`) e detecta mudanças
+// acidentais no formato retornado pelo banco.
+const DashboardStatsRpcSchema = z.object({
+  total_schools: z.number().nonnegative(),
+  total_coordinators: z.number().nonnegative(),
+  total_students: z.number().nonnegative(),
+  total_cronogramas: z.number().nonnegative(),
+  total_pdfs: z.number().nonnegative(),
+  storage_bytes: z.number().nonnegative(),
+  cronogramas_today: z.number().nonnegative(),
+  cronogramas_week: z.number().nonnegative(),
+  api_calls_today: z.number().nonnegative(),
+  api_errors_today: z.number().nonnegative(),
+});
+
+type DashboardStatsRpc = z.infer<typeof DashboardStatsRpcSchema>;
+
+interface DashboardStats extends DashboardStatsRpc {
   readonly students_with_cronograma: number;
-  readonly total_cronogramas: number;
   readonly total_blocos: number;
   readonly media_blocos_por_aluno: number;
-  readonly total_pdfs: number;
-  readonly storage_bytes: number;
-  readonly cronogramas_today: number;
-  readonly cronogramas_week: number;
-  readonly api_calls_today: number;
-  readonly api_errors_today: number;
 }
 
 interface AuditEntry {
@@ -353,19 +363,43 @@ export function DashboardHome({
     ]);
 
     if (rpcRes.data) {
+      // CRITICAL 2: valida shape do RPC com Zod antes de usar.
+      // Se o schema mudar no banco, logamos erro detalhado e renderizamos
+      // zeros em vez de quebrar a tela.
+      const parsed = DashboardStatsRpcSchema.safeParse(rpcRes.data);
       const cronogramas = cronogramasRes.data ?? [];
       const studentsWithCronograma = new Set(
         cronogramas.map((cronograma) => cronograma.aluno_id),
       ).size;
       const totalBlocos = blocosRes.count ?? 0;
-
-      setStats({
-        ...(rpcRes.data as unknown as Omit<DashboardStats, "students_with_cronograma" | "total_blocos" | "media_blocos_por_aluno">),
+      const derived = {
         students_with_cronograma: studentsWithCronograma,
         total_blocos: totalBlocos,
         media_blocos_por_aluno:
           studentsWithCronograma > 0 ? Math.round(totalBlocos / studentsWithCronograma) : 0,
-      });
+      };
+
+      if (parsed.success) {
+        setStats({ ...parsed.data, ...derived });
+      } else {
+        console.error(
+          "[dashboard-home] RPC get_admin_dashboard_stats retornou shape inesperado:",
+          parsed.error.format(),
+        );
+        setStats({
+          total_schools: 0,
+          total_coordinators: 0,
+          total_students: 0,
+          total_cronogramas: 0,
+          total_pdfs: 0,
+          storage_bytes: 0,
+          cronogramas_today: 0,
+          cronogramas_week: 0,
+          api_calls_today: 0,
+          api_errors_today: 0,
+          ...derived,
+        });
+      }
     }
   }, [
     isSchoolScoped,

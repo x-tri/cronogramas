@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { deletePdf, deleteAllSchoolPdfs } from "../../services/pdf-storage";
+import { deletePdf, deleteAllSchoolPdfs, getSignedPdfUrl } from "../../services/pdf-storage";
 
 interface School {
   id: string;
@@ -29,7 +29,6 @@ interface AdminPdfsProps {
   userSchoolId?: string | null;
 }
 
-const BUCKET_URL_BASE = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/cronogramas-pdf`;
 const PDF_TYPE_LABELS: Readonly<Record<string, string>> = {
   cronograma: "Cronograma semanal",
   plano_estudo: "Plano de estudo",
@@ -122,10 +121,23 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
     setDeleting(false);
   }
 
-  function copyLink(storagePath: string) {
-    const url = `${BUCKET_URL_BASE}/${storagePath}`;
-    navigator.clipboard.writeText(url);
-    alert("Link copiado!");
+  async function copyLink(storagePath: string) {
+    const url = await getSignedPdfUrl(storagePath);
+    if (!url) {
+      alert("Não foi possível gerar o link. Verifique permissões no bucket.");
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    alert("Link copiado! (válido por 1 hora)");
+  }
+
+  async function openPdf(storagePath: string) {
+    const url = await getSignedPdfUrl(storagePath);
+    if (!url) {
+      alert("Não foi possível abrir o PDF. Verifique permissões no bucket.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   if (loading) {
@@ -283,22 +295,20 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {/* Download */}
-                        <a
-                          href={`${BUCKET_URL_BASE}/${r.storage_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => openPdf(r.storage_path)}
                           className="rounded p-1.5 text-[#2563eb] hover:bg-[#dbeafe] transition-colors"
-                          title="Baixar"
+                          title="Baixar (link temporário)"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
-                        </a>
+                        </button>
                         {/* Copy link */}
                         <button
-                          onClick={() => copyLink(r.storage_path)}
+                          onClick={() => void copyLink(r.storage_path)}
                           className="rounded p-1.5 text-[#64748b] hover:bg-[#f1f5f9] transition-colors"
-                          title="Copiar link"
+                          title="Copiar link (válido por 1 hora)"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />

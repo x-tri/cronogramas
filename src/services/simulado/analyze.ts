@@ -18,6 +18,7 @@ import {
 import { getRealStudentErrors } from './real-errors'
 import { getStudentByMatricula } from './student'
 import { getTRIScoresFromStudentAnswers } from './tri-scores'
+import { getMentoriaSimuladoResult, listMentoriaSimulados } from './mentoria'
 
 function normalizeMatricula(matricula: string): string {
   return matricula.trim().replace(/^0+/, '') || '0'
@@ -146,28 +147,49 @@ export async function listStudentSimulados(
     return null
   })
 
-  const projetosHistory = await listProjetosSimulados(matricula, student)
-  if (projetosHistory.length > 0) {
-    return markLatest(projetosHistory)
-  }
+  // Busca legacy (banco dedicado) + mentoria (banco primary) em paralelo
+  // e unifica a lista cronologicamente. Antes a funcao usava early-return
+  // nos projetos; agora agregamos os 3 sources e ordenamos por data desc.
+  const [projetosHistory, mentoriaHistory] = await Promise.all([
+    listProjetosSimulados(matricula, student),
+    listMentoriaSimulados(matricula),
+  ])
 
   const fallbackIdentifiers = [matricula, normalized, student?.sheet_code]
     .filter(Boolean)
     .filter((value, index, list) => list.indexOf(value) === index)
 
-  for (const identifier of fallbackIdentifiers) {
-    const history = await listStudentAnswersSimulados(identifier as string, student)
-    if (history.length > 0) {
-      return markLatest(history)
+  let studentAnswersHistory: SimuladoHistoryItem[] = []
+  // Student answers só entra se nao houver projetos (logica legada
+  // do banco dedicado — mantemos pra nao poluir com duplicatas).
+  if (projetosHistory.length === 0) {
+    for (const identifier of fallbackIdentifiers) {
+      const history = await listStudentAnswersSimulados(identifier as string, student)
+      if (history.length > 0) {
+        studentAnswersHistory = history
+        break
+      }
     }
   }
 
-  return []
+  const combined = [
+    ...projetosHistory,
+    ...studentAnswersHistory,
+    ...mentoriaHistory,
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  return markLatest(combined)
 }
 
 export async function getSimuladoResultByHistoryItem(
   item: SimuladoHistoryItem,
 ): Promise<SimuladoResult | null> {
+  // Mentoria (novo fluxo, banco primary) — nao precisa de reconcile ou
+  // mergeTRIScores: o TRI ja foi computado pela Edge Function no submit.
+  if (item.source === 'mentoria') {
+    return getMentoriaSimuladoResult(item)
+  }
+
   const baseResult = isStudentAnswersHistoryItem(item)
     ? await getStudentAnswersSimuladoResult(item)
     : await getProjetoSimuladoResult(item)

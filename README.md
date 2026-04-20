@@ -1,4 +1,63 @@
-# React + TypeScript + Vite
+# XTRI Cronogramas
+
+Monorepo do frontend XTRI — preparação ENEM baseada em TRI.
+
+- **`/`** — painel admin (super admin e coordenador) em `horariodeestudos.com`
+- **`/aluno`** — portal do aluno em `horariodeestudos.com/aluno`
+
+Stack: React 19 + TypeScript strict + Vite 7 + Supabase + pnpm.
+
+## Deploy
+
+### 🚀 Automático (padrão)
+
+Push em `main` dispara o workflow `.github/workflows/deploy-hostinger.yml`:
+
+1. **CI gate** — `tsc --noEmit` + 294 testes Vitest (admin) + `tsc` do aluno
+2. **Deploy** — build admin + aluno → snapshot do `public_html` atual (mantém 3 últimos) → rsync via SSH → verify por hash do bundle servido
+
+Logs: aba **Actions** do repo. Tempo médio: **~3 min**.
+
+Deploy manual pela UI: **Actions → Deploy to Hostinger → Run workflow**.
+
+### 🔧 Fallback manual — `./deploy-hostinger.sh`
+
+Se o GitHub Actions estiver com outage ou você precisar subir um hotfix sem passar por `main`:
+
+```bash
+cp .env.deploy.example .env.deploy  # preencha HOSTINGER_PASSWORD
+brew install hudochenkov/sshpass/sshpass
+
+./deploy-hostinger.sh              # build + deploy admin + aluno
+./deploy-hostinger.sh --no-build   # só sobe dist/ existente
+./deploy-hostinger.sh admin        # só admin
+./deploy-hostinger.sh aluno        # só aluno
+```
+
+`.env.deploy` está no `.gitignore` — nunca commitar.
+
+### ↩️ Rollback
+
+**Via Git** (lento, passa pelo CI de novo, ~3 min):
+```bash
+git revert <sha-ruim> && git push origin main
+```
+
+**Via snapshot no servidor** (instantâneo, ~30s — credenciais no `.env.deploy` local):
+```bash
+source .env.deploy
+ssh -i ~/.ssh/hostinger_deploy -p "$HOSTINGER_PORT" \
+    "$HOSTINGER_USER@$HOSTINGER_HOST" '
+  cd domains/horariodeestudos.com
+  ls -dt public_html.bak-*  # lista snapshots (até 3 mantidos)
+  rm -rf public_html
+  mv public_html.bak-<timestamp> public_html
+'
+```
+
+---
+
+## Template original Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

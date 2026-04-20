@@ -221,7 +221,7 @@ export type TopicSummary = {
   questions: number[]
 }
 
-export type SimuladoHistorySource = 'projetos' | 'student_answers'
+export type SimuladoHistorySource = 'projetos' | 'student_answers' | 'mentoria'
 
 type SimuladoHistoryItemBase = {
   id: string
@@ -246,9 +246,17 @@ export type StudentAnswersSimuladoHistoryItem = SimuladoHistoryItemBase & {
   studentNumber: string
 }
 
+export type MentoriaSimuladoHistoryItem = SimuladoHistoryItemBase & {
+  source: 'mentoria'
+  simuladoId: string
+  respostaId: string
+  studentId: string
+}
+
 export type SimuladoHistoryItem =
   | ProjetoSimuladoHistoryItem
   | StudentAnswersSimuladoHistoryItem
+  | MentoriaSimuladoHistoryItem
 
 // ============ TABELA PROJETOS (Gabaritos) ============
 

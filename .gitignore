@@ -12,6 +12,10 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.env.deploy
+
+# Deploy artifacts (zips gerados pelo deploy-hostinger.sh ou manuais)
+*.zip
 
 # IDE
 .vscode/*
@@ -48,6 +52,27 @@ playwright-report/
 .rollup.cache
 .venv-gliner/
 
+# Claude Code / Playwright CLI local state (nunca commitar)
+.claude/
+.playwright-cli/
+.playwright-mcp/
+
+# Supabase CLI local state (nunca commitar)
+supabase/.temp/
+supabase/supabase/
+
+# Debug/dev outputs locais
+output/
+tmp/
+
+# Assets pesados de desenvolvimento (not for deploy)
+personagens/
+
+# Lockfiles de package managers não utilizados
+# (projeto usa pnpm; evita ruído se alguém rodar npm/bun sem querer)
+package-lock.json
+bun.lock
+bun.lockb
+
 # Misc
 *.tsbuildinfo
-.playwright-mcp/
