@@ -38,10 +38,14 @@ jobs:
 
       # Cria .env na pasta pai (onde vite.config.ts aponta via envDir)
       # Usa secret DOTENV_CI único com todos os VITE_* do projeto.
+      # Também exporta as vars pro GITHUB_ENV pra ficarem disponíveis como
+      # process.env nos próximos steps (Vitest não lê .env automaticamente).
       - name: Restore .env from secret
         run: |
           printf '%s\n' "${{ secrets.DOTENV_CI }}" > "${{ github.workspace }}/../.env"
-          echo "::notice::.env restaurado em $(dirname ${{ github.workspace }})/.env ($(wc -l < ${{ github.workspace }}/../.env) linhas)"
+          # Exporta linhas KEY=VALUE (ignora comentários e vazias) pro env do job
+          grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "${{ github.workspace }}/../.env" >> "$GITHUB_ENV" || true
+          echo "::notice::.env restaurado ($(wc -l < ${{ github.workspace }}/../.env) linhas)"
 
       # ADMIN
       - name: Install admin deps
