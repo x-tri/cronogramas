@@ -36,6 +36,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
 
+      # Cria .env na pasta pai (onde vite.config.ts aponta via envDir)
+      # Usa secret DOTENV_CI único com todos os VITE_* do projeto.
+      - name: Restore .env from secret
+        run: |
+          printf '%s\n' "${{ secrets.DOTENV_CI }}" > "${{ github.workspace }}/../.env"
+          echo "::notice::.env restaurado em $(dirname ${{ github.workspace }})/.env ($(wc -l < ${{ github.workspace }}/../.env) linhas)"
+
       # ADMIN
       - name: Install admin deps
         run: pnpm install --frozen-lockfile
@@ -84,6 +91,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
+
+      # Cria .env na pasta pai (Vite usa envDir='..' no admin e envDir='../..' no aluno).
+      - name: Restore .env from secret
+        run: |
+          printf '%s\n' "${{ secrets.DOTENV_CI }}" > "${{ github.workspace }}/../.env"
 
       # Build admin
       - name: Install admin deps
