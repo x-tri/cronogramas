@@ -13,6 +13,7 @@ export interface WizardStateMeta {
   readonly title: string;
   readonly schoolId: string;
   readonly turmas: readonly string[];
+  readonly caderno_url: string;
 }
 
 export interface WizardState {
@@ -21,7 +22,7 @@ export interface WizardState {
 }
 
 export const INITIAL_WIZARD_STATE: WizardState = {
-  meta: { title: "", schoolId: "", turmas: [] },
+  meta: { title: "", schoolId: "", turmas: [], caderno_url: "" },
   items: [],
 };
 

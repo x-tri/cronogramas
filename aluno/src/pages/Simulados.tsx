@@ -5,7 +5,7 @@
 import { useNavigate } from "react-router-dom";
 import { useSimuladosPendentes } from "@/hooks/useSimulados";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowRight, CheckCircle2, FileText } from "lucide-react";
+import { ArrowRight, CheckCircle2, Download, FileText } from "lucide-react";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -56,7 +56,7 @@ export default function Simulados() {
       <header>
         <h1 className="text-xl font-black text-foreground">Simulados ENEM</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          Receba o PDF no grupo da turma e registre suas respostas aqui.
+          Baixe o caderno e registre suas respostas aqui.
         </p>
       </header>
 
@@ -131,6 +131,19 @@ export default function Simulados() {
                   >
                     {sim.ja_respondeu ? "Ver meu resultado" : "Preencher gabarito"}
                   </span>
+                  {sim.caderno_url && (
+                    <a
+                      href={sim.caderno_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 rounded-lg border border-primary/30 px-2.5 py-1 text-[10px] font-black text-primary hover:bg-primary/5 transition-colors"
+                      aria-label={`Baixar caderno de ${sim.title}`}
+                    >
+                      <Download className="h-3 w-3" />
+                      Baixar Caderno
+                    </a>
+                  )}
                 </div>
               </button>
             </li>

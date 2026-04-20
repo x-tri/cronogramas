@@ -34,6 +34,7 @@ interface SimuladoRow {
   readonly status: SimuladoStatus;
   readonly published_at: string | null;
   readonly created_at: string;
+  readonly caderno_url: string | null;
   /** Supabase nested count: [{ count: number }] ou vazio */
   readonly simulado_respostas?: ReadonlyArray<{ count: number }>;
 }
@@ -98,6 +99,12 @@ export function AdminSimulados({
   const [actionError, setActionError] = useState<string | null>(null);
   const [drawerSimulado, setDrawerSimulado] = useState<SimuladoRow | null>(null);
 
+  // Estado do dialog de edição de link do caderno
+  const [editLinkSimulado, setEditLinkSimulado] = useState<SimuladoRow | null>(null);
+  const [editLinkUrl, setEditLinkUrl] = useState<string>("");
+  const [editLinkSaving, setEditLinkSaving] = useState<boolean>(false);
+  const [editLinkError, setEditLinkError] = useState<string | null>(null);
+
   // super_admin: carrega lista de escolas para filtro.
   useEffect(() => {
     if (isSchoolScoped) return;
@@ -128,7 +135,7 @@ export function AdminSimulados({
     let query = supabase
       .from("simulados")
       .select(
-        "id, title, school_id, turmas, status, published_at, created_at, simulado_respostas(count)",
+        "id, title, school_id, turmas, status, published_at, created_at, caderno_url, simulado_respostas(count)",
       )
       .order("created_at", { ascending: false });
 
@@ -161,6 +168,36 @@ export function AdminSimulados({
   };
 
   const handleWizardCreated = (): void => {
+    setReloadTick((n) => n + 1);
+  };
+
+  const openEditLink = (sim: SimuladoRow): void => {
+    setEditLinkSimulado(sim);
+    setEditLinkUrl(sim.caderno_url ?? "");
+    setEditLinkError(null);
+  };
+
+  const closeEditLink = (): void => {
+    setEditLinkSimulado(null);
+    setEditLinkUrl("");
+    setEditLinkSaving(false);
+    setEditLinkError(null);
+  };
+
+  const saveEditLink = async (): Promise<void> => {
+    if (!editLinkSimulado) return;
+    setEditLinkSaving(true);
+    setEditLinkError(null);
+    const { error: e } = await supabase
+      .from("simulados")
+      .update({ caderno_url: editLinkUrl.trim() || null })
+      .eq("id", editLinkSimulado.id);
+    if (e) {
+      setEditLinkSaving(false);
+      setEditLinkError(e.message);
+      return;
+    }
+    closeEditLink();
     setReloadTick((n) => n + 1);
   };
 
@@ -327,6 +364,7 @@ export function AdminSimulados({
                   setPendingAction({ kind: "delete", simulado: sim })
                 }
                 onViewResponses={() => setDrawerSimulado(sim)}
+                onEditLink={() => openEditLink(sim)}
               />
             </li>
           ))}
@@ -384,6 +422,57 @@ export function AdminSimulados({
         turmasAlvo={rankingTurmas}
         onClose={() => setDrawerSimulado(null)}
       />
+
+      {/* Dialog: editar link do caderno */}
+      {editLinkSimulado !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Editar link do caderno"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+            <h2 className="text-base font-semibold text-[#1d1d1f] mb-1">
+              Link do caderno
+            </h2>
+            <p className="text-xs text-[#71717a] mb-4">
+              <span className="font-medium text-[#1d1d1f]">{editLinkSimulado.title}</span>
+              {" "}— Cole o link do Google Drive ou deixe vazio para remover.
+            </p>
+            <input
+              type="url"
+              value={editLinkUrl}
+              onChange={(e) => setEditLinkUrl(e.target.value)}
+              placeholder="https://drive.google.com/file/d/..."
+              autoFocus
+              className="w-full rounded-md border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1d1d1f] focus:border-[#2563eb] focus:outline-none mb-3"
+            />
+            {editLinkError && (
+              <p role="alert" className="mb-3 text-xs text-[#dc2626]">
+                {editLinkError}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeEditLink}
+                disabled={editLinkSaving}
+                className="text-sm font-medium text-[#71717a] hover:text-[#1d1d1f] disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => { void saveEditLink(); }}
+                disabled={editLinkSaving}
+                className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-medium text-white disabled:bg-[#e5e7eb] disabled:text-[#94a3b8]"
+              >
+                {editLinkSaving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -428,6 +517,7 @@ interface SimuladoCardProps {
   readonly onClose: () => void;
   readonly onDelete: () => void;
   readonly onViewResponses: () => void;
+  readonly onEditLink: () => void;
 }
 
 function SimuladoCard({
@@ -437,6 +527,7 @@ function SimuladoCard({
   onClose,
   onDelete,
   onViewResponses,
+  onEditLink,
 }: SimuladoCardProps) {
   const style = STATUS_STYLES[simulado.status];
   const respostas = countRespostas(simulado);
@@ -475,6 +566,22 @@ function SimuladoCard({
           <dt className="font-medium">Publicado:</dt>
           <dd className="text-[#1d1d1f]">{formatDate(simulado.published_at)}</dd>
         </div>
+        {simulado.caderno_url && (
+          <div className="flex items-center gap-2">
+            <dt className="font-medium">Caderno:</dt>
+            <dd>
+              <a
+                href={simulado.caderno_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#2563eb] hover:underline truncate max-w-[160px] inline-block align-bottom"
+                title={simulado.caderno_url}
+              >
+                🔗 Ver link
+              </a>
+            </dd>
+          </div>
+        )}
       </dl>
 
       <footer className="mt-4 flex flex-col gap-2 border-t border-[#f4f4f5] pt-3">
@@ -488,14 +595,25 @@ function SimuladoCard({
             </span>{" "}
             resposta{respostas === 1 ? "" : "s"}
           </span>
-          <button
-            type="button"
-            onClick={onViewResponses}
-            className="text-xs font-medium text-[#2563eb] hover:underline"
-            aria-label={`Ver respostas de ${simulado.title}`}
-          >
-            Ver respostas
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onEditLink}
+              className="text-xs font-medium text-[#71717a] hover:text-[#2563eb] hover:underline"
+              aria-label={`Editar link do caderno de ${simulado.title}`}
+              title={simulado.caderno_url ? "Editar link do caderno" : "Adicionar link do caderno"}
+            >
+              {simulado.caderno_url ? "🔗 Editar link" : "🔗 Adicionar link"}
+            </button>
+            <button
+              type="button"
+              onClick={onViewResponses}
+              className="text-xs font-medium text-[#2563eb] hover:underline"
+              aria-label={`Ver respostas de ${simulado.title}`}
+            >
+              Ver respostas
+            </button>
+          </div>
         </div>
 
         {/* Botoes de estado */}
