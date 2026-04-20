@@ -113,6 +113,7 @@ export default function Avisos() {
           }
           ctaLabel="Preencher gabarito"
           tone="accent"
+          caderno_url={simuladoPendente.caderno_url}
         />
       )}
       {!simuladoPendente && simuladoRespondido && (
@@ -123,6 +124,7 @@ export default function Avisos() {
           }
           ctaLabel="Ver meu resultado"
           tone="success"
+          caderno_url={simuladoRespondido.caderno_url}
         />
       )}
 
@@ -287,9 +289,10 @@ interface SimuladoBannerProps {
   readonly onClick: () => void;
   readonly ctaLabel: string;
   readonly tone: "accent" | "success";
+  readonly caderno_url?: string | null;
 }
 
-function SimuladoBanner({ title, onClick, ctaLabel, tone }: SimuladoBannerProps) {
+function SimuladoBanner({ title, onClick, ctaLabel, tone, caderno_url }: SimuladoBannerProps) {
   const toneStyles =
     tone === "accent"
       ? {
@@ -342,6 +345,18 @@ function SimuladoBanner({ title, onClick, ctaLabel, tone }: SimuladoBannerProps)
         {ctaLabel}
         <ArrowRight className="h-3.5 w-3.5" />
       </button>
+      {caderno_url && (
+        <a
+          href={caderno_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl border-2 border-current/30 py-2 text-xs font-black text-foreground/70 hover:text-foreground transition-colors active:scale-[0.98]"
+          aria-label="Baixar caderno de questões"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Baixar Caderno
+        </a>
+      )}
     </div>
   );
 }

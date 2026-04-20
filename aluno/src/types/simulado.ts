@@ -16,6 +16,7 @@ export interface SimuladoPendenteRow {
   readonly published_at: string | null;
   readonly ja_respondeu: boolean;
   readonly submitted_at: string | null;
+  readonly caderno_url: string | null;
 }
 
 export interface SimuladoResultadoItem {

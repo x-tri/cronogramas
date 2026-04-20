@@ -246,6 +246,28 @@ export function StepMeta({
           </p>
         )}
       </div>
+
+      {/* Link do caderno de questões */}
+      <div>
+        <label
+          htmlFor="sim-caderno-url"
+          className="block text-sm font-medium text-[#1d1d1f] mb-1"
+        >
+          Link do caderno de questões{" "}
+          <span className="text-[10px] font-normal text-[#71717a]">(opcional)</span>
+        </label>
+        <input
+          id="sim-caderno-url"
+          type="url"
+          value={meta.caderno_url}
+          onChange={(e) => onChange({ ...meta, caderno_url: e.target.value })}
+          placeholder="https://drive.google.com/file/d/..."
+          className="w-full rounded-md border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1d1d1f] focus:border-[#2563eb] focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-[#71717a]">
+          Cole o link do Google Drive (ou qualquer URL pública). Alunos verão um botão "Baixar Caderno".
+        </p>
+      </div>
     </div>
   );
 }

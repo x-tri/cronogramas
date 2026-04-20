@@ -114,6 +114,7 @@ export function SimuladoWizard({
       p_title: state.meta.title.trim(),
       p_school_id: state.meta.schoolId,
       p_turmas: state.meta.turmas,
+      p_caderno_url: state.meta.caderno_url.trim() || null,
       p_items: state.items.map((it) => ({
         numero: it.numero,
         gabarito: it.gabarito,
