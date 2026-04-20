@@ -1,9 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Loader2, Sparkles } from "lucide-react";
 import logoXtri from "@/assets/logo-xtri.png";
 
@@ -19,12 +16,8 @@ function GoogleIcon({ className }: { readonly className?: string }) {
 }
 
 export default function Login() {
-  const { user, loading, signIn, signInWithGoogle, signInWithApple } = useAuth();
-  const [showMatricula, setShowMatricula] = useState(false);
-  const [matricula, setMatricula] = useState("");
-  const [password, setPassword] = useState("");
+  const { user, loading, signInWithGoogle, signInWithApple } = useAuth();
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
 
@@ -46,15 +39,6 @@ export default function Login() {
       setError("Erro ao conectar com Google. Tente novamente.");
       setGoogleLoading(false);
     }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSubmitting(true);
-    const { error } = await signIn(matricula, password);
-    if (error) setError("Matrícula ou senha incorretos.");
-    setSubmitting(false);
   };
 
   return (
@@ -137,57 +121,6 @@ export default function Login() {
           </div>
         )}
 
-        {/* Fallback — link discreto */}
-        {!showMatricula ? (
-          <div className="text-center animate-fade-in" style={{ animationDelay: "0.3s", animationFillMode: "both" }}>
-            <button
-              onClick={() => setShowMatricula(true)}
-              className="text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
-            >
-              Entrar com matrícula e senha →
-            </button>
-          </div>
-        ) : (
-          <div className="animate-bounce-in">
-            <div className="rounded-2xl border-2 bg-card p-5">
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="matricula" className="text-xs font-bold">Matrícula</Label>
-                  <Input
-                    id="matricula"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="Ex: 214140291"
-                    value={matricula}
-                    onChange={(e) => setMatricula(e.target.value)}
-                    required
-                    autoFocus
-                    className="h-11 rounded-xl border-2 text-sm font-semibold"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="password" className="text-xs font-bold">Senha</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="h-11 rounded-xl border-2 text-sm font-semibold"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full h-11 rounded-xl text-sm font-black"
-                  disabled={submitting || googleLoading}
-                >
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}
-                </Button>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
 
       <p className="mt-8 text-xs font-semibold text-muted-foreground">
