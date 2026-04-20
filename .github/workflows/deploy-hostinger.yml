@@ -1,10 +1,12 @@
 name: Deploy to Hostinger (shared hosting)
 
-# Trigger TEMPORÁRIO em chore/ci-deploy-hostinger para validação.
-# Após primeiro deploy bem-sucedido, trocar para: [main]
+# Trigger:
+# - push em main  → roda ci + deploy (produção)
+# - PR pra main   → roda só ci (gate, nunca deploy)
+# - dispatch      → manual via UI (ci + deploy)
 on:
   push:
-    branches: [main, chore/ci-deploy-hostinger]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -76,7 +78,7 @@ jobs:
     needs: ci
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/chore/ci-deploy-hostinger'))
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-hostinger
