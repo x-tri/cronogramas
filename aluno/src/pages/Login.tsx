@@ -76,7 +76,7 @@ export default function Login() {
         <div className="animate-bounce-in" style={{ animationDelay: "0.1s" }}>
           <button
             onClick={handleGoogle}
-            disabled={googleLoading || submitting}
+            disabled={googleLoading}
             className="w-full h-14 flex items-center justify-center gap-3 rounded-2xl border-2 bg-card text-base font-black text-foreground shadow-[0_4px_0_0_hsl(var(--border))] hover:shadow-[0_2px_0_0_hsl(var(--border))] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50"
           >
             {googleLoading ? (
@@ -99,7 +99,7 @@ export default function Login() {
               const { error } = await signInWithApple();
               if (error) { setError("Erro ao conectar com Apple."); setAppleLoading(false); }
             }}
-            disabled={appleLoading || googleLoading || submitting}
+            disabled={appleLoading || googleLoading}
             className="w-full h-14 flex items-center justify-center gap-3 rounded-2xl border-2 bg-foreground text-base font-black text-background shadow-[0_4px_0_0_hsl(var(--border))] hover:shadow-[0_2px_0_0_hsl(var(--border))] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50"
           >
             {appleLoading ? (
