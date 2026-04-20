@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "../../lib/supabase";
 import { ConfirmDialog } from "./simulado-actions/confirm-dialog";
+import { SimuladoEditItems } from "./simulado-actions/simulado-edit-items";
 import { SimuladoRanking } from "./simulado-actions/simulado-ranking";
 import { SimuladoWizard } from "./simulado-wizard";
 
@@ -98,6 +99,7 @@ export function AdminSimulados({
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [drawerSimulado, setDrawerSimulado] = useState<SimuladoRow | null>(null);
+  const [editItemsSimulado, setEditItemsSimulado] = useState<SimuladoRow | null>(null);
 
   // Estado do dialog de edição de link do caderno
   const [editLinkSimulado, setEditLinkSimulado] = useState<SimuladoRow | null>(null);
@@ -365,6 +367,7 @@ export function AdminSimulados({
                 }
                 onViewResponses={() => setDrawerSimulado(sim)}
                 onEditLink={() => openEditLink(sim)}
+                onEditItems={() => setEditItemsSimulado(sim)}
               />
             </li>
           ))}
@@ -421,6 +424,13 @@ export function AdminSimulados({
         schoolId={drawerSimulado?.school_id ?? null}
         turmasAlvo={rankingTurmas}
         onClose={() => setDrawerSimulado(null)}
+      />
+
+      <SimuladoEditItems
+        open={editItemsSimulado !== null}
+        simuladoId={editItemsSimulado?.id ?? null}
+        simuladoTitle={editItemsSimulado?.title ?? ""}
+        onClose={() => setEditItemsSimulado(null)}
       />
 
       {/* Dialog: editar link do caderno */}
@@ -518,6 +528,7 @@ interface SimuladoCardProps {
   readonly onDelete: () => void;
   readonly onViewResponses: () => void;
   readonly onEditLink: () => void;
+  readonly onEditItems: () => void;
 }
 
 function SimuladoCard({
@@ -528,6 +539,7 @@ function SimuladoCard({
   onDelete,
   onViewResponses,
   onEditLink,
+  onEditItems,
 }: SimuladoCardProps) {
   const style = STATUS_STYLES[simulado.status];
   const respostas = countRespostas(simulado);
@@ -619,14 +631,24 @@ function SimuladoCard({
         {/* Botoes de estado */}
         <div className="flex items-center gap-2">
           {isDraft && (
-            <button
-              type="button"
-              onClick={onPublish}
-              className="flex-1 rounded-md bg-[#16a34a] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#15803d]"
-              aria-label={`Publicar ${simulado.title}`}
-            >
-              Publicar
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={onEditItems}
+                className="rounded-md border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-medium text-[#1d1d1f] hover:bg-[#f4f4f5]"
+                aria-label={`Editar itens de ${simulado.title}`}
+              >
+                ✏️ Editar itens
+              </button>
+              <button
+                type="button"
+                onClick={onPublish}
+                className="flex-1 rounded-md bg-[#16a34a] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#15803d]"
+                aria-label={`Publicar ${simulado.title}`}
+              >
+                Publicar
+              </button>
+            </>
           )}
           {isPublished && (
             <button
