@@ -59,11 +59,11 @@ function ShiftButton({ turno, label }: { turno: BulkShift; label: string }) {
 }
 
 export function BloquearTurnoButtons() {
-  const cronograma = useCronogramaStore((s) => s.cronograma)
   const currentStudent = useCronogramaStore((s) => s.currentStudent)
 
-  // Só mostra se há aluno + cronograma ativo (sem isso, bloqueio não faz sentido)
-  if (!currentStudent || !cronograma?.id) {
+  // Só precisa do aluno selecionado; o cronograma é criado on-the-fly no toggle
+  // quando ainda não existe (mesma lógica do block-editor-modal.tsx).
+  if (!currentStudent) {
     return null
   }
 

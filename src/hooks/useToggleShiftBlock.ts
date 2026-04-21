@@ -21,22 +21,41 @@ import {
 export function useToggleShiftBlock(turno: BulkShift) {
   const blocks = useCronogramaStore((s) => s.blocks)
   const cronograma = useCronogramaStore((s) => s.cronograma)
+  const currentStudent = useCronogramaStore((s) => s.currentStudent)
   const addBlock = useCronogramaStore((s) => s.addBlock)
   const removeBlock = useCronogramaStore((s) => s.removeBlock)
+  const createCronograma = useCronogramaStore((s) => s.createCronograma)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const { blocked, total, status } = computeShiftBlockStatus(blocks, turno)
   const isBlocked = status === 'full'
 
+  /**
+   * Se o aluno ainda não tem cronograma, cria um pra semana corrente
+   * (mesma lógica de `ensureCronogramaId` em block-editor-modal.tsx).
+   */
+  const ensureCronogramaId = async (): Promise<string> => {
+    if (cronograma?.id) return cronograma.id
+    if (!currentStudent) throw new Error('Selecione um aluno primeiro')
+    const today = new Date()
+    const weekStart = new Date(today)
+    weekStart.setDate(today.getDate() - today.getDay() + 1)
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    const novo = await createCronograma(currentStudent.id, weekStart, weekEnd)
+    return novo.id
+  }
+
   const toggle = async () => {
-    if (!cronograma?.id) {
-      setError('Selecione um aluno com cronograma ativo')
+    if (!currentStudent) {
+      setError('Selecione um aluno primeiro')
       return
     }
     setError(null)
     setLoading(true)
     try {
+      const cronogramaId = await ensureCronogramaId()
       if (status === 'full') {
         // Desbloquear: remove TODOS os bloqueios do turno (preserva estudos)
         const ids = blockIdsToUnblock(blocks, turno)
@@ -49,7 +68,7 @@ export function useToggleShiftBlock(turno: BulkShift) {
         const missing = missingSlotsToBlock(blocks, turno)
         for (const slot of missing) {
           await addBlock({
-            cronogramaId: cronograma.id,
+            cronogramaId,
             diaSemana: slot.dia,
             turno,
             horarioInicio: slot.inicio,
