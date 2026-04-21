@@ -88,38 +88,68 @@ function AreaMiniTrend({
   performances: readonly SimuladoPerformance[];
   area: Area;
 }) {
-  const valid = [...performances]
-    .filter((p) => !p.tri_estimado[area] && p.tri[area] > 0)
+  // Sort cronológico, ignora zero, mantém estimated com flag
+  const points = [...performances]
+    .filter((p) => p.tri[area] > 0)
     .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
-    .map((p) => p.tri[area]);
+    .map((p) => ({ value: p.tri[area], estimated: p.tri_estimado[area] }));
 
-  if (valid.length < 2) {
-    return <div className="text-[10px] text-[#94a3b8] italic">sem histórico</div>;
+  if (points.length === 0) {
+    return <div className="text-[10px] text-[#94a3b8] italic">sem dados</div>;
   }
 
   const W = 140;
   const H = 32;
-  const min = Math.min(...valid) - 15;
-  const max = Math.max(...valid) + 15;
+  const values = points.map((p) => p.value);
+  const min = Math.min(...values) - 15;
+  const max = Math.max(...values) + 15;
   const range = Math.max(1, max - min);
 
-  const pts = valid.map((v, i) => {
-    const x = (i / (valid.length - 1)) * (W - 8) + 4;
-    const y = H - ((v - min) / range) * (H - 8) - 4;
-    return { x, y };
-  });
+  const coords = points.map((p, i) => ({
+    x: points.length === 1 ? W / 2 : (i / (points.length - 1)) * (W - 8) + 4,
+    y: H - ((p.value - min) / range) * (H - 8) - 4,
+    estimated: p.estimated,
+  }));
+
+  // Linha conecta apenas os não-estimados (guardrail G3)
+  const validCoords = coords.filter((c) => !c.estimated);
 
   return (
     <svg width={W} height={H}>
-      <polyline
-        points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
-        fill="none"
-        stroke={AREA_COLOR[area]}
-        strokeWidth="1.8"
-      />
-      {pts.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={2} fill={AREA_COLOR[area]} />
-      ))}
+      {validCoords.length >= 2 && (
+        <polyline
+          points={validCoords.map((p) => `${p.x},${p.y}`).join(" ")}
+          fill="none"
+          stroke={AREA_COLOR[area]}
+          strokeWidth="1.8"
+        />
+      )}
+      {coords.map((c, i) =>
+        c.estimated ? (
+          <circle
+            key={i}
+            cx={c.x}
+            cy={c.y}
+            r={3}
+            fill="white"
+            stroke={AREA_COLOR[area]}
+            strokeWidth="1.3"
+            strokeDasharray="2 1.5"
+          >
+            <title>Score estimado — excluído da tendência</title>
+          </circle>
+        ) : (
+          <circle
+            key={i}
+            cx={c.x}
+            cy={c.y}
+            r={3}
+            fill={AREA_COLOR[area]}
+            stroke="white"
+            strokeWidth="1.3"
+          />
+        ),
+      )}
     </svg>
   );
 }
@@ -388,8 +418,10 @@ export function StudentTriHistoryDrawer({
                   </table>
                 </div>
                 <p className="mt-2 text-[10px] text-[#94a3b8]">
-                  Células em <span className="italic text-amber-600">âmbar</span> indicam
-                  scores estimados (dia não realizado ou valor mínimo).
+                  Células em <span className="italic text-amber-600">âmbar</span> e
+                  círculos <span className="font-mono">○</span> tracejados no gráfico
+                  indicam scores estimados (dia não realizado ou floor mínimo) —
+                  excluídos do cálculo de tendência.
                 </p>
               </section>
             </>

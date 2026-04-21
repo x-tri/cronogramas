@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  collectAreaSeriesWithFlags,
   collectAreaTimeSeries,
   computeAreaTrend,
   hasAnyEstimated,
@@ -131,6 +132,59 @@ describe("collectAreaTimeSeries", () => {
       "lc",
     );
     expect(series).toEqual([650]);
+  });
+});
+
+describe("collectAreaSeriesWithFlags", () => {
+  it("retorna TODOS os scores (incluindo estimated) com flag", () => {
+    const series = collectAreaSeriesWithFlags(
+      [
+        mk({
+          simulado_id: "c",
+          data: "2026-05-01T00:00:00Z",
+          tri: { lc: 700 },
+        }),
+        mk({
+          simulado_id: "b",
+          data: "2026-03-01T00:00:00Z",
+          tri: { lc: 310 },
+          tri_estimado: { lc: true },
+        }),
+        mk({
+          simulado_id: "a",
+          data: "2026-01-01T00:00:00Z",
+          tri: { lc: 500 },
+        }),
+      ],
+      "lc",
+    );
+    expect(series).toEqual([
+      { value: 500, estimated: false },
+      { value: 310, estimated: true },
+      { value: 700, estimated: false },
+    ]);
+  });
+
+  it("ordena do mais antigo ao mais recente", () => {
+    const series = collectAreaSeriesWithFlags(
+      [
+        mk({ simulado_id: "new", data: "2026-06-01T00:00:00Z", tri: { lc: 800 } }),
+        mk({ simulado_id: "old", data: "2026-01-01T00:00:00Z", tri: { lc: 600 } }),
+      ],
+      "lc",
+    );
+    expect(series.map((s) => s.value)).toEqual([600, 800]);
+  });
+
+  it("exclui scores zero", () => {
+    const series = collectAreaSeriesWithFlags(
+      [
+        mk({ simulado_id: "zero", data: "2026-02-01T00:00:00Z", tri: { lc: 0 } }),
+        mk({ simulado_id: "valid", data: "2026-03-01T00:00:00Z", tri: { lc: 650 } }),
+      ],
+      "lc",
+    );
+    expect(series).toEqual([{ value: 650, estimated: false }]);
   });
 });
 

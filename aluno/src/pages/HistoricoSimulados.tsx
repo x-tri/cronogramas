@@ -14,7 +14,7 @@ import { useStudentPerformance } from "@/hooks/useStudentPerformance";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, History, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { AREA_LABELS, AREA_SHORT, type AreaSigla, type SimuladoPerformance } from "@/types/performance";
-import { collectAreaTimeSeries, computeAreaTrend, hasAnyEstimated } from "@/types/performance-utils";
+import { collectAreaSeriesWithFlags, computeAreaTrend, hasAnyEstimated } from "@/types/performance-utils";
 import { cn } from "@/lib/utils";
 
 const AREA_COLORS: Record<AreaSigla, { bg: string; text: string; stroke: string }> = {
@@ -44,8 +44,9 @@ function formatDate(iso: string): string {
 }
 
 /**
- * Simple sparkline without recharts dependency — plots TRI per area over time.
- * Shows a smooth line with dots for each data point.
+ * Sparkline sem recharts — renderiza TODOS os pontos (1 por simulado),
+ * com dots sólidos para scores válidos e dots tracejados (anel vazio)
+ * para scores estimados. Linha de tendência conecta apenas os válidos.
  */
 function AreaSparkline({
   performances,
@@ -55,47 +56,84 @@ function AreaSparkline({
   area: AreaSigla;
 }) {
   const points = useMemo(
-    () => collectAreaTimeSeries(performances, area),
+    () => collectAreaSeriesWithFlags(performances, area),
     [performances, area],
   );
 
-  if (points.length < 2) {
+  if (points.length === 0) {
     return (
       <div className="text-[10px] text-muted-foreground italic">
-        Mínimo 2 simulados válidos para gráfico
+        Sem dados para esta área
       </div>
     );
   }
 
   const W = 200;
   const H = 48;
-  const min = Math.min(...points) - 20;
-  const max = Math.max(...points) + 20;
+  const values = points.map((p) => p.value);
+  const min = Math.min(...values) - 20;
+  const max = Math.max(...values) + 20;
   const range = Math.max(1, max - min);
 
-  const coords = points.map((v, i) => {
-    const x = (i / (points.length - 1)) * (W - 8) + 4;
-    const y = H - ((v - min) / range) * (H - 8) - 4;
-    return { x, y };
-  });
+  const coords = points.map((p, i) => ({
+    x:
+      points.length === 1
+        ? W / 2
+        : (i / (points.length - 1)) * (W - 8) + 4,
+    y: H - ((p.value - min) / range) * (H - 8) - 4,
+    estimated: p.estimated,
+  }));
 
-  const pathD = coords
-    .map((c, i) => (i === 0 ? `M${c.x},${c.y}` : `L${c.x},${c.y}`))
-    .join(" ");
+  // Linha de tendência conecta apenas os pontos não-estimados (G3 guardrail)
+  const validCoords = coords.filter((c) => !c.estimated);
+  const pathD =
+    validCoords.length >= 2
+      ? validCoords
+          .map((c, i) => (i === 0 ? `M${c.x},${c.y}` : `L${c.x},${c.y}`))
+          .join(" ")
+      : null;
 
   return (
     <svg width={W} height={H} className="overflow-visible">
-      <path d={pathD} fill="none" strokeWidth="2" className={cn(AREA_COLORS[area].stroke)} />
-      {coords.map((c, i) => (
-        <circle
-          key={i}
-          cx={c.x}
-          cy={c.y}
-          r={2.5}
-          className={cn(AREA_COLORS[area].bg)}
-          fill="currentColor"
+      {pathD && (
+        <path
+          d={pathD}
+          fill="none"
+          strokeWidth="2"
+          className={cn(AREA_COLORS[area].stroke)}
         />
-      ))}
+      )}
+      {coords.map((c, i) =>
+        c.estimated ? (
+          // Estimated: anel vazio tracejado (visível mas distinto)
+          <circle
+            key={i}
+            cx={c.x}
+            cy={c.y}
+            r={4}
+            fill="white"
+            strokeWidth="1.5"
+            strokeDasharray="2 2"
+            className={cn(AREA_COLORS[area].stroke)}
+          >
+            <title>Score estimado — dia não realizado ou floor mínimo</title>
+          </circle>
+        ) : (
+          // Válido: dot sólido com borda branca para contraste
+          <circle
+            key={i}
+            cx={c.x}
+            cy={c.y}
+            r={4}
+            fill="currentColor"
+            stroke="white"
+            strokeWidth="1.5"
+            className={cn(AREA_COLORS[area].bg)}
+          >
+            <title>Score válido: {c.estimated ? "" : Math.round(points[i].value)}</title>
+          </circle>
+        ),
+      )}
     </svg>
   );
 }

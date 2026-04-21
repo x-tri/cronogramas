@@ -27,7 +27,7 @@ export function computeAreaTrend(
 
 /**
  * Returns chronologically-ordered (old→new) valid scores for an area.
- * Used by the sparkline chart.
+ * Used by legacy sparkline code. Prefer `collectAreaSeriesWithFlags` for new UI.
  */
 export function collectAreaTimeSeries(
   performances: ReadonlyArray<SimuladoPerformance>,
@@ -37,6 +37,29 @@ export function collectAreaTimeSeries(
     .filter((p) => !p.tri_estimado[area] && p.tri[area] > 0)
     .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
     .map((p) => p.tri[area]);
+}
+
+/**
+ * Returns chronologically-ordered (old→new) scores for an area WITH a flag
+ * indicating whether each score is estimated (floor value / missed dia1-dia2).
+ *
+ * Use this for sparklines that want to show ALL data points but style
+ * estimated ones distinctly (dashed circle) while connecting the trend line
+ * only through real scores.
+ *
+ * Filters out only zero/null scores; estimated scores remain in the series.
+ */
+export function collectAreaSeriesWithFlags(
+  performances: ReadonlyArray<SimuladoPerformance>,
+  area: AreaSigla,
+): Array<{ readonly value: number; readonly estimated: boolean }> {
+  return [...performances]
+    .filter((p) => p.tri[area] > 0)
+    .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
+    .map((p) => ({
+      value: p.tri[area],
+      estimated: p.tri_estimado[area],
+    }));
 }
 
 /** True if any of the 4 areas of a performance has an estimated score. */
