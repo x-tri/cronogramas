@@ -7,6 +7,7 @@ import { TURNOS_CONFIG, getSlotByIndex } from '../../constants/time-slots'
 import { getWeekBounds } from '../week-utils'
 import { detectAreaFromTitle } from '../../constants/colors'
 import { KanbanSlot } from './kanban-slot'
+import { BloquearTurnoButtons } from '../cronograma/bloquear-turno-buttons'
 
 type KanbanBoardProps = {
   onSlotClick?: (dia: DiaSemana, turno: Turno, slotIndex: number) => void
@@ -162,6 +163,14 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
               </svg>
               <span>Arraste blocos para trocar</span>
             </div>
+          </div>
+
+          {/* Bulk block buttons — seg→sex por turno */}
+          <div
+            className="flex items-center justify-between gap-3 border border-t-0 border-[#e5e7eb] bg-[#fafafa] px-3 py-2"
+            style={{ borderRadius: '0 0 10px 10px', marginBottom: 12 }}
+          >
+            <BloquearTurnoButtons />
           </div>
 
           {TURNOS.map((turno) => {

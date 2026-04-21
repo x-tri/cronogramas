@@ -3,6 +3,7 @@ import { DIAS_SEMANA, DIAS_SEMANA_LABELS, TURNOS, TURNO_LABELS } from '../../typ
 import type { BlocoCronograma, DiaSemana, Turno } from '../../types/domain'
 import { TURNOS_CONFIG } from '../../constants/time-slots'
 import { detectAreaFromTitle } from '../../constants/colors'
+import { BloquearTurnoButtons } from '../cronograma/bloquear-turno-buttons'
 
 type TimelineViewProps = {
   dayDates: Record<DiaSemana, Date>
@@ -80,6 +81,14 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
             </svg>
             <span>Clique em slot vazio para adicionar</span>
           </div>
+        </div>
+
+        {/* ===== BULK BLOCK BUTTONS (seg–sex por turno) ===== */}
+        <div
+          className="flex items-center justify-between gap-3 border border-t-0 border-[#e5e7eb] bg-[#fafafa] px-3 py-2"
+          style={{ borderRadius: '0 0 10px 10px', marginBottom: 12 }}
+        >
+          <BloquearTurnoButtons />
         </div>
 
         {TURNOS.map((turno) => {
