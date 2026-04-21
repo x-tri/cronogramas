@@ -18,6 +18,7 @@ import { supabase } from "../../lib/supabase";
 import { ConfirmDialog } from "./simulado-actions/confirm-dialog";
 import { SimuladoEditItems } from "./simulado-actions/simulado-edit-items";
 import { SimuladoRanking } from "./simulado-actions/simulado-ranking";
+import { StudentTriHistoryDrawer } from "./student-tri-history-drawer";
 import { SimuladoWizard } from "./simulado-wizard";
 
 type SimuladoStatus = "draft" | "published" | "closed";
@@ -106,6 +107,15 @@ export function AdminSimulados({
   const [editLinkUrl, setEditLinkUrl] = useState<string>("");
   const [editLinkSaving, setEditLinkSaving] = useState<boolean>(false);
   const [editLinkError, setEditLinkError] = useState<string | null>(null);
+
+  // Phase 4: quick lookup histórico TRI por matrícula (mentor / coordenador)
+  const [triLookupMatricula, setTriLookupMatricula] = useState<string>("");
+  const [triLookupLoading, setTriLookupLoading] = useState<boolean>(false);
+  const [triLookupError, setTriLookupError] = useState<string | null>(null);
+  const [triDrawerStudent, setTriDrawerStudent] = useState<{
+    id: string;
+    name: string | null;
+  } | null>(null);
 
   // super_admin: carrega lista de escolas para filtro.
   useEffect(() => {
@@ -260,8 +270,86 @@ export function AdminSimulados({
     [drawerSimulado?.id],
   );
 
+  const handleTriLookup = async () => {
+    const m = triLookupMatricula.trim();
+    if (!m) {
+      setTriLookupError("Digite uma matrícula");
+      return;
+    }
+    setTriLookupError(null);
+    setTriLookupLoading(true);
+    try {
+      let query = supabase
+        .from("students")
+        .select("id, name, matricula, school_id")
+        .eq("matricula", m);
+      if (effectiveSchoolId) {
+        query = query.eq("school_id", effectiveSchoolId);
+      }
+      const { data, error: err } = await query.maybeSingle();
+      if (err) {
+        setTriLookupError(err.message);
+      } else if (!data) {
+        setTriLookupError(
+          effectiveSchoolId
+            ? "Aluno não encontrado nesta escola"
+            : "Aluno não encontrado",
+        );
+      } else {
+        setTriDrawerStudent({ id: data.id, name: data.name });
+      }
+    } catch (e) {
+      setTriLookupError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTriLookupLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Phase 4: quick lookup de histórico TRI */}
+      <div className="rounded-xl border border-[#e5e7eb] bg-[#f8fafc] p-3">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="tri-lookup-input"
+              className="text-xs font-bold text-[#1d1d1f]"
+            >
+              📊 Consultar histórico TRI de aluno
+            </label>
+            <input
+              id="tri-lookup-input"
+              type="text"
+              value={triLookupMatricula}
+              onChange={(e) => setTriLookupMatricula(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleTriLookup();
+              }}
+              placeholder="Matrícula (ex: 101051)"
+              className="rounded-md border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1d1d1f] w-[220px] focus:border-[#2563eb] focus:outline-none"
+              data-testid="tri-lookup-input"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleTriLookup()}
+            disabled={triLookupLoading}
+            className="rounded-md border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-sm font-bold text-white hover:bg-[#1d4ed8] disabled:opacity-50"
+            data-testid="tri-lookup-btn"
+          >
+            {triLookupLoading ? "Buscando..." : "Ver histórico"}
+          </button>
+          {triLookupError && (
+            <span className="text-xs font-semibold text-red-600">
+              {triLookupError}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-[10px] text-[#71717a]">
+          Busca simulados históricos (legacy + cronogramas) com evolução TRI por área.
+        </p>
+      </div>
+
       {/* Filtros + acao */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -424,6 +512,18 @@ export function AdminSimulados({
         schoolId={drawerSimulado?.school_id ?? null}
         turmasAlvo={rankingTurmas}
         onClose={() => setDrawerSimulado(null)}
+      />
+
+      {/* Phase 4: drawer de histórico TRI (aberto pelo quick-lookup ou ranking) */}
+      <StudentTriHistoryDrawer
+        open={triDrawerStudent !== null}
+        studentId={triDrawerStudent?.id ?? null}
+        studentName={triDrawerStudent?.name ?? null}
+        onClose={() => {
+          setTriDrawerStudent(null);
+          setTriLookupMatricula("");
+          setTriLookupError(null);
+        }}
       />
 
       <SimuladoEditItems

@@ -18,6 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "../../../lib/supabase";
+import { StudentTriHistoryDrawer } from "../student-tri-history-drawer";
 import {
   exportRankingExcel,
 } from "../../../services/simulado/export-excel";
@@ -96,6 +97,11 @@ export function SimuladoRanking({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [turmaFiltro, setTurmaFiltro] = useState<string>("");
+  // Phase 4: drawer de histórico TRI por aluno
+  const [triDrawer, setTriDrawer] = useState<{
+    studentId: string;
+    studentName: string | null;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ESC fecha o dialog + move foco pro container quando abrir (focus trap leve).
@@ -395,7 +401,24 @@ export function SimuladoRanking({
                           {posicaoBadge(row.posicao)}
                         </td>
                         <td className="px-3 py-2 font-medium text-[#1d1d1f]">
-                          {row.resposta.student_name ?? "(sem nome)"}
+                          <div className="flex items-center gap-2">
+                            <span>{row.resposta.student_name ?? "(sem nome)"}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTriDrawer({
+                                  studentId: row.resposta.student_id,
+                                  studentName: row.resposta.student_name ?? null,
+                                });
+                              }}
+                              title="Ver histórico TRI"
+                              className="rounded-md border border-[#e5e7eb] px-1.5 py-0.5 text-[10px] font-bold text-[#2563eb] hover:bg-[#eff6ff]"
+                              data-testid={`tri-history-btn-${row.resposta.student_id}`}
+                            >
+                              TRI
+                            </button>
+                          </div>
                         </td>
                         <td className="px-2 py-2 text-center text-[#71717a]">
                           {row.resposta.student_turma ?? "—"}
@@ -587,6 +610,15 @@ export function SimuladoRanking({
           </div>
         )}
       </div>
+
+      {/* Phase 4: Drawer de histórico TRI por aluno — renderizado fora
+          do layout principal para evitar stacking issues. */}
+      <StudentTriHistoryDrawer
+        open={triDrawer !== null}
+        studentId={triDrawer?.studentId ?? null}
+        studentName={triDrawer?.studentName}
+        onClose={() => setTriDrawer(null)}
+      />
     </div>
   );
 }

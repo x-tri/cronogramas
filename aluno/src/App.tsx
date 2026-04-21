@@ -14,6 +14,7 @@ import Avisos from "@/pages/Avisos";
 import Simulados from "@/pages/Simulados";
 import SimuladoResponder from "@/pages/SimuladoResponder";
 import SimuladoResultado from "@/pages/SimuladoResultado";
+import HistoricoSimulados from "@/pages/HistoricoSimulados";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient({
@@ -41,6 +42,7 @@ const App = () => (
                 <Route path="/analise" element={<Analise />} />
                 <Route path="/avisos" element={<Avisos />} />
                 <Route path="/simulados" element={<Simulados />} />
+                <Route path="/simulados/historico" element={<HistoricoSimulados />} />
                 <Route path="/simulados/:id/responder" element={<SimuladoResponder />} />
                 <Route path="/simulados/:id/resultado" element={<SimuladoResultado />} />
               </Route>

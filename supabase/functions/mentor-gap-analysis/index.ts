@@ -2,6 +2,11 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { buildStudentPerformanceAudit, type PlanTopicRef, type TopicPerformanceRecord } from '../../../src/services/mentor-gap-engine.ts'
 import { buildStudentNumberCandidates, parseStudentKey } from '../../../src/services/student-key.ts'
+import {
+  buildTriContext,
+  type SimuladoPerformance,
+  type TriContextSummary,
+} from '../../../src/services/mentor-tri-context.ts'
 
 type QuestionContentLike = {
   questionNumber?: number
@@ -170,6 +175,67 @@ function buildQuestionRecordsFromExam(params: {
       correct: answerAt(params.answers, answerIndex) === answerKey,
     }
   })
+}
+
+// =============================================================================
+// Phase 3: per-area TRI context via get-student-performance
+// =============================================================================
+
+/**
+ * Invoke get-student-performance edge function via direct fetch.
+ * Forwards the incoming Authorization header (service_role for server-to-server,
+ * or user JWT when called from the frontend) so identity check in the target fn
+ * sees the correct principal.
+ *
+ * Returns null on any failure (graceful degradation).
+ * Types + buildTriContext live in src/services/mentor-tri-context.ts (unit-tested).
+ */
+async function fetchStudentPerformance(
+  authHeader: string,
+  studentKey: string,
+  schoolId: string,
+): Promise<{
+  performances: SimuladoPerformance[]
+  fontes_utilizadas: Array<'legacy' | 'cronogramas'>
+} | null> {
+  const parsed = parseStudentKey(studentKey)
+  if (parsed.kind === 'avulso') return null
+
+  const url = Deno.env.get('SUPABASE_URL') ?? Deno.env.get('VITE_SUPABASE_URL') ?? ''
+  if (!url || !authHeader) return null
+
+  try {
+    const response = await fetch(`${url}/functions/v1/get-student-performance`, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        matricula: parsed.value,
+        school_id: schoolId,
+      }),
+    })
+    if (!response.ok) {
+      const body = await response.text().catch(() => '')
+      console.warn(
+        `[mentor-gap-analysis] get-student-performance returned ${response.status}: ${body.slice(0, 200)}`,
+      )
+      return null
+    }
+    const data = (await response.json()) as {
+      performances?: SimuladoPerformance[]
+      fontes_utilizadas?: Array<'legacy' | 'cronogramas'>
+    }
+    return {
+      performances: data.performances ?? [],
+      fontes_utilizadas: data.fontes_utilizadas ?? [],
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn('[mentor-gap-analysis] get-student-performance fetch failed:', msg)
+    return null
+  }
 }
 
 async function fetchPlan(primary: ReturnType<typeof createPrimaryClient>, planId: string): Promise<MentorPlanRow> {
@@ -377,10 +443,14 @@ async function buildAuditInput(
     plan.student_key ?? '',
     startDateIso,
   )
+  let usedProjetosFallback = false
   const rawRecords =
     rawRecordsFromAnswers.length > 0
       ? rawRecordsFromAnswers
-      : await fetchProjetosPerformance(simulado, plan.student_key ?? '', startDateIso)
+      : await (async () => {
+          usedProjetosFallback = true
+          return fetchProjetosPerformance(simulado, plan.student_key ?? '', startDateIso)
+        })()
 
   const mappings = await fetchApprovedMappingsForRecords(primary, rawRecords)
   const mappingsByPair = new Map(
@@ -429,6 +499,7 @@ async function buildAuditInput(
     previousPlanTopicIds: ((previousPlans ?? []) as Array<{
       items?: Array<{ topic_id: string }> | null
     }>).map((planRow) => (planRow.items ?? []).map((item) => item.topic_id)),
+    usedProjetosFallback,
   }
 }
 
@@ -441,6 +512,8 @@ async function persistAudit(
   primary: ReturnType<typeof createPrimaryClient>,
   plan: MentorPlanRow,
   audit: ReturnType<typeof buildStudentPerformanceAudit>,
+  triContext: TriContextSummary | null,
+  fontesDados: readonly string[],
 ) {
   await primary
     .from('mentor_alerts')
@@ -463,6 +536,8 @@ async function persistAudit(
       avg_mastery_planned: average(audit.plannedTopics.map((topic) => topic.masteryScore)),
       avg_mastery_critical: average(audit.criticalTopics.map((topic) => topic.masteryScore)),
       unmapped_questions_count: audit.coverageMetrics.unmappedQuestionsCount,
+      fontes_dados: fontesDados,
+      tri_context: triContext,
     })
     .select('id, analyzed_at')
     .single()
@@ -518,6 +593,8 @@ async function persistAudit(
   return {
     ...audit,
     analyzedAt: runRow.analyzed_at,
+    triContext,
+    fontesDados,
     alerts: ((persistedAlerts ?? []) as Array<{
       id: string
       analysis_run_id: string
@@ -593,6 +670,13 @@ serve(async (request) => {
       payload.reference_date,
     )
 
+    // Phase 3: fetch TRI context from get-student-performance in parallel
+    // with the audit build. If it fails, we degrade gracefully (triContext=null).
+    // Forwards caller's Authorization header so identity check in target fn
+    // sees the right principal (service_role for server-to-server, user JWT otherwise).
+    const incomingAuth = request.headers.get('authorization') ?? ''
+    const triFetchPromise = fetchStudentPerformance(incomingAuth, plan.student_key, plan.school_id)
+
     const audit = buildStudentPerformanceAudit({
       mentorPlanId: plan.id,
       schoolId: plan.school_id,
@@ -603,7 +687,20 @@ serve(async (request) => {
       mappedQuestionsCount: auditInput.mappedQuestionsCount,
       unmappedQuestionsCount: auditInput.unmappedQuestionsCount,
     })
-    const persisted = await persistAudit(primary, plan, audit)
+
+    const triFetchResult = await triFetchPromise
+    const triContext = triFetchResult
+      ? buildTriContext(triFetchResult.performances, triFetchResult.fontes_utilizadas)
+      : null
+
+    const fontesDados: readonly string[] = [
+      'student_answers',
+      'exam_question_topics',
+      ...(triFetchResult ? ['get-student-performance'] : []),
+      ...(auditInput.usedProjetosFallback ? ['projetos_fallback'] : []),
+    ]
+
+    const persisted = await persistAudit(primary, plan, audit, triContext, fontesDados)
 
     return jsonResponse(200, { audit: persisted })
   } catch (error) {

@@ -76,3 +76,9 @@ bun.lockb
 
 # Misc
 *.tsbuildinfo
+
+# Playwright test outputs (screenshots, videos, traces)
+test-results/
+test-results-*/
+playwright-report/
+playwright-report-*/

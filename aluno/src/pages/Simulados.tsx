@@ -5,7 +5,7 @@
 import { useNavigate } from "react-router-dom";
 import { useSimuladosPendentes } from "@/hooks/useSimulados";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowRight, CheckCircle2, Download, FileText } from "lucide-react";
+import { ArrowRight, CheckCircle2, Download, FileText, History } from "lucide-react";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -53,11 +53,22 @@ export default function Simulados() {
 
   return (
     <div className="p-4 pb-24 max-w-lg mx-auto space-y-4">
-      <header>
-        <h1 className="text-xl font-black text-foreground">Simulados ENEM</h1>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Baixe o caderno e registre suas respostas aqui.
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-black text-foreground">Simulados ENEM</h1>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Baixe o caderno e registre suas respostas aqui.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/simulados/historico")}
+          className="flex flex-shrink-0 items-center gap-1.5 rounded-xl border-2 border-primary/30 px-3 py-2 text-xs font-black text-primary hover:bg-primary/5"
+          data-testid="historico-link"
+        >
+          <History className="h-3.5 w-3.5" />
+          Histórico TRI
+        </button>
       </header>
 
       {list.length === 0 ? (
