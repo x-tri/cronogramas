@@ -65,10 +65,9 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
     return () => window.clearTimeout(timeoutId);
   }, [loadData]);
 
-  const activeCoordinators = users.filter((u) => u.role !== "super_admin");
   const filtered = filterSchool
-    ? activeCoordinators.filter((c) => c.school_id === filterSchool)
-    : activeCoordinators;
+    ? users.filter((c) => c.school_id === filterSchool)
+    : users;
 
   const filteredInvites = filterSchool
     ? pendingInvites.filter((i) => i.school_id === filterSchool)
@@ -139,8 +138,8 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
         {/* Stats */}
         <div className="flex items-center gap-4">
           <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
-            <p className="text-2xl font-semibold text-[#1d1d1f]">{activeCoordinators.length}</p>
-            <p className="text-xs text-[#64748b]">Coordenadores ativos</p>
+            <p className="text-2xl font-semibold text-[#1d1d1f]">{users.length}</p>
+            <p className="text-xs text-[#64748b]">Mentores ativos</p>
           </div>
           <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
             <p className="text-2xl font-semibold text-[#1d1d1f]">{pendingInvites.length}</p>
@@ -369,6 +368,7 @@ function AddUserModal({
     message: string;
     invite_code?: string;
   } | null>(null);
+  const [confirmSuperAdmin, setConfirmSuperAdmin] = useState(false);
 
   const seriesOptions = ["1º Ano", "2º Ano", "3º Ano"];
 
@@ -388,10 +388,12 @@ function AddUserModal({
       setResult({ success: false, message: "Senha deve ter pelo menos 6 caracteres" });
       return;
     }
-    if (role === "super_admin" && !confirm("Criar usuario com poderes de Super Admin? Tera acesso TOTAL ao sistema.")) {
+    if (role === "super_admin" && !confirmSuperAdmin) {
+      setConfirmSuperAdmin(true);
       return;
     }
     setSubmitting(true);
+    setConfirmSuperAdmin(false);
     setResult(null);
 
     // Garantir sessao valida antes do RPC
@@ -424,7 +426,7 @@ function AddUserModal({
     if (res.success) {
       const selectedSchool = schools.find((s) => s.id === schoolId);
       logAudit("add_coordinator", "coordinator", email, { schoolId, schoolName: selectedSchool?.name });
-      setTimeout(onSuccess, 1500);
+      // Não auto-close — user fecha manualmente após ver o resultado
     }
   }
 
@@ -612,21 +614,63 @@ function AddUserModal({
             </div>
           )}
 
+          {/* Confirmação inline para super_admin */}
+          {confirmSuperAdmin && !result && (
+            <div className="rounded-lg border border-[#fcd34d] bg-[#fffbeb] px-3 py-2.5">
+              <p className="text-sm font-medium text-[#92400e]">
+                Criar usuário com poderes de <strong>Super Admin</strong>?
+              </p>
+              <p className="text-xs text-[#a16207] mt-1">
+                Terá acesso TOTAL ao sistema, todas as escolas e painel administrativo.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-lg bg-[#f59e0b] px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#d97706] disabled:opacity-60"
+                >
+                  {submitting ? "Criando..." : "Sim, criar Super Admin"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmSuperAdmin(false)}
+                  className="rounded-lg border border-[#e5e7eb] px-3 py-1.5 text-xs text-[#64748b] hover:bg-white"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[#e5e7eb] px-4 py-2 text-sm text-[#64748b] transition-colors hover:bg-[#f1f5f9]"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-lg bg-[#2563eb] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1d4ed8] disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {submitting ? "Processando..." : "Adicionar"}
-            </button>
+            {result?.success ? (
+              <button
+                type="button"
+                onClick={onSuccess}
+                className="rounded-lg bg-[#16a34a] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#15803d]"
+              >
+                Fechar
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-lg border border-[#e5e7eb] px-4 py-2 text-sm text-[#64748b] transition-colors hover:bg-[#f1f5f9]"
+                >
+                  Cancelar
+                </button>
+                {!confirmSuperAdmin && (
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="rounded-lg bg-[#2563eb] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1d4ed8] disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {submitting ? "Processando..." : "Adicionar"}
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </form>
       </div>
