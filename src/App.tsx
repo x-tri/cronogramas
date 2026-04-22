@@ -254,124 +254,108 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f7]">
-      <header className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.88)] backdrop-blur-xl">
-        <div className="mx-auto max-w-[1440px] px-4 py-2.5">
-          <div className="flex flex-col gap-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#ffffff_0%,#edf4ff_52%,#fff4ef_100%)] shadow-[0_12px_28px_-18px_rgba(37,99,235,0.7)] ring-1 ring-[#dbe5f3]">
-                  <img src="/logo-xtri.png" alt="XTRI" className="h-8 w-8 flex-shrink-0" />
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">
-                    Sessão de mentoria
-                  </p>
-                  <p className="text-sm font-semibold text-[#1d1d1f]">
-                    Análise do simulado e cronograma do aluno
-                  </p>
-                </div>
-              </div>
+      <header className="sticky top-0 z-50 border-b border-[#e0e4ea] bg-white/92 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-2 px-3 py-1.5">
+          {/* Logo — compact */}
+          <img src="/logo-xtri.png" alt="XTRI" className="h-7 w-7 shrink-0" />
 
-              <div className="ml-auto flex items-center gap-2">
-                {/* Toggle Mentoria | Simulados (coord only) */}
-                <div
-                  role="group"
-                  aria-label="Alternar entre Mentoria e Simulados"
-                  className="flex items-center gap-1 rounded-2xl border border-[#e5e7eb] bg-white/80 p-1 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.45)]"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setCoordView("mentor")}
-                    aria-pressed={coordView === "mentor"}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-                      coordView === "mentor"
-                        ? "bg-[#2563eb] text-white shadow-sm"
-                        : "text-[#475569] hover:text-[#0f172a]"
-                    }`}
-                  >
-                    Mentoria
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCoordView("simulados")}
-                    aria-pressed={coordView === "simulados"}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-                      coordView === "simulados"
-                        ? "bg-[#2563eb] text-white shadow-sm"
-                        : "text-[#475569] hover:text-[#0f172a]"
-                    }`}
-                  >
-                    Simulados ENEM
-                  </button>
-                </div>
+          {/* Toggle Mentoria | Simulados */}
+          <div
+            role="group"
+            aria-label="Alternar entre Mentoria e Simulados"
+            className="flex items-center gap-0.5 rounded-lg border border-[#e5e7eb] bg-[#f8fafc] p-0.5"
+          >
+            <button
+              type="button"
+              onClick={() => setCoordView("mentor")}
+              aria-pressed={coordView === "mentor"}
+              className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition-all ${
+                coordView === "mentor"
+                  ? "bg-[#2563eb] text-white shadow-sm"
+                  : "text-[#64748b] hover:text-[#0f172a]"
+              }`}
+            >
+              Mentoria
+            </button>
+            <button
+              type="button"
+              onClick={() => setCoordView("simulados")}
+              aria-pressed={coordView === "simulados"}
+              className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition-all ${
+                coordView === "simulados"
+                  ? "bg-[#2563eb] text-white shadow-sm"
+                  : "text-[#64748b] hover:text-[#0f172a]"
+              }`}
+            >
+              Simulados ENEM
+            </button>
+          </div>
 
-                <div className="hidden rounded-2xl border border-[#e5e7eb] bg-white/80 px-3 py-2 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.5)] sm:flex sm:flex-col sm:items-end">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
-                    Coordenador ativo
-                  </span>
-                  <span className="mt-0.5 text-sm font-medium text-[#1d1d1f]">
-                    {user.name}
-                  </span>
+          {/* Divider */}
+          <div className="h-5 w-px bg-[#e2e8f0]" />
+
+          {/* Student info + search (only in mentor view with student) */}
+          {coordView === "mentor" && currentStudent && (
+            <>
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-[#111827] leading-tight">
+                    {currentStudent.nome}
+                  </p>
+                  <p className="text-[10px] text-[#94a3b8] leading-tight">
+                    Turma {currentStudent.turma} · {currentStudent.matricula}
+                  </p>
                 </div>
                 <button
-                  onClick={handleLogout}
-                  className="inline-flex h-10 items-center gap-2 rounded-2xl border border-[#e5e7eb] bg-white px-3.5 text-xs font-semibold text-[#475569] shadow-[0_12px_28px_-24px_rgba(15,23,42,0.45)] transition-all hover:-translate-y-0.5 hover:border-[#cbd5e1] hover:bg-[#f8fafc] hover:text-[#0f172a]"
+                  onClick={() => setShowSearch(true)}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#dbe5f3] bg-[#f8fbff] text-[#2563eb] transition-colors hover:bg-white"
+                  title="Trocar aluno"
                 >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1" />
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  Sair
                 </button>
               </div>
-            </div>
 
-            {coordView === "mentor" && currentStudent && (
-              <div className="flex flex-col gap-2">
-                <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
-                  <div className="flex min-w-0 items-center justify-between gap-3 rounded-[24px] border border-[#e5e7eb] bg-white/94 px-4 py-3 xl:w-[360px]">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[#111827]">
-                        {currentStudent.nome}
-                      </p>
-                      <p className="mt-0.5 text-xs text-[#64748b]">
-                        Turma {currentStudent.turma} · {currentStudent.matricula}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowSearch(true)}
-                      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-2xl border border-[#dbe5f3] bg-[#f8fbff] px-3.5 text-sm font-medium text-[#1d4ed8] transition-colors hover:border-[#bfdbfe] hover:bg-white"
-                      title="Trocar aluno"
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      Trocar aluno
-                    </button>
-                  </div>
+              <div className="h-5 w-px bg-[#e2e8f0]" />
 
-                  <div className="min-w-0 flex-1 rounded-[24px] border border-[#e5e7eb] bg-white/94 px-3 py-2">
-                    <WeekSelector variant="compact" />
-                  </div>
-                </div>
-
-                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-                  <Suspense fallback={null}>
-                    {/* SimuladoAnalyzer unificado: lista simulados legacy
-                        (banco dedicado: projetos + student_answers) E os
-                        novos via mentoria (banco primary simulado_respostas)
-                        no mesmo dropdown de Historico. */}
-                    <SimuladoAnalyzer
-                      matricula={currentStudent.matricula}
-                      variant="compact"
-                    />
-                  </Suspense>
-                  <ResetButton />
-                  <Suspense fallback={null}>
-                    <ShareDropdown />
-                  </Suspense>
-                </div>
+              {/* Week selector — inline */}
+              <div className="shrink-0">
+                <WeekSelector variant="compact" />
               </div>
-            )}
+
+              <div className="h-5 w-px bg-[#e2e8f0]" />
+
+              {/* Action buttons — inline */}
+              <div className="flex items-center gap-1.5">
+                <Suspense fallback={null}>
+                  <SimuladoAnalyzer
+                    matricula={currentStudent.matricula}
+                    variant="compact"
+                  />
+                </Suspense>
+                <ResetButton />
+                <Suspense fallback={null}>
+                  <ShareDropdown />
+                </Suspense>
+              </div>
+            </>
+          )}
+
+          {/* Right side — coordinator + logout */}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden text-[11px] font-medium text-[#94a3b8] sm:block">
+              <span className="font-bold text-[#475569]">{user.name}</span>
+            </span>
+            <button
+              onClick={handleLogout}
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-[#e5e7eb] bg-white px-2.5 text-[11px] font-semibold text-[#64748b] transition-colors hover:bg-[#f8fafc] hover:text-[#0f172a]"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1" />
+              </svg>
+              Sair
+            </button>
           </div>
         </div>
       </header>

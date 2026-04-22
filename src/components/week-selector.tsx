@@ -6,13 +6,8 @@ type WeekSelectorProps = {
 }
 
 function formatWeekRange(start: Date, end: Date): string {
-  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
-  const startStr = start.toLocaleDateString('pt-BR', options)
-  const endStr = end.toLocaleDateString('pt-BR', {
-    ...options,
-    year: 'numeric',
-  })
-  return `${startStr} - ${endStr}`
+  const d = (dt: Date) => `${dt.getDate()}/${dt.getMonth() + 1}`
+  return `${d(start)} – ${d(end)}`
 }
 
 function isCurrentWeek(date: Date): boolean {
@@ -50,6 +45,58 @@ export function WeekSelector({ variant = 'default' }: WeekSelectorProps) {
   const hasCronograma = cronograma !== null
   const isCompact = variant === 'compact'
 
+  if (isCompact) {
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          onClick={goToPreviousWeek}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#475569] transition-colors hover:bg-[#f8fafc]"
+          title="Semana anterior"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        <div className="flex items-center gap-1.5 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-1">
+          <span className="text-xs font-semibold text-[#111827] whitespace-nowrap">
+            {formatWeekRange(start, end)}
+          </span>
+          {isCurrent && (
+            <span className="rounded-full bg-[#eff6ff] px-1.5 py-px text-[9px] font-bold text-[#2563eb]">
+              Atual
+            </span>
+          )}
+          {!hasCronograma && (
+            <span className="rounded-full bg-[#fef3c7] px-1.5 py-px text-[9px] font-bold text-[#92400e]">
+              Novo
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={goToNextWeek}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#475569] transition-colors hover:bg-[#f8fafc]"
+          title="Próxima semana"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        {!isCurrent && (
+          <button
+            onClick={goToCurrentWeek}
+            className="h-7 rounded-lg border border-[#dbe5f3] bg-white px-2 text-[10px] font-bold text-[#2563eb] transition-colors hover:bg-[#f8fbff]"
+            title="Ir para semana atual"
+          >
+            Hoje
+          </button>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button
@@ -62,11 +109,7 @@ export function WeekSelector({ variant = 'default' }: WeekSelectorProps) {
         </svg>
       </button>
 
-      <div
-        className={`min-w-[220px] flex-1 rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-4 ${
-          isCompact ? 'py-2.5' : 'py-3'
-        }`}
-      >
+      <div className="min-w-[220px] flex-1 rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="text-sm font-semibold text-[#111827]">
             {formatWeekRange(start, end)}
@@ -85,13 +128,11 @@ export function WeekSelector({ variant = 'default' }: WeekSelectorProps) {
           )}
         </div>
 
-        {!isCompact && (
-          <p className="mt-1 text-xs text-[#64748b]">
-            {isCurrent
-              ? 'Semana em andamento para o aluno selecionado.'
-              : 'Use as setas para revisar semanas anteriores ou futuras.'}
-          </p>
-        )}
+        <p className="mt-1 text-xs text-[#64748b]">
+          {isCurrent
+            ? 'Semana em andamento para o aluno selecionado.'
+            : 'Use as setas para revisar semanas anteriores ou futuras.'}
+        </p>
       </div>
 
       <button

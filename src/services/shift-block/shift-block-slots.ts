@@ -7,11 +7,10 @@
  * visual existente em timeline-view.tsx). Clicar de novo remove os bloqueios.
  *
  * Ranges definidos pelo coordenador:
- *  - MANHÃ: 07:15 até 12:45 (6 slots de 50min)
- *  - TARDE: 14:35 até 18:15 (4 slots de 50min)
+ *  - MANHÃ: 07:15 até 13:35 (7 slots)
+ *  - TARDE: 14:35 até 19:05 (5 slots)
  *
- * O slot 12:45→13:35 da manhã e o 18:15→19:05 da tarde permanecem LIVRES
- * (não são incluídos no bulk block) — intencional, seguindo spec do usuário.
+ * Todos os slots do turno são bloqueados, incluindo os últimos horários.
  */
 
 import type { DiaSemana } from '../../types/domain'
@@ -34,12 +33,14 @@ export const SHIFT_BLOCK_SLOTS: Record<BulkShift, readonly { inicio: string; fim
     { inicio: '09:55', fim: '11:05' },
     { inicio: '11:05', fim: '11:55' },
     { inicio: '11:55', fim: '12:45' },
+    { inicio: '12:45', fim: '13:35' },
   ],
   tarde: [
     { inicio: '14:35', fim: '15:25' },
     { inicio: '15:25', fim: '16:15' },
     { inicio: '16:15', fim: '17:25' },
     { inicio: '17:25', fim: '18:15' },
+    { inicio: '18:15', fim: '19:05' },
   ],
 }
 

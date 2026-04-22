@@ -73,8 +73,8 @@ export function BloquearTurnoButtons() {
       <ShiftButton turno="tarde" label="TARDE" />
       <span className="ml-1 text-[10px] text-[#94a3b8]">
         seg–sex · {' '}
-        <span className="font-mono">07:15–12:45</span> / {' '}
-        <span className="font-mono">14:35–18:15</span>
+        <span className="font-mono">07:15–13:35</span> / {' '}
+        <span className="font-mono">14:35–19:05</span>
       </span>
     </div>
   )
