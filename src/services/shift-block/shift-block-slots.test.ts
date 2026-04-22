@@ -20,18 +20,18 @@ function mk(
 }
 
 describe('SHIFT_BLOCK_SLOTS', () => {
-  it('MANHÃ = 6 slots de 07:15 até 12:45', () => {
+  it('MANHÃ = 7 slots de 07:15 até 13:35', () => {
     const m = SHIFT_BLOCK_SLOTS.manha
-    expect(m).toHaveLength(6)
+    expect(m).toHaveLength(7)
     expect(m[0]).toEqual({ inicio: '07:15', fim: '08:05' })
-    expect(m[m.length - 1]).toEqual({ inicio: '11:55', fim: '12:45' })
+    expect(m[m.length - 1]).toEqual({ inicio: '12:45', fim: '13:35' })
   })
 
-  it('TARDE = 4 slots de 14:35 até 18:15', () => {
+  it('TARDE = 5 slots de 14:35 até 19:05', () => {
     const t = SHIFT_BLOCK_SLOTS.tarde
-    expect(t).toHaveLength(4)
+    expect(t).toHaveLength(5)
     expect(t[0]).toEqual({ inicio: '14:35', fim: '15:25' })
-    expect(t[t.length - 1]).toEqual({ inicio: '17:25', fim: '18:15' })
+    expect(t[t.length - 1]).toEqual({ inicio: '18:15', fim: '19:05' })
   })
 
   it('WEEKDAYS = segunda a sexta (sem fds)', () => {
@@ -42,17 +42,17 @@ describe('SHIFT_BLOCK_SLOTS', () => {
 describe('computeShiftBlockStatus', () => {
   it('status "none" quando não há nenhum bloqueio no turno', () => {
     const r = computeShiftBlockStatus([], 'manha')
-    expect(r).toEqual({ blocked: 0, total: 30, status: 'none' })
+    expect(r).toEqual({ blocked: 0, total: 35, status: 'none' })
   })
 
-  it('MANHÃ totalmente bloqueada = 5 dias × 6 slots = 30 slots', () => {
+  it('MANHÃ totalmente bloqueada = 5 dias × 7 slots = 35 slots', () => {
     const blocks: BlockLike[] = WEEKDAYS.flatMap((dia) =>
       SHIFT_BLOCK_SLOTS.manha.map((slot) =>
         mk({ diaSemana: dia, turno: 'manha', horarioInicio: slot.inicio }),
       ),
     )
     const r = computeShiftBlockStatus(blocks, 'manha')
-    expect(r).toEqual({ blocked: 30, total: 30, status: 'full' })
+    expect(r).toEqual({ blocked: 35, total: 35, status: 'full' })
   })
 
   it('TARDE parcialmente bloqueada = status "partial"', () => {
@@ -61,7 +61,7 @@ describe('computeShiftBlockStatus', () => {
       mk({ diaSemana: 'terca', turno: 'tarde', horarioInicio: '14:35' }),
     ]
     const r = computeShiftBlockStatus(blocks, 'tarde')
-    expect(r).toEqual({ blocked: 2, total: 20, status: 'partial' })
+    expect(r).toEqual({ blocked: 2, total: 25, status: 'partial' })
   })
 
   it('ignora blocos de outro turno', () => {
@@ -82,9 +82,9 @@ describe('computeShiftBlockStatus', () => {
     expect(r.blocked).toBe(0)
   })
 
-  it('ignora bloqueios em slots fora do range definido (ex: 12:45 da MANHÃ)', () => {
+  it('ignora bloqueios em slots fora do range definido (ex: 13:35 da MANHÃ)', () => {
     const blocks: BlockLike[] = [
-      mk({ diaSemana: 'segunda', turno: 'manha', horarioInicio: '12:45' }),
+      mk({ diaSemana: 'segunda', turno: 'manha', horarioInicio: '13:35' }),
     ]
     const r = computeShiftBlockStatus(blocks, 'manha')
     expect(r.blocked).toBe(0)
@@ -105,9 +105,9 @@ describe('computeShiftBlockStatus', () => {
 })
 
 describe('missingSlotsToBlock', () => {
-  it('quando nada bloqueado, retorna TODOS os 30 slots da manhã', () => {
+  it('quando nada bloqueado, retorna TODOS os 35 slots da manhã', () => {
     const r = missingSlotsToBlock([], 'manha')
-    expect(r).toHaveLength(30)
+    expect(r).toHaveLength(35)
     expect(r[0]).toMatchObject({ dia: 'segunda', inicio: '07:15' })
   })
 
@@ -122,7 +122,7 @@ describe('missingSlotsToBlock', () => {
       }),
     ]
     const r = missingSlotsToBlock(blocks, 'manha')
-    expect(r).toHaveLength(29)
+    expect(r).toHaveLength(34)
     expect(
       r.find((s) => s.dia === 'segunda' && s.inicio === '07:15'),
     ).toBeUndefined()
