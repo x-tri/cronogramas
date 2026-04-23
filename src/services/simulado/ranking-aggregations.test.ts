@@ -37,14 +37,25 @@ function makeResposta(overrides: Partial<RankingResposta> = {}): RankingResposta
 }
 
 describe("mediaTriSimples", () => {
-  it("calcula média das 4 áreas", () => {
+  it("calcula média das 4 áreas quando todas submetidas", () => {
     const r = makeResposta({ tri_lc: 400, tri_ch: 500, tri_cn: 600, tri_mt: 700 });
     expect(mediaTriSimples(r)).toBe(550);
   });
 
-  it("retorna null se qualquer área é null", () => {
-    expect(mediaTriSimples(makeResposta({ tri_lc: null }))).toBeNull();
-    expect(mediaTriSimples(makeResposta({ tri_mt: null }))).toBeNull();
+  it("calcula média parcial ignorando áreas não submetidas (null)", () => {
+    // Aluno só submeteu LC e MT — média deve ser dos 2, não null
+    const r = makeResposta({ tri_lc: 400, tri_ch: null, tri_cn: null, tri_mt: 600 });
+    expect(mediaTriSimples(r)).toBe(500);
+  });
+
+  it("calcula média de 1 área só (entrega super parcial)", () => {
+    const r = makeResposta({ tri_lc: 750, tri_ch: null, tri_cn: null, tri_mt: null });
+    expect(mediaTriSimples(r)).toBe(750);
+  });
+
+  it("retorna null SÓ se NENHUMA área foi submetida", () => {
+    const r = makeResposta({ tri_lc: null, tri_ch: null, tri_cn: null, tri_mt: null });
+    expect(mediaTriSimples(r)).toBeNull();
   });
 });
 
@@ -81,13 +92,26 @@ describe("rankRespostas", () => {
     expect(ranked[1]!.diffTurma).toBe(-100);
   });
 
-  it("respostas com média null vão para o fim", () => {
-    const r1 = makeResposta({ id: "r1", tri_lc: null });
+  it("respostas SEM nenhuma área submetida vão para o fim", () => {
+    // Só a r1 com TODAS áreas null fica null e vai pro fim
+    const r1 = makeResposta({ id: "r1", tri_lc: null, tri_ch: null, tri_cn: null, tri_mt: null });
     const r2 = makeResposta({ id: "r2", tri_lc: 500, tri_ch: 500, tri_cn: 500, tri_mt: 500 });
     const ranked = rankRespostas([r1, r2]);
     expect(ranked[0]!.resposta.id).toBe("r2");
     expect(ranked[1]!.resposta.id).toBe("r1");
     expect(ranked[1]!.mediaTri).toBeNull();
+  });
+
+  it("respostas parciais entram no ranking com a média das áreas submetidas", () => {
+    // r1 só LC=800 → média 800
+    // r2 todas 500 → média 500
+    // r1 deve ficar EM PRIMEIRO mesmo sendo parcial
+    const r1 = makeResposta({ id: "r1", tri_lc: 800, tri_ch: null, tri_cn: null, tri_mt: null });
+    const r2 = makeResposta({ id: "r2", tri_lc: 500, tri_ch: 500, tri_cn: 500, tri_mt: 500 });
+    const ranked = rankRespostas([r1, r2]);
+    expect(ranked[0]!.resposta.id).toBe("r1");
+    expect(ranked[0]!.mediaTri).toBe(800);
+    expect(ranked[1]!.resposta.id).toBe("r2");
   });
 
   it("array vazio retorna array vazio", () => {
@@ -185,6 +209,28 @@ describe("mediaAcertosPorArea", () => {
 
   it("zeros quando array vazio", () => {
     expect(mediaAcertosPorArea([])).toEqual({ LC: 0, CH: 0, CN: 0, MT: 0 });
+  });
+
+  it("ignora alunos que não submeteram a área (tri_xx == null)", () => {
+    // Aluno A só submeteu MT (40 acertos), outras áreas tri null mas acertos=0
+    // Aluno B submeteu tudo
+    // Média MT deve ser (40+30)/2 = 35, não (40+30)/2
+    // Média LC deve usar SÓ o B (não somar 0 do A) = 20
+    const respostas = [
+      makeResposta({
+        tri_lc: null, tri_ch: null, tri_cn: null, tri_mt: 700,
+        acertos_lc: 0, acertos_ch: 0, acertos_cn: 0, acertos_mt: 40,
+      }),
+      makeResposta({
+        tri_lc: 500, tri_ch: 500, tri_cn: 500, tri_mt: 500,
+        acertos_lc: 20, acertos_ch: 20, acertos_cn: 20, acertos_mt: 30,
+      }),
+    ];
+    const medias = mediaAcertosPorArea(respostas);
+    expect(medias.LC).toBe(20); // só o aluno B
+    expect(medias.CH).toBe(20); // só o aluno B
+    expect(medias.CN).toBe(20); // só o aluno B
+    expect(medias.MT).toBe(35); // ambos (40+30)/2
   });
 });
 

@@ -35,13 +35,24 @@ export interface RankedStudent {
   readonly diffTurma: number | null;
 }
 
-/** Computa média simples das 4 áreas (sem redação). Null se alguma área null. */
+/**
+ * Computa média das áreas SUBMETIDAS (sem redação).
+ * Áreas com TRI null = não foram submetidas pelo aluno (entrega parcial)
+ * e são ignoradas no cálculo. Retorna null só se nenhuma área foi submetida.
+ */
 export function mediaTriSimples(r: RankingResposta): number | null {
-  const { tri_lc, tri_ch, tri_cn, tri_mt } = r;
-  if (tri_lc == null || tri_ch == null || tri_cn == null || tri_mt == null) {
-    return null;
-  }
-  return (tri_lc + tri_ch + tri_cn + tri_mt) / 4;
+  const submetidas = [r.tri_lc, r.tri_ch, r.tri_cn, r.tri_mt].filter(
+    (x): x is number => x != null,
+  );
+  if (submetidas.length === 0) return null;
+  return submetidas.reduce((a, b) => a + b, 0) / submetidas.length;
+}
+
+/**
+ * Quantidade de áreas submetidas (1-4). Útil pra UI sinalizar entrega parcial.
+ */
+export function areasSubmetidas(r: RankingResposta): number {
+  return [r.tri_lc, r.tri_ch, r.tri_cn, r.tri_mt].filter((x) => x != null).length;
 }
 
 /** Soma dos acertos nas 4 áreas. */
@@ -290,26 +301,30 @@ export function topicoMaisErradoPorArea(
 /**
  * Média de acertos por área da turma (0-45). Usado no mini bar chart
  * "Áreas mais fracas da turma".
+ *
+ * IMPORTANTE: ignora alunos que NÃO submeteram a área (tri_xx == null).
+ * Sem isso, entregas parciais arrastariam a média pra baixo com 0/45.
  */
 export function mediaAcertosPorArea(
   respostas: ReadonlyArray<RankingResposta>,
 ): Record<AreaKey, number> {
-  if (respostas.length === 0) {
-    return { LC: 0, CH: 0, CN: 0, MT: 0 };
-  }
-  const somas = { LC: 0, CH: 0, CN: 0, MT: 0 };
+  const acc = {
+    LC: { soma: 0, n: 0 },
+    CH: { soma: 0, n: 0 },
+    CN: { soma: 0, n: 0 },
+    MT: { soma: 0, n: 0 },
+  };
   for (const r of respostas) {
-    somas.LC += r.acertos_lc;
-    somas.CH += r.acertos_ch;
-    somas.CN += r.acertos_cn;
-    somas.MT += r.acertos_mt;
+    if (r.tri_lc != null) { acc.LC.soma += r.acertos_lc; acc.LC.n += 1; }
+    if (r.tri_ch != null) { acc.CH.soma += r.acertos_ch; acc.CH.n += 1; }
+    if (r.tri_cn != null) { acc.CN.soma += r.acertos_cn; acc.CN.n += 1; }
+    if (r.tri_mt != null) { acc.MT.soma += r.acertos_mt; acc.MT.n += 1; }
   }
-  const n = respostas.length;
   return {
-    LC: somas.LC / n,
-    CH: somas.CH / n,
-    CN: somas.CN / n,
-    MT: somas.MT / n,
+    LC: acc.LC.n === 0 ? 0 : acc.LC.soma / acc.LC.n,
+    CH: acc.CH.n === 0 ? 0 : acc.CH.soma / acc.CH.n,
+    CN: acc.CN.n === 0 ? 0 : acc.CN.soma / acc.CN.n,
+    MT: acc.MT.n === 0 ? 0 : acc.MT.soma / acc.MT.n,
   };
 }
 

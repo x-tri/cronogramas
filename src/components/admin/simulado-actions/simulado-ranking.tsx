@@ -97,6 +97,8 @@ export function SimuladoRanking({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [turmaFiltro, setTurmaFiltro] = useState<string>("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState<number>(0);
   // Phase 4: drawer de histórico TRI por aluno
   const [triDrawer, setTriDrawer] = useState<{
     studentId: string;
@@ -202,7 +204,40 @@ export function SimuladoRanking({
     return () => {
       cancelled = true;
     };
-  }, [open, simuladoId, schoolId, turmasAlvo]);
+  }, [open, simuladoId, schoolId, turmasAlvo, reloadKey]);
+
+  async function handleDeleteResposta(
+    respostaId: string,
+    studentName: string | null,
+  ): Promise<void> {
+    const nome = studentName ?? "esse aluno";
+    if (
+      !window.confirm(
+        `Apagar a resposta de ${nome}?\n\nO aluno poderá reenviar o simulado depois.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(respostaId);
+    try {
+      const { data, error: rpcErr } = await supabase.rpc("delete_simulado_resposta", {
+        p_resposta_id: respostaId,
+      });
+      if (rpcErr) {
+        window.alert(`Erro: ${rpcErr.message}`);
+        return;
+      }
+      const res = data as { success: boolean; message: string };
+      if (!res.success) {
+        window.alert(res.message);
+        return;
+      }
+      // Reload ranking
+      setReloadKey((k) => k + 1);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   // Derivacoes (pure)
   const filtradas = useMemo(
@@ -378,13 +413,14 @@ export function SimuladoRanking({
                       <th className="px-2 py-2 text-center font-semibold">± turma</th>
                       <th className="px-2 py-2 text-center font-semibold">Acertos</th>
                       <th className="px-3 py-2 text-left font-semibold">Enviou</th>
+                      <th className="px-2 py-2 text-center font-semibold w-12">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#f4f4f5]">
                     {ranked.length === 0 && (
                       <tr>
                         <td
-                          colSpan={11}
+                          colSpan={12}
                           className="px-3 py-8 text-center text-[#94a3b8] italic"
                         >
                           Nenhum aluno respondeu ainda.
@@ -423,20 +459,27 @@ export function SimuladoRanking({
                         <td className="px-2 py-2 text-center text-[#71717a]">
                           {row.resposta.student_turma ?? "—"}
                         </td>
-                        <td className="px-2 py-2 text-center font-mono">
+                        <td className={`px-2 py-2 text-center font-mono ${row.resposta.tri_lc == null ? 'text-[#cbd5e1] italic' : ''}`} title={row.resposta.tri_lc == null ? 'Não submetido' : undefined}>
                           {formatScore(row.resposta.tri_lc)}
                         </td>
-                        <td className="px-2 py-2 text-center font-mono">
+                        <td className={`px-2 py-2 text-center font-mono ${row.resposta.tri_ch == null ? 'text-[#cbd5e1] italic' : ''}`} title={row.resposta.tri_ch == null ? 'Não submetido' : undefined}>
                           {formatScore(row.resposta.tri_ch)}
                         </td>
-                        <td className="px-2 py-2 text-center font-mono">
+                        <td className={`px-2 py-2 text-center font-mono ${row.resposta.tri_cn == null ? 'text-[#cbd5e1] italic' : ''}`} title={row.resposta.tri_cn == null ? 'Não submetido' : undefined}>
                           {formatScore(row.resposta.tri_cn)}
                         </td>
-                        <td className="px-2 py-2 text-center font-mono">
+                        <td className={`px-2 py-2 text-center font-mono ${row.resposta.tri_mt == null ? 'text-[#cbd5e1] italic' : ''}`} title={row.resposta.tri_mt == null ? 'Não submetido' : undefined}>
                           {formatScore(row.resposta.tri_mt)}
                         </td>
                         <td className="px-2 py-2 text-center font-black text-[#1d1d1f]">
                           {formatScore(row.mediaTri)}
+                          {(() => {
+                            const submetidas = [row.resposta.tri_lc, row.resposta.tri_ch, row.resposta.tri_cn, row.resposta.tri_mt].filter((x) => x != null).length;
+                            if (submetidas < 4 && submetidas > 0) {
+                              return <span className="ml-1 text-[9px] font-bold text-amber-600" title={`Entrega parcial — só ${submetidas}/4 áreas`}>({submetidas}/4)</span>;
+                            }
+                            return null;
+                          })()}
                         </td>
                         <td className="px-2 py-2 text-center font-semibold">
                           {row.diffTurma == null ? (
@@ -457,6 +500,20 @@ export function SimuladoRanking({
                         </td>
                         <td className="px-3 py-2 text-[#71717a] whitespace-nowrap">
                           {formatDate(row.resposta.submitted_at)}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleDeleteResposta(row.resposta.id, row.resposta.student_name);
+                            }}
+                            disabled={deletingId === row.resposta.id}
+                            title="Apagar resposta (libera reenvio)"
+                            className="rounded-md border border-[#fecaca] px-1.5 py-0.5 text-[10px] font-bold text-[#dc2626] hover:bg-[#fef2f2] disabled:opacity-40"
+                          >
+                            {deletingId === row.resposta.id ? "..." : "🗑"}
+                          </button>
                         </td>
                       </tr>
                     ))}
