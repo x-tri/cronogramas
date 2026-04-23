@@ -299,6 +299,33 @@ export function topicoMaisErradoPorArea(
 }
 
 /**
+ * Média TRI por área da turma. Ignora alunos que não submeteram a área.
+ * Retorna null se nenhum aluno submeteu aquela área.
+ */
+export function mediaTriPorArea(
+  respostas: ReadonlyArray<RankingResposta>,
+): Record<AreaKey, number | null> {
+  const acc = {
+    LC: { soma: 0, n: 0 },
+    CH: { soma: 0, n: 0 },
+    CN: { soma: 0, n: 0 },
+    MT: { soma: 0, n: 0 },
+  };
+  for (const r of respostas) {
+    if (r.tri_lc != null) { acc.LC.soma += r.tri_lc; acc.LC.n += 1; }
+    if (r.tri_ch != null) { acc.CH.soma += r.tri_ch; acc.CH.n += 1; }
+    if (r.tri_cn != null) { acc.CN.soma += r.tri_cn; acc.CN.n += 1; }
+    if (r.tri_mt != null) { acc.MT.soma += r.tri_mt; acc.MT.n += 1; }
+  }
+  return {
+    LC: acc.LC.n === 0 ? null : acc.LC.soma / acc.LC.n,
+    CH: acc.CH.n === 0 ? null : acc.CH.soma / acc.CH.n,
+    CN: acc.CN.n === 0 ? null : acc.CN.soma / acc.CN.n,
+    MT: acc.MT.n === 0 ? null : acc.MT.soma / acc.MT.n,
+  };
+}
+
+/**
  * Média de acertos por área da turma (0-45). Usado no mini bar chart
  * "Áreas mais fracas da turma".
  *

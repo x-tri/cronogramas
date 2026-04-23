@@ -26,6 +26,7 @@ import {
   filtrarPorTurma,
   histogramaNotas,
   mediaAcertosPorArea,
+  mediaTriPorArea,
   rankRespostas,
   statsGrupo,
   topicoMaisErradoPorArea,
@@ -251,6 +252,7 @@ export function SimuladoRanking({
     [filtradas],
   );
   const mediaArea = useMemo(() => mediaAcertosPorArea(filtradas), [filtradas]);
+  const triPorArea = useMemo(() => mediaTriPorArea(filtradas), [filtradas]);
   const histograma = useMemo(() => histogramaNotas(filtradas, 50), [filtradas]);
   const turmas = useMemo(() => turmasPresentes(respostas), [respostas]);
 
@@ -391,11 +393,24 @@ export function SimuladoRanking({
               />
             </section>
 
-            {/* Tabela Ranking */}
+            {/* Média TRI por área */}
+            <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <AreaTriCard label="LC · Linguagens" value={formatScore(triPorArea.LC)} color="#7c3aed" />
+              <AreaTriCard label="CH · Humanas" value={formatScore(triPorArea.CH)} color="#ea580c" />
+              <AreaTriCard label="CN · Natureza" value={formatScore(triPorArea.CN)} color="#16a34a" />
+              <AreaTriCard label="MT · Matemática" value={formatScore(triPorArea.MT)} color="#2563eb" />
+            </section>
+
+            {/* Tabela Ranking unificada — respondentes no topo, não-respondentes embaixo */}
             <section className="rounded-xl border border-[#e5e7eb] bg-white overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-[#f4f4f5]">
                 <h2 className="text-sm font-bold text-[#1d1d1f]">
-                  🏆 Ranking ({ranked.length} aluno{ranked.length === 1 ? "" : "s"})
+                  🏆 Ranking · {ranked.length} responderam
+                  {naoResponderamFiltered.length > 0 && (
+                    <span className="ml-2 text-xs font-normal text-[#9a3412]">
+                      · {naoResponderamFiltered.length} não responderam
+                    </span>
+                  )}
                 </h2>
               </div>
               <div className="overflow-x-auto">
@@ -417,13 +432,13 @@ export function SimuladoRanking({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#f4f4f5]">
-                    {ranked.length === 0 && (
+                    {ranked.length === 0 && naoResponderamFiltered.length === 0 && (
                       <tr>
                         <td
                           colSpan={12}
                           className="px-3 py-8 text-center text-[#94a3b8] italic"
                         >
-                          Nenhum aluno respondeu ainda.
+                          Nenhum aluno na turma selecionada.
                         </td>
                       </tr>
                     )}
@@ -517,6 +532,40 @@ export function SimuladoRanking({
                         </td>
                       </tr>
                     ))}
+
+                    {/* Separador entre respondentes e não-respondentes */}
+                    {ranked.length > 0 && naoResponderamFiltered.length > 0 && (
+                      <tr className="bg-[#fff7ed]">
+                        <td colSpan={12} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9a3412]">
+                          ⚠️ Não responderam ({naoResponderamFiltered.length})
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Não-respondentes — sorted por turma + nome */}
+                    {naoResponderamFiltered
+                      .slice()
+                      .sort((a, b) => {
+                        const t = (a.turma ?? "").localeCompare(b.turma ?? "");
+                        if (t !== 0) return t;
+                        return (a.name ?? "").localeCompare(b.name ?? "");
+                      })
+                      .map((s) => (
+                        <tr key={`absent-${s.id}`} className="bg-[#fffbf5] text-[#9a3412]">
+                          <td className="px-3 py-1.5 text-center text-sm">—</td>
+                          <td className="px-3 py-1.5 font-medium">{s.name ?? "(sem nome)"}</td>
+                          <td className="px-2 py-1.5 text-center">{s.turma ?? "—"}</td>
+                          <td className="px-2 py-1.5 text-center text-[#cbd5e1]">—</td>
+                          <td className="px-2 py-1.5 text-center text-[#cbd5e1]">—</td>
+                          <td className="px-2 py-1.5 text-center text-[#cbd5e1]">—</td>
+                          <td className="px-2 py-1.5 text-center text-[#cbd5e1]">—</td>
+                          <td className="px-2 py-1.5 text-center text-[#cbd5e1]">—</td>
+                          <td className="px-2 py-1.5 text-center text-[#cbd5e1]">—</td>
+                          <td className="px-2 py-1.5 text-center text-[#cbd5e1]">—</td>
+                          <td className="px-3 py-1.5 text-[10px] italic">não enviou</td>
+                          <td className="px-2 py-1.5 text-center text-[#cbd5e1]">—</td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
@@ -636,34 +685,6 @@ export function SimuladoRanking({
               )}
             </section>
 
-            {/* Quem não respondeu */}
-            {naoResponderamFiltered.length > 0 && (
-              <section className="rounded-xl border border-[#fed7aa] bg-[#fff7ed] p-4">
-                <h2 className="mb-3 text-sm font-bold text-[#9a3412]">
-                  ⚠️ Alunos que ainda não responderam ({naoResponderamFiltered.length})
-                </h2>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                  {naoResponderamFiltered.slice(0, 30).map((s) => (
-                    <li
-                      key={s.id}
-                      className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5 text-xs"
-                    >
-                      <span className="font-semibold text-[#1d1d1f] truncate flex-1 min-w-0">
-                        {s.name ?? "(sem nome)"}
-                      </span>
-                      <span className="text-[10px] text-[#9a3412] flex-shrink-0">
-                        {s.turma ?? "—"} · {s.matricula ?? "—"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {naoResponderamFiltered.length > 30 && (
-                  <p className="mt-2 text-[10px] text-[#9a3412]">
-                    +{naoResponderamFiltered.length - 30} não mostrados
-                  </p>
-                )}
-              </section>
-            )}
           </div>
         )}
       </div>
@@ -710,6 +731,33 @@ function StatCard({ label, value, emoji, accent, positive, negative }: StatCardP
         </p>
       </div>
       <p className={`mt-1 text-2xl font-black ${valueClass}`}>{value}</p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subcomponente AreaTriCard — média TRI por área
+// ---------------------------------------------------------------------------
+
+interface AreaTriCardProps {
+  readonly label: string;
+  readonly value: string;
+  readonly color: string;
+}
+
+function AreaTriCard({ label, value, color }: AreaTriCardProps) {
+  return (
+    <div
+      className="rounded-xl border border-[#e5e7eb] bg-white p-3 border-l-4"
+      style={{ borderLeftColor: color }}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wider text-[#71717a]">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-black" style={{ color }}>
+        {value}
+      </p>
+      <p className="text-[10px] text-[#94a3b8]">média TRI</p>
     </div>
   );
 }
