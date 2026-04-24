@@ -59,9 +59,9 @@ export function SecaoResumo({ sisu, mapaHabilidades, simulado }: SecaoResumoProp
       </h3>
 
       {/* Grid: nota ponderada, nota de corte, gap, vagas */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
         <div className="bg-[#f7f6f3] rounded-lg px-3 py-2">
-          <span className="text-[9px] text-[#9ca3af] uppercase tracking-wider">Nota ponderada</span>
+          <span className="text-[9px] text-[#9ca3af] uppercase tracking-wider">Nota ponderada*</span>
           <p className="text-[18px] font-bold text-[#1d1d1f] tabular-nums leading-tight">
             {formatNota(notaPonderadaAtual)}
           </p>
@@ -89,6 +89,11 @@ export function SecaoResumo({ sisu, mapaHabilidades, simulado }: SecaoResumoProp
           </div>
         ) : null}
       </div>
+
+      {/* Legenda do asterisco */}
+      <p className="text-[10px] text-[#9ca3af] italic mb-4">
+        * Redação assumida como 900 na simulação SISU (simulado padrão não mede redação).
+      </p>
 
       {/* Tabela: desempenho por area */}
       <h4 className="text-[10px] font-bold text-[#1d1d1f] uppercase tracking-wider mb-2">

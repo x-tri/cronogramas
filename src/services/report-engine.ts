@@ -716,6 +716,13 @@ async function findCurso(
   return (melhorMatch ?? fallback[0]) as CursoEncontrado
 }
 
+/**
+ * Redação assumida no cálculo quando o simulado não mede redação.
+ * Valor otimista mas realista para alunos focados — ver legenda na UI
+ * "* Assumimos redação = 900 na simulação SISU".
+ */
+export const REDACAO_ASSUMIDA_DEFAULT = 900
+
 function computeNotaPonderada(
   notas: NotasAluno,
   pesos: PesosSisu,
@@ -728,9 +735,10 @@ function computeNotaPonderada(
 
   if (lc == null || ch == null || cn == null || mt == null) return null
 
-  // Se não tem redação, calcula sem ela
-  const redacaoNota = red ?? 0
-  const redacaoPeso = red != null ? pesos.redacao : 0
+  // Se não tem redação (simulado padrão não mede), assume 900 hardcoded.
+  // Isso evita cair a nota ponderada artificialmente ao ignorar o peso da redação.
+  const redacaoNota = red ?? REDACAO_ASSUMIDA_DEFAULT
+  const redacaoPeso = pesos.redacao
 
   const numerador =
     lc * pesos.linguagens +
