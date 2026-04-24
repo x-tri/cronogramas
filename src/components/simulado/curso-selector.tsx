@@ -170,7 +170,7 @@ export function CursoSelector({
           </svg>
         </div>
         <p className="text-[12px] font-semibold text-[#1d1d1f]">
-          Selecione o curso desejado
+          Simule seu plano com o SISU 2026 — escolha o curso
         </p>
       </div>
 
