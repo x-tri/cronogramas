@@ -283,7 +283,7 @@ export function SimuladoRanking({
       role="dialog"
       aria-modal="true"
       aria-label={`Ranking de ${simuladoTitle}`}
-      className="fixed inset-0 z-40 flex flex-col bg-[#f5f5f7] outline-none"
+      className="fixed inset-x-0 bottom-0 top-11 z-40 flex flex-col bg-[#f5f5f7] outline-none"
     >
       {/* Top bar */}
       <header className="flex items-center justify-between gap-4 border-b border-[#e5e7eb] bg-white px-6 py-3 flex-shrink-0">
