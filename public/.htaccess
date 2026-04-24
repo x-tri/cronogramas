@@ -1,6 +1,12 @@
 RewriteEngine On
 RewriteBase /
 
+# Assets que não existem devem retornar 404 de verdade (não HTML)
+# Evita "Failed to fetch dynamically imported module" quando chunk antigo some
+# após um novo deploy — browser precisa do 404 pra recarregar o index.html novo.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^assets/.+\.(js|mjs|css|map|png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|eot|ico)$ - [L,R=404]
+
 # Se o arquivo ou diretorio existe, servir normalmente
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
@@ -8,3 +14,15 @@ RewriteCond %{REQUEST_FILENAME} !-d
 # Tudo mais redireciona para index.html (SPA routing)
 # Necessario para rotas client-side sobreviverem a F5 / deep links.
 RewriteRule ^ index.html [QSA,L]
+
+# Cache busting: index.html nunca cacheado — navegador sempre pega a versão nova
+# com os hashes corretos dos chunks. Assets (com hash no nome) cacheiam forte.
+<FilesMatch "index\.html$">
+  Header set Cache-Control "no-cache, no-store, must-revalidate"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
+</FilesMatch>
+
+<FilesMatch "\.(js|mjs|css|woff2?|ttf|eot|png|jpg|jpeg|gif|svg|webp)$">
+  Header set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
