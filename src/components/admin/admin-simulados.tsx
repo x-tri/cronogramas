@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "../../lib/supabase";
+import { CloneSimuladoModal } from "./simulado-actions/clone-simulado-modal";
 import { ConfirmDialog } from "./simulado-actions/confirm-dialog";
 import { SimuladoEditItems } from "./simulado-actions/simulado-edit-items";
 import { SimuladoRanking } from "./simulado-actions/simulado-ranking";
@@ -98,6 +99,7 @@ export function AdminSimulados({
     | { readonly kind: "delete"; readonly simulado: SimuladoRow };
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [cloneSource, setCloneSource] = useState<SimuladoRow | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [drawerSimulado, setDrawerSimulado] = useState<SimuladoRow | null>(null);
   const [editItemsSimulado, setEditItemsSimulado] = useState<SimuladoRow | null>(null);
@@ -444,6 +446,7 @@ export function AdminSimulados({
               <SimuladoCard
                 simulado={sim}
                 schoolName={schoolNameById[sim.school_id] ?? "—"}
+                canClone={!isSchoolScoped && schools.length > 1}
                 onPublish={() =>
                   setPendingAction({ kind: "publish", simulado: sim })
                 }
@@ -453,6 +456,7 @@ export function AdminSimulados({
                 onDelete={() =>
                   setPendingAction({ kind: "delete", simulado: sim })
                 }
+                onClone={() => setCloneSource(sim)}
                 onViewResponses={() => setDrawerSimulado(sim)}
                 onEditLink={() => openEditLink(sim)}
                 onEditItems={() => setEditItemsSimulado(sim)}
@@ -469,6 +473,17 @@ export function AdminSimulados({
         schools={schools}
         isSchoolScoped={isSchoolScoped}
         lockedSchoolId={isSchoolScoped ? (userSchoolId ?? null) : null}
+      />
+
+      <CloneSimuladoModal
+        open={cloneSource !== null}
+        source={cloneSource}
+        schools={schools}
+        onClose={() => setCloneSource(null)}
+        onCloned={() => {
+          setCloneSource(null);
+          setReloadTick((n) => n + 1);
+        }}
       />
 
       <ConfirmDialog
@@ -623,9 +638,11 @@ function EmptyState({ onCreate }: EmptyStateProps) {
 interface SimuladoCardProps {
   readonly simulado: SimuladoRow;
   readonly schoolName: string;
+  readonly canClone: boolean;
   readonly onPublish: () => void;
   readonly onClose: () => void;
   readonly onDelete: () => void;
+  readonly onClone: () => void;
   readonly onViewResponses: () => void;
   readonly onEditLink: () => void;
   readonly onEditItems: () => void;
@@ -634,9 +651,11 @@ interface SimuladoCardProps {
 function SimuladoCard({
   simulado,
   schoolName,
+  canClone,
   onPublish,
   onClose,
   onDelete,
+  onClone,
   onViewResponses,
   onEditLink,
   onEditItems,
@@ -758,6 +777,17 @@ function SimuladoCard({
               aria-label={`Encerrar ${simulado.title}`}
             >
               Encerrar
+            </button>
+          )}
+          {canClone && (
+            <button
+              type="button"
+              onClick={onClone}
+              className="rounded-md border border-[#dbe5f3] bg-[#f8fbff] px-2.5 py-1.5 text-xs font-medium text-[#2563eb] hover:bg-[#eff6ff]"
+              aria-label={`Duplicar ${simulado.title} para outra escola`}
+              title="Duplicar para outra escola"
+            >
+              📋 Duplicar
             </button>
           )}
           <button
