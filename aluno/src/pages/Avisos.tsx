@@ -3,6 +3,7 @@ import { useNotifications, type StudentNotification } from "@/hooks/useNotificat
 import { useGamification } from "@/hooks/useGamification";
 import { useStudentPdfs, type StudentPdf } from "@/hooks/useStudentPdfs";
 import { useSimuladosPendentes } from "@/hooks/useSimulados";
+import { useTrackPdfDownload } from "@/hooks/useTrackPdfDownload";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -156,7 +157,14 @@ export default function Avisos() {
             Suas listas e materiais
           </h2>
           {pdfs.map((pdf, idx) => (
-            <PdfCard key={pdf.id} pdf={pdf} index={idx} />
+            <PdfCard
+              key={pdf.id}
+              pdf={pdf}
+              index={idx}
+              studentId={student?.id ?? null}
+              matricula={student?.matricula ?? null}
+              schoolId={student?.school_id ?? null}
+            />
           ))}
         </div>
       )}
@@ -193,17 +201,40 @@ const PDF_TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
   caderno_questoes: { label: "Caderno de questões", emoji: "📝" },
 };
 
-function PdfCard({ pdf, index }: { pdf: StudentPdf; index: number }) {
+interface PdfCardProps {
+  readonly pdf: StudentPdf;
+  readonly index: number;
+  readonly studentId: string | null;
+  readonly matricula: string | null;
+  readonly schoolId: string | null;
+}
+
+function PdfCard({ pdf, index, studentId, matricula, schoolId }: PdfCardProps) {
   const typeInfo = PDF_TYPE_LABELS[pdf.tipo] ?? { label: pdf.tipo.replace("_", " "), emoji: "📄" };
   const date = pdf.created_at
     ? new Date(pdf.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
     : "";
+  const trackDownload = useTrackPdfDownload();
+
+  function handleClick(): void {
+    // Fire-and-forget: nao bloqueia a abertura do link.
+    // ON CONFLICT DO NOTHING preserva a primeira data registrada.
+    if (studentId && schoolId) {
+      trackDownload.mutate({
+        pdfHistoryId: pdf.id,
+        studentId,
+        matricula,
+        schoolId,
+      });
+    }
+  }
 
   return (
     <a
       href={pdf.url}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={handleClick}
       className="flex items-center gap-3 rounded-2xl border-2 bg-card p-3.5 transition-all active:scale-[0.98] hover:border-primary/30 animate-fade-in"
       style={{ animationDelay: `${index * 0.08}s`, animationFillMode: "both" }}
     >

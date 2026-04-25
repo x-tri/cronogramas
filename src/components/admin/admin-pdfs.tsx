@@ -20,7 +20,13 @@ interface PdfRecord {
   file_size: number | null;
   created_at: string;
   school?: School | null;
+  // Vindos de pdf_history_with_status (migration 025)
+  download_count: number;
+  first_downloaded_at: string | null;
+  last_downloaded_at: string | null;
 }
+
+type StatusFilter = "all" | "downloaded" | "not_downloaded";
 
 interface AdminPdfsProps {
   onBack: () => void;
@@ -48,14 +54,18 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState(isCoordinator ? userSchoolId! : "");
   const [filterTurma, setFilterTurma] = useState("");
+  const [filterStatus, setFilterStatus] = useState<StatusFilter>("all");
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    // pdf_history_with_status (view criada em 025) traz download_count
+    // + first/last_downloaded_at agregados — evita N+1 na hora de calcular
+    // status por linha. Herda RLS de pdf_history + pdf_download_log.
     let pdfsQuery = supabase
-      .from("pdf_history")
-      .select("*, school:schools(id, name)")
+      .from("pdf_history_with_status")
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (isCoordinator) {
@@ -84,8 +94,11 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
   let filtered = records;
   if (selectedSchool) filtered = filtered.filter((r) => r.school_id === selectedSchool);
   if (filterTurma) filtered = filtered.filter((r) => r.turma === filterTurma);
+  if (filterStatus === "downloaded") filtered = filtered.filter((r) => r.download_count > 0);
+  if (filterStatus === "not_downloaded") filtered = filtered.filter((r) => r.download_count === 0);
 
   const totalSize = filtered.reduce((sum, r) => sum + (r.file_size ?? 0), 0);
+  const downloadedCount = filtered.filter((r) => r.download_count > 0).length;
 
   async function handleDelete(record: PdfRecord) {
     if (!confirm(`Apagar PDF de ${record.aluno_nome}?`)) return;
@@ -210,6 +223,12 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
             </p>
             <p className="text-xs text-[#64748b]">Alunos atendidos</p>
           </div>
+          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
+            <p className="text-2xl font-semibold text-[#1d1d1f]">
+              {downloadedCount}<span className="text-sm font-normal text-[#94a3b8]"> / {filtered.length}</span>
+            </p>
+            <p className="text-xs text-[#64748b]">Baixaram</p>
+          </div>
         </div>
 
         {/* Filters */}
@@ -242,6 +261,18 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
               ))}
             </select>
           </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-[#64748b]">Baixou?</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as StatusFilter)}
+              className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs text-[#1d1d1f]"
+            >
+              <option value="all">Todos</option>
+              <option value="downloaded">Baixaram</option>
+              <option value="not_downloaded">Nao baixaram</option>
+            </select>
+          </div>
           <span className="text-xs text-[#94a3b8]">{filtered.length} PDFs</span>
         </div>
 
@@ -256,13 +287,14 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b] hidden lg:table-cell">Tipo</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b] hidden md:table-cell">Tamanho</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b]">Data</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b]">Baixou?</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#64748b]">Acoes</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-16 text-center">
+                  <td colSpan={8} className="px-4 py-16 text-center">
                     <div className="mx-auto max-w-xl space-y-2">
                       <p className="text-sm font-medium text-[#1d1d1f]">
                         Nenhum PDF registrado ainda
@@ -290,6 +322,20 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
                     <td className="px-4 py-2.5 text-xs text-[#94a3b8] hidden md:table-cell">{formatFileSize(r.file_size)}</td>
                     <td className="px-4 py-2.5 text-xs text-[#94a3b8]">
                       {new Date(r.created_at).toLocaleDateString("pt-BR")}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {r.download_count > 0 ? (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-[#dcfce7] px-2 py-0.5 text-xs font-medium text-[#166534]"
+                          title={`Baixou em ${r.first_downloaded_at ? new Date(r.first_downloaded_at).toLocaleString("pt-BR") : "-"}`}
+                        >
+                          ✓ Baixou
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#fff7ed] px-2 py-0.5 text-xs font-medium text-[#9a3412]">
+                          Nao baixou
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1">
