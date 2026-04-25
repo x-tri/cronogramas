@@ -189,7 +189,6 @@ export default function Avisos() {
 
 const PDF_TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
   cronograma: { label: "Cronograma semanal", emoji: "📅" },
-  plano_estudo: { label: "Plano de estudo", emoji: "📋" },
   relatorio: { label: "Relatório de desempenho", emoji: "📊" },
   caderno_questoes: { label: "Caderno de questões", emoji: "📝" },
 };

@@ -40,7 +40,7 @@ interface UploadPdfParams {
   alunoNome: string;
   turma?: string;
   matricula?: string;
-  tipo?: "cronograma" | "plano_estudo" | "relatorio" | "caderno_questoes";
+  tipo?: "cronograma" | "relatorio" | "caderno_questoes";
 }
 
 function isUuid(value: string | null | undefined): value is string {

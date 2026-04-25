@@ -31,7 +31,6 @@ interface AdminPdfsProps {
 
 const PDF_TYPE_LABELS: Readonly<Record<string, string>> = {
   cronograma: "Cronograma semanal",
-  plano_estudo: "Plano de estudo",
   relatorio: "Relatório de desempenho",
   caderno_questoes: "Caderno de questões",
 };
