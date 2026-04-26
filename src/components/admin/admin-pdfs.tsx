@@ -206,7 +206,7 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
 
         <div className="flex items-center gap-4">
           <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
-            <p className="text-2xl font-semibold text-[#1d1d1f]">{records.length}</p>
+            <p className="text-2xl font-semibold text-[#1d1d1f]">{filtered.length}</p>
             <p className="text-xs text-[#64748b]">PDFs gerados</p>
           </div>
           <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
@@ -215,7 +215,7 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
           </div>
           <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
             <p className="text-2xl font-semibold text-[#1d1d1f]">
-              {[...new Set(records.map((r) => r.aluno_id))].length}
+              {[...new Set(filtered.map((r) => r.aluno_id))].length}
             </p>
             <p className="text-xs text-[#64748b]">Alunos atendidos</p>
           </div>
