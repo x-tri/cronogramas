@@ -26,6 +26,7 @@ interface RelatorioCirurgicoProps {
     matricula?: string | null
     escola?: string | null
     schoolId?: string | null
+    turma?: string | null
   }
   readonly isLoading?: boolean
   readonly loadingMessage?: string
@@ -242,6 +243,7 @@ export function RelatorioCirurgico({
         schoolName: student.escola ?? null,
         alunoId: student.id,
         alunoNome: nomeAluno,
+        turma: student.turma ?? undefined,
         matricula: student.matricula,
         tipo: params.tipo,
       })

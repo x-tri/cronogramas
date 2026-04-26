@@ -480,6 +480,7 @@ export function SimuladoAnalyzer({
                   matricula: currentStudent?.matricula ?? matricula,
                   escola: currentStudent?.escola ?? null,
                   schoolId: currentStudent?.escolaId ?? null,
+                  turma: currentStudent?.turma ?? null,
                 }}
                 isLoading={isLoadingReport}
                 loadingMessage={reportLoadingMessage}
