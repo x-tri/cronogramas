@@ -197,15 +197,11 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
         {/* Stats */}
         <div className="rounded-2xl border border-[#e5e7eb] bg-white p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
-            Histórico de PDFs
+            Auditoria de Downloads
           </p>
           <h2 className="mt-2 text-lg font-semibold text-[#1d1d1f]">
-            O que já foi gerado e ficou salvo no storage
+            Aqui você encontrará os arquivos gerados nas análises e se o aluno baixou cada um ou não.
           </h2>
-          <p className="mt-1 text-sm text-[#64748b]">
-            Esta tela mostra apenas PDFs registrados pelo app no Supabase Storage:
-            cronograma semanal, relatório de desempenho e caderno de questões.
-          </p>
         </div>
 
         <div className="flex items-center gap-4">
