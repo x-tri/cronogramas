@@ -47,6 +47,14 @@ const AdminSimulados = lazy(() =>
   })),
 );
 
+// Aba "Listas e Planos" do coord — visualizacao de PDFs entregues e
+// status de download por aluno (migration 025).
+const AdminPdfs = lazy(() =>
+  import("./components/admin/admin-pdfs").then((mod) => ({
+    default: mod.AdminPdfs,
+  })),
+);
+
 type SlotSelection = {
   dia: DiaSemana;
   turno: Turno;
@@ -78,7 +86,7 @@ function AppContent() {
   const [showSearch, setShowSearch] = useState(false);
   // Coord toggle: alterna entre painel de mentoria (kanban/timeline)
   // e gestao de Simulados ENEM (lista + wizard + respostas).
-  const [coordView, setCoordView] = useState<"mentor" | "simulados">("mentor");
+  const [coordView, setCoordView] = useState<"mentor" | "simulados" | "materiais">("mentor");
 
   const handleSlotClick = (
     dia: DiaSemana,
@@ -289,6 +297,18 @@ function AppContent() {
             >
               Simulados ENEM
             </button>
+            <button
+              type="button"
+              onClick={() => setCoordView("materiais")}
+              aria-pressed={coordView === "materiais"}
+              className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition-all ${
+                coordView === "materiais"
+                  ? "bg-[#2563eb] text-white shadow-sm"
+                  : "text-[#64748b] hover:text-[#0f172a]"
+              }`}
+            >
+              Listas e Planos
+            </button>
           </div>
 
           {/* Divider */}
@@ -369,6 +389,24 @@ function AppContent() {
             </div>
           }>
             <AdminSimulados userRole={userRole} userSchoolId={userSchoolId} />
+          </Suspense>
+        </main>
+      )}
+
+      {/* Listas e Planos view (coord toggle) — PDFs entregues + status de download */}
+      {coordView === "materiais" && (
+        <main className="mx-auto max-w-[1440px] px-4 py-6">
+          <Suspense fallback={
+            <div className="flex items-center justify-center h-64">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent" />
+            </div>
+          }>
+            <AdminPdfs
+              embedded
+              onBack={() => setCoordView("mentor")}
+              userRole={userRole}
+              userSchoolId={userSchoolId}
+            />
           </Suspense>
         </main>
       )}
