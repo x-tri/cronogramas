@@ -299,6 +299,38 @@ export function topicoMaisErradoPorArea(
 }
 
 /**
+ * Top 5 tópicos mais errados por área de UM aluno específico.
+ *
+ * Usa o mesmo classificador `areaDoTopico` para agrupar os erros do aluno
+ * em LC/CH/CN/MT. Útil pro drawer de detalhe individual no ranking.
+ *
+ * Tópicos não-classificáveis (matéria fora do mapa) são ignorados.
+ * Áreas sem erros retornam array vazio.
+ */
+export function topErrosPorArea(
+  erros: Record<string, number>,
+): Record<AreaKey, ReadonlyArray<{ topico: string; erros: number }>> {
+  const porArea: Record<AreaKey, Array<{ topico: string; erros: number }>> = {
+    LC: [], CH: [], CN: [], MT: [],
+  };
+
+  for (const [topico, qtd] of Object.entries(erros)) {
+    const t = topico.trim();
+    if (!t || typeof qtd !== "number" || qtd <= 0) continue;
+    const area = areaDoTopico(t);
+    if (area == null) continue;
+    porArea[area].push({ topico: t, erros: qtd });
+  }
+
+  return {
+    LC: porArea.LC.sort((a, b) => b.erros - a.erros).slice(0, 5),
+    CH: porArea.CH.sort((a, b) => b.erros - a.erros).slice(0, 5),
+    CN: porArea.CN.sort((a, b) => b.erros - a.erros).slice(0, 5),
+    MT: porArea.MT.sort((a, b) => b.erros - a.erros).slice(0, 5),
+  };
+}
+
+/**
  * Média TRI por área da turma. Ignora alunos que não submeteram a área.
  * Retorna null se nenhum aluno submeteu aquela área.
  */

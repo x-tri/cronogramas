@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "../../../lib/supabase";
 import { StudentTriHistoryDrawer } from "../student-tri-history-drawer";
+import { StudentSimuladoDetailDrawer } from "./student-simulado-detail-drawer";
 import {
   exportRankingExcel,
 } from "../../../services/simulado/export-excel";
@@ -32,6 +33,7 @@ import {
   topicoMaisErradoPorArea,
   topicosErradosTurma,
   turmasPresentes,
+  type RankedStudent,
   type RankingResposta,
 } from "../../../services/simulado/ranking-aggregations";
 
@@ -105,6 +107,8 @@ export function SimuladoRanking({
     studentId: string;
     studentName: string | null;
   } | null>(null);
+  // Drawer com relatorio individual do simulado atual (TRI/acertos/erros por area)
+  const [detailRow, setDetailRow] = useState<RankedStudent | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ESC fecha o dialog + move foco pro container quando abrir (focus trap leve).
@@ -446,7 +450,10 @@ export function SimuladoRanking({
                       <tr
                         key={row.resposta.id}
                         className="hover:bg-[#fafbff] cursor-pointer"
-                        onClick={() => onViewAluno?.(row.resposta.id)}
+                        onClick={() => {
+                          setDetailRow(row);
+                          onViewAluno?.(row.resposta.id);
+                        }}
                       >
                         <td className="px-3 py-2 text-center text-sm font-black">
                           {posicaoBadge(row.posicao)}
@@ -696,6 +703,14 @@ export function SimuladoRanking({
         studentId={triDrawer?.studentId ?? null}
         studentName={triDrawer?.studentName}
         onClose={() => setTriDrawer(null)}
+      />
+
+      {/* Drawer com relatorio individual do simulado atual */}
+      <StudentSimuladoDetailDrawer
+        open={detailRow !== null}
+        row={detailRow}
+        mediaTurma={stats.media}
+        onClose={() => setDetailRow(null)}
       />
     </div>
   );

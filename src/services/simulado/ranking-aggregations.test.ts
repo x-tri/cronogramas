@@ -9,6 +9,7 @@ import {
   mediaTriSimples,
   rankRespostas,
   statsGrupo,
+  topErrosPorArea,
   topicoMaisErradoPorArea,
   topicosErradosTurma,
   totalAcertos,
@@ -382,6 +383,52 @@ describe("topicoMaisErradoPorArea", () => {
   it("array vazio retorna todas áreas null", () => {
     const top = topicoMaisErradoPorArea([]);
     expect(top).toEqual({ LC: null, CH: null, CN: null, MT: null });
+  });
+});
+
+describe("topErrosPorArea", () => {
+  it("retorna top 5 por area, sorted desc por erros", () => {
+    const erros: Record<string, number> = {
+      "Matemática - Funções": 5,
+      "Matemática - Geometria": 3,
+      "Matemática - Probabilidade": 7,
+      "Matemática - Trigonometria": 1,
+      "Matemática - Logaritmos": 4,
+      "Matemática - Estatística": 2,
+      "Matemática - Análise Combinatória": 6,
+      "Geografia - Clima": 2,
+      "Biologia - Genética": 8,
+    };
+    const top = topErrosPorArea(erros);
+
+    expect(top.MT).toHaveLength(5);
+    expect(top.MT.map((t) => t.erros)).toEqual([7, 6, 5, 4, 3]);
+    expect(top.MT[0]?.topico).toBe("Matemática - Probabilidade");
+
+    expect(top.CH).toHaveLength(1);
+    expect(top.CH[0]?.topico).toBe("Geografia - Clima");
+
+    expect(top.CN).toHaveLength(1);
+    expect(top.CN[0]?.erros).toBe(8);
+
+    expect(top.LC).toHaveLength(0);
+  });
+
+  it("ignora topicos invalidos (vazio, count<=0, materia desconhecida)", () => {
+    const top = topErrosPorArea({
+      "  ": 5,
+      "Matemática - Funções": 0,
+      "Matemática - Geometria": -3,
+      "Astrologia - Horóscopo": 10,
+      "Biologia - Ecologia": 4,
+    });
+    expect(top.MT).toHaveLength(0);
+    expect(top.CN).toHaveLength(1);
+    expect(top.CN[0]?.topico).toBe("Biologia - Ecologia");
+  });
+
+  it("entrada vazia retorna 4 areas com array vazio", () => {
+    expect(topErrosPorArea({})).toEqual({ LC: [], CH: [], CN: [], MT: [] });
   });
 });
 
