@@ -430,6 +430,33 @@ describe("topErrosPorArea", () => {
   it("entrada vazia retorna 4 areas com array vazio", () => {
     expect(topErrosPorArea({})).toEqual({ LC: [], CH: [], CN: [], MT: [] });
   });
+
+  it("formato NOVO ({area, n}) usa area autoritativa, nao heuristica", () => {
+    // "funcao seno..." sem prefixo de materia — heuristica falharia (null)
+    // mas o formato novo carrega area=MT autoritativa de simulado_itens.area.
+    const top = topErrosPorArea({
+      "funcao seno e mes de menor preco": { area: "MT", n: 3 },
+      "lei de Benford e logaritmo decimal": { area: "MT", n: 1 },
+      "Biologia - prevencao da leishmaniose": { area: "CN", n: 2 },
+    });
+    expect(top.MT).toHaveLength(2);
+    expect(top.MT[0]).toEqual({ topico: "funcao seno e mes de menor preco", erros: 3 });
+    expect(top.CN).toHaveLength(1);
+    expect(top.CN[0]?.erros).toBe(2);
+    expect(top.LC).toHaveLength(0);
+    expect(top.CH).toHaveLength(0);
+  });
+
+  it("formato MISTO (legacy + novo) processa ambos", () => {
+    const top = topErrosPorArea({
+      "Geografia - Clima": 4, // legacy: heuristica -> CH
+      "lei de Benford e logaritmo": { area: "MT", n: 5 }, // novo: autoritativo MT
+    });
+    expect(top.CH).toHaveLength(1);
+    expect(top.CH[0]?.erros).toBe(4);
+    expect(top.MT).toHaveLength(1);
+    expect(top.MT[0]?.erros).toBe(5);
+  });
 });
 
 describe("turmasPresentes + filtrarPorTurma", () => {

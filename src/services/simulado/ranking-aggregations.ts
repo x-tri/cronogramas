@@ -9,6 +9,30 @@
 
 export type AreaKey = "LC" | "CH" | "CN" | "MT";
 
+/**
+ * Valor de erros_por_topico — pode estar em 2 formatos:
+ *  - LEGACY (pre-2026-04-26): number — apenas a contagem; area precisa ser
+ *    inferida via heuristica `areaDoTopico`, que falha em ~28% dos topicos
+ *    sem prefixo "Materia - ".
+ *  - NOVO (pos-2026-04-26 + backfill): { area, n } — area autoritativa de
+ *    simulado_itens.area, sem dependencia do formato do string.
+ *
+ * As funcoes de agregacao detectam o formato via typeof e processam ambos.
+ */
+export type ErrosPorTopicoValor = number | { readonly area: AreaKey; readonly n: number };
+
+/**
+ * Extrai { n, area? } de um valor que pode estar no formato antigo (number)
+ * ou novo (objeto). Quando vier no formato antigo, area=null e o caller
+ * decide se usa heuristica `areaDoTopico` como fallback.
+ */
+export function unwrapErroValor(
+  v: ErrosPorTopicoValor,
+): { readonly n: number; readonly area: AreaKey | null } {
+  if (typeof v === "number") return { n: v, area: null };
+  return { n: v.n, area: v.area };
+}
+
 export interface RankingResposta {
   readonly id: string;
   readonly student_id: string;
@@ -22,7 +46,7 @@ export interface RankingResposta {
   readonly acertos_ch: number;
   readonly acertos_cn: number;
   readonly acertos_mt: number;
-  readonly erros_por_topico: Record<string, number>;
+  readonly erros_por_topico: Record<string, ErrosPorTopicoValor>;
   readonly submitted_at: string;
 }
 
@@ -149,9 +173,11 @@ export function topicosErradosTurma(
 
   for (const r of respostas) {
     const topicos = r.erros_por_topico ?? {};
-    for (const [topico, n] of Object.entries(topicos)) {
+    for (const [topico, valor] of Object.entries(topicos)) {
       const t = topico.trim();
-      if (!t || typeof n !== "number" || n <= 0) continue;
+      if (!t) continue;
+      const { n } = unwrapErroValor(valor);
+      if (n <= 0) continue;
       const prev = totais.get(t) ?? { total: 0, alunos: new Set() };
       prev.total += n;
       prev.alunos.add(r.student_id);
@@ -266,10 +292,14 @@ export function topicoMaisErradoPorArea(
 
   for (const r of respostas) {
     const topicos = r.erros_por_topico ?? {};
-    for (const [topico, n] of Object.entries(topicos)) {
+    for (const [topico, valor] of Object.entries(topicos)) {
       const t = topico.trim();
-      if (!t || typeof n !== "number" || n <= 0) continue;
-      const area = areaDoTopico(t);
+      if (!t) continue;
+      const { n, area: areaAutoritativa } = unwrapErroValor(valor);
+      if (n <= 0) continue;
+      // Prefere area autoritativa (formato novo); se nao tem, usa heuristica
+      // (formato legacy). Tópicos sem área classificavel sao ignorados.
+      const area = areaAutoritativa ?? areaDoTopico(t);
       if (area == null) continue;
       const prev = porTopico.get(t) ?? { area, total: 0, alunos: new Set() };
       prev.total += n;
@@ -308,18 +338,22 @@ export function topicoMaisErradoPorArea(
  * Áreas sem erros retornam array vazio.
  */
 export function topErrosPorArea(
-  erros: Record<string, number>,
+  erros: Record<string, ErrosPorTopicoValor>,
 ): Record<AreaKey, ReadonlyArray<{ topico: string; erros: number }>> {
   const porArea: Record<AreaKey, Array<{ topico: string; erros: number }>> = {
     LC: [], CH: [], CN: [], MT: [],
   };
 
-  for (const [topico, qtd] of Object.entries(erros)) {
+  for (const [topico, valor] of Object.entries(erros)) {
     const t = topico.trim();
-    if (!t || typeof qtd !== "number" || qtd <= 0) continue;
-    const area = areaDoTopico(t);
+    if (!t) continue;
+    const { n, area: areaAutoritativa } = unwrapErroValor(valor);
+    if (n <= 0) continue;
+    // Prefere area autoritativa (formato novo); fallback para heuristica
+    // (formato legacy). Topicos sem area classificavel sao ignorados.
+    const area = areaAutoritativa ?? areaDoTopico(t);
     if (area == null) continue;
-    porArea[area].push({ topico: t, erros: qtd });
+    porArea[area].push({ topico: t, erros: n });
   }
 
   return {
