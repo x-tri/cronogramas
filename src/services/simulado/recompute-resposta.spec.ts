@@ -23,6 +23,10 @@ import { describe, it, expect } from 'vitest'
 
 import { recomputeSimuladoResposta } from './recompute-resposta'
 
+// tsconfig.app.json restringe types a 'vite/client' — declaracao local
+// de process pra esse spec rodar via vitest sem precisar de @types/node.
+declare const process: { readonly env: Readonly<Record<string, string | undefined>> }
+
 const SUPABASE_URL = 'https://comwcnmvnuzqqbypjtqn.supabase.co'
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY
 
