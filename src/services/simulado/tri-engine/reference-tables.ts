@@ -1,14 +1,18 @@
 /**
- * Tabelas de referencia TRI — consolidado de 9 edicoes do ENEM (2009, 2015-2022).
+ * Tabelas de referencia TRI — consolidado de 9 edicoes do ENEM (2009, 2015-2022),
+ * com LC ampliado para incluir ENEM 2024 (n=44 recalculada e n=45 adicionada).
  *
  * Metodo: mediana dos valores Min/Med/Max entre edicoes oficiais do INEP.
- * Origem: port direto de `/Users/home/Desktop/MENTORIA XANDAO 2027/aluno/src/services/tri-reference-tables.ts`.
  *
  * Este arquivo e intencionalmente hardcoded (nao vai para DB) para garantir que
  * o motor seja self-contained e auditavel. Se uma nova calibracao chegar, basta
  * substituir os numeros aqui e bumpar a versao via comentario.
  *
- * Versao: 1.0 (consolidado 2009-2022)
+ * Versao: 1.1 (2026-04-26) — LC n=44 recalculada incluindo 2024 (restaura
+ *   amplitude que estava coincidentemente achatada em 801.7 na mediana 09-22)
+ *   e n=45 LC adicionada (fonte: ENEM 2024 INGLES, unico ano com dado disponivel).
+ *   Demais areas mantidas em mediana 09-22.
+ * Versao: 1.0 — consolidado 2009-2022.
  */
 
 export type RefEntry = {
@@ -20,11 +24,16 @@ export type RefEntry = {
 
 /**
  * Nota sobre tamanho das tabelas:
- * - LC tem 45 entradas (n: 0..44). O anchor oficial consolidado do INEP para
- *   Linguagens esgota em n=44 (ha somente 45 itens, mas a tabela fonte termina
- *   antes do teto maximo). O motor usa `Math.min(nCorrect, ref.length - 1)`
- *   para tratar corretamente o caso n=45.
+ * - LC tem 46 entradas (n: 0..45) desde v1.1 — n=45 vem do ENEM 2024 (unico
+ *   ano com dado). Antes da v1.1, LC parava em n=44 e o motor clampava
+ *   alunos com 45 acertos no teto da tabela.
  * - CH / CN / MT tem 46 entradas (n: 0..45), incluindo o teto maximo.
+ *
+ * Nota sobre escala LC vs outras areas:
+ *   LC tem teto historicamente menor (~795-835) que MT (~960-1000) na escala
+ *   TRI INEP. Isso NAO e bug — reflete a calibracao real do INEP, onde alta
+ *   taxa de acerto em LC (interpretacao basica) penaliza menos que em MT
+ *   (conhecimento tecnico raro). Validado contra ENEM 2024 oficial.
  */
 export const REF_TABLES: Readonly<Record<string, readonly RefEntry[]>> = {
   LC: [
@@ -42,7 +51,8 @@ export const REF_TABLES: Readonly<Record<string, readonly RefEntry[]>> = {
     { n: 33, mn: 588.3, md: 660.0, mx: 702.0 }, { n: 34, mn: 614.1, md: 671.9, mx: 713.9 }, { n: 35, mn: 625.6, md: 683.9, mx: 727.2 },
     { n: 36, mn: 641.9, md: 696.8, mx: 738.5 }, { n: 37, mn: 650.1, md: 706.8, mx: 751.4 }, { n: 38, mn: 667.2, md: 718.2, mx: 764.0 },
     { n: 39, mn: 664.7, md: 728.5, mx: 772.6 }, { n: 40, mn: 698.6, md: 741.2, mx: 787.3 }, { n: 41, mn: 710.0, md: 758.0, mx: 787.4 },
-    { n: 42, mn: 731.3, md: 767.2, mx: 801.1 }, { n: 43, mn: 758.6, md: 778.8, mx: 799.4 }, { n: 44, mn: 801.7, md: 801.7, mx: 801.7 },
+    { n: 42, mn: 731.3, md: 767.2, mx: 801.1 }, { n: 43, mn: 758.6, md: 778.8, mx: 799.4 }, { n: 44, mn: 793.5, md: 797.4, mx: 801.4 },
+    { n: 45, mn: 795.8, md: 795.8, mx: 795.8 },
   ],
   CH: [
     { n: 0, mn: 328.4, md: 328.4, mx: 328.4 }, { n: 1, mn: 328.4, md: 331.9, mx: 362.6 }, { n: 2, mn: 328.4, md: 337.8, mx: 389.0 },
