@@ -62,7 +62,8 @@ export interface SimuladoResultado {
     readonly acertos_mt: number;
     readonly erros_mt: number;
     readonly branco_mt: number;
-    readonly erros_por_topico: Record<string, number>;
+    // Suporta ambos formatos: legacy (number) e novo ({ area, n }).
+    readonly erros_por_topico: Record<string, number | { area: string; n: number }>;
     readonly erros_por_habilidade: Record<string, number>;
     readonly submitted_at: string;
   } | null;
@@ -83,7 +84,7 @@ export interface SubmitSimuladoResponse {
     AreaKey,
     { readonly acertos: number; readonly erros: number; readonly branco: number }
   >;
-  readonly erros_por_topico: Record<string, number>;
+  readonly erros_por_topico: Record<string, number | { area: string; n: number }>;
   readonly erros_por_habilidade: Record<string, number>;
   readonly submitted_at: string;
 }

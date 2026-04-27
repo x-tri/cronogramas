@@ -48,7 +48,9 @@ interface RespostaRow {
   readonly acertos_mt: number;
   readonly erros_mt: number;
   readonly branco_mt: number;
-  readonly erros_por_topico: Record<string, number>;
+  // Suporta ambos formatos: legacy (number) e novo ({ area, n }).
+  // Ver migration 027 e ranking-aggregations.unwrapErroValor.
+  readonly erros_por_topico: Record<string, number | { area: string; n: number }>;
   readonly submitted_at: string;
   readonly simulados?: {
     readonly title: string;
@@ -172,7 +174,9 @@ export function SimuladoEnemAnalyzer({
 
   const topTopicos = useMemo<ReadonlyArray<[string, number]>>(() => {
     if (!selected?.erros_por_topico) return [];
+    // Aceita ambos formatos: legacy (number) e novo ({ area, n }).
     return Object.entries(selected.erros_por_topico)
+      .map(([t, v]): [string, number] => [t, typeof v === "number" ? v : v.n])
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
   }, [selected]);

@@ -184,7 +184,12 @@ describe('submitSimulado — integracao (requer supabase local)', () => {
       expect(result.data.totais.erros).toBe(180)
       expect(result.data.totais.acertos).toBe(0)
       // Mapa de erros deve acumular por topico e habilidade
-      expect(Object.values(result.data.erros_por_topico).reduce((a, b) => a + b, 0)).toBe(180)
+      // Novo formato: { [topico]: { area, n } } — soma os n
+      const totalErros = Object.values(result.data.erros_por_topico).reduce(
+        (acc, entry) => acc + entry.n,
+        0,
+      )
+      expect(totalErros).toBe(180)
     } finally {
       await cleanupSimulado(sid)
     }

@@ -21,6 +21,8 @@ import {
   calcAllTRI,
   calcTotals,
   groupErrorsBy,
+  groupErrorsByWithArea,
+  type ErrosPorTopicoComArea,
   type TriResults,
 } from './tri-engine/engine.ts'
 import { AREAS, type AreaKey } from './tri-engine/reference-tables.ts'
@@ -63,7 +65,7 @@ export interface SubmitResult {
     AreaKey,
     { readonly acertos: number; readonly erros: number; readonly branco: number }
   >
-  readonly erros_por_topico: Record<string, number>
+  readonly erros_por_topico: Record<string, ErrosPorTopicoComArea>
   readonly erros_por_habilidade: Record<string, number>
   readonly submitted_at: string
 }
@@ -281,6 +283,7 @@ export async function submitSimulado(
   const difficulties: number[] = new Array(TOTAL_ITEMS).fill(3)
   const topicos: (string | null)[] = new Array(TOTAL_ITEMS).fill(null)
   const habilidades: (string | null)[] = new Array(TOTAL_ITEMS).fill(null)
+  const areas: (AreaKey | null)[] = new Array(TOTAL_ITEMS).fill(null)
 
   for (const item of itens) {
     const idx = item.numero - 1
@@ -289,6 +292,7 @@ export async function submitSimulado(
     difficulties[idx] = item.dificuldade
     topicos[idx] = item.topico
     habilidades[idx] = item.habilidade
+    areas[idx] = item.area
   }
 
   const answersArray = answersMapToArray(answers)
@@ -297,7 +301,9 @@ export async function submitSimulado(
   const tri = calcAllTRI(answersArray, { gabarito, difficulties })
   const totais = calcTotals(answersArray, gabarito)
   const porArea = computeAreaBreakdown(answersArray, gabarito)
-  const errosPorTopico = groupErrorsBy(answersArray, gabarito, topicos)
+  // erros_por_topico: novo formato { [topico]: { area, n } } — area autoritativa
+  // de simulado_itens.area, evitando depender de prefixo no string do topico.
+  const errosPorTopico = groupErrorsByWithArea(answersArray, gabarito, topicos, areas)
   const errosPorHabilidade = groupErrorsBy(answersArray, gabarito, habilidades)
 
   // 8. Persiste (RLS bypassada via service_role).

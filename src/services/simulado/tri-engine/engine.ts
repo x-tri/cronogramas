@@ -291,3 +291,49 @@ export function groupErrorsBy(
   }
   return out
 }
+
+/**
+ * Versao do groupErrorsBy que tambem registra a `area` autoritativa de cada
+ * item (vinda de simulado_itens.area). Resolve bug em que topicos sem prefixo
+ * "Materia - " caiam num "buraco" do classificador heuristico.
+ *
+ * Retorna: { [topico]: { area: AreaKey, n: number } }
+ *
+ * Se um mesmo topico aparece em areas diferentes (caso patologico — coord
+ * cadastrou tudo errado), a primeira area vista vence. Isso e raro e a
+ * incoerencia indica problema de cadastro a ser tratado a parte.
+ */
+export interface ErrosPorTopicoComArea {
+  readonly area: AreaKey
+  readonly n: number
+}
+
+export function groupErrorsByWithArea(
+  answers: readonly string[],
+  gabarito: readonly string[],
+  itemTopicos: readonly (string | null | undefined)[],
+  itemAreas: readonly (AreaKey | null | undefined)[],
+): Record<string, ErrosPorTopicoComArea> {
+  assertFullExam([
+    { name: 'answers', value: answers },
+    { name: 'gabarito', value: gabarito },
+    { name: 'itemTopicos', value: itemTopicos },
+    { name: 'itemAreas', value: itemAreas },
+  ])
+
+  const out: Record<string, ErrosPorTopicoComArea> = {}
+  for (let i = 0; i < TOTAL_ITEMS; i++) {
+    const ans = normalizeAnswer(answers[i])
+    if (!ans) continue
+    const correct = normalizeAnswer(gabarito[i])
+    if (ans === correct) continue
+    const topico = itemTopicos[i]
+    const area = itemAreas[i]
+    if (!topico || !area) continue
+    const prev = out[topico]
+    out[topico] = prev
+      ? { area: prev.area, n: prev.n + 1 }
+      : { area, n: 1 }
+  }
+  return out
+}

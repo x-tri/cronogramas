@@ -95,7 +95,9 @@ interface RespostaRow {
   acertos_mt: number
   erros_mt: number
   branco_mt: number
-  erros_por_topico: Record<string, number>
+  // Suporta ambos formatos: legacy (number) e novo ({ area, n }).
+  // Ver migration 027 e ranking-aggregations.unwrapErroValor.
+  erros_por_topico: Record<string, number | { area: string; n: number }>
   erros_por_habilidade: Record<string, number>
 }
 
