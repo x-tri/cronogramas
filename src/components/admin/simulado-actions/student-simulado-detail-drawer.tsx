@@ -98,7 +98,7 @@ export function StudentSimuladoDetailDrawer({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-3xl max-h-[88vh] overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+      <div className="w-full max-w-3xl max-h-[95vh] overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
         {/* Header */}
         <header className="flex items-start justify-between gap-3 border-b border-[#e5e7eb] px-5 py-4">
           <div className="min-w-0">
@@ -123,14 +123,14 @@ export function StudentSimuladoDetailDrawer({
           </button>
         </header>
 
-        <div className="overflow-y-auto p-5 space-y-5" style={{ maxHeight: "calc(88vh - 70px)" }}>
+        <div className="overflow-y-auto p-5 space-y-5" style={{ maxHeight: "calc(95vh - 70px)" }}>
           {/* Resumo: media + acertos totais + diff turma */}
           <section className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-[#e5e7eb] bg-white p-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#71717a]">
                 Média TRI
               </p>
-              <p className="mt-1 text-2xl font-black text-[#1d1d1f]">
+              <p className="mt-1 text-base font-black text-[#1d1d1f]">
                 {formatScore(mediaTri)}
               </p>
             </div>
@@ -138,9 +138,9 @@ export function StudentSimuladoDetailDrawer({
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#71717a]">
                 Acertos totais
               </p>
-              <p className="mt-1 text-2xl font-black text-[#1d1d1f]">
+              <p className="mt-1 text-base font-black text-[#1d1d1f]">
                 {totalAcertos}
-                <span className="text-sm font-normal text-[#94a3b8]">/180</span>
+                <span className="text-xs font-normal text-[#94a3b8]">/180</span>
               </p>
             </div>
             <div className="rounded-xl border border-[#e5e7eb] bg-white p-3">
@@ -148,7 +148,7 @@ export function StudentSimuladoDetailDrawer({
                 ± Turma
               </p>
               <p
-                className={`mt-1 text-2xl font-black ${
+                className={`mt-1 text-base font-black ${
                   diffTurma == null
                     ? "text-[#94a3b8]"
                     : diffTurma >= 0
@@ -186,7 +186,7 @@ export function StudentSimuladoDetailDrawer({
                       {area} · {AREA_LABEL[area]}
                     </p>
                     <p
-                      className="mt-1 text-2xl font-black tabular-nums"
+                      className="mt-1 text-base font-black tabular-nums"
                       style={{ color: triValor == null ? "#cbd5e1" : AREA_COLOR[area] }}
                       title={triValor == null ? "Não submetido" : undefined}
                     >
