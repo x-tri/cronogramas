@@ -224,7 +224,13 @@ export function SisuGoalSelector({
       cidade,
       universidade,
       courseId: selectedCourse.id,
-      courseLabel: selectedCourse.nome,
+      courseLabel: [
+        selectedCourse.nome,
+        selectedCourse.campus,
+        selectedCourse.turno,
+      ]
+        .filter((part): part is string => Boolean(part && part.trim()))
+        .join(' · '),
     })
   }, [cidade, cursoId, cursos, estado, onChange, onCutoffChange, universidade])
 
@@ -322,7 +328,12 @@ export function SisuGoalSelector({
           onChange={(event) => setCursoId(event.target.value)}
           options={cursos.map((item) => ({
             value: String(item.id),
-            label: item.campus ? `${item.nome} · ${item.campus}` : item.nome,
+            // Inclui turno no label para o coord distinguir cursos com mesmo
+            // nome+campus mas turnos diferentes (ex: Direito Natal Matutino
+            // vs Direito Natal Vespertino).
+            label: [item.nome, item.campus, item.turno]
+              .filter((part): part is string => Boolean(part && part.trim()))
+              .join(' · '),
           }))}
           placeholder="Selecione o curso"
           disabled={!universidade}

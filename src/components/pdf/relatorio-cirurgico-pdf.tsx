@@ -235,7 +235,7 @@ export function RelatorioCirurgicoPDF({ report, nomeAluno, simulado }: Props) {
   const topRoi = sortedRoi[0]
   const botRoi = sortedRoi[sortedRoi.length - 1]
   const cursoNome = sisuAnalysis.curso
-    ? `${sisuAnalysis.curso.nome} — ${sisuAnalysis.curso.universidade}${sisuAnalysis.curso.campus ? ` (${sisuAnalysis.curso.campus})` : ''}${sisuAnalysis.curso.estado ? ` — ${sisuAnalysis.curso.estado}` : ''}`
+    ? `${sisuAnalysis.curso.nome} — ${sisuAnalysis.curso.universidade}${sisuAnalysis.curso.campus ? ` (${sisuAnalysis.curso.campus})` : ''}${sisuAnalysis.curso.turno ? ` · ${sisuAnalysis.curso.turno}` : ''}${sisuAnalysis.curso.estado ? ` — ${sisuAnalysis.curso.estado}` : ''}`
     : null
   const resumoGap = gapValue < 0
     ? `faltam ${fmtNota(Math.abs(gapValue))} pontos para alcançar a nota de corte`
