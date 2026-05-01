@@ -1,6 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getQuestionBankSupabaseClient } from '../lib/question-bank-supabase'
 import type { AreaSigla, QuestaoRecomendada } from '../types/report'
+import {
+  fetchQuestionByYearIndex,
+  mapApiToOptions,
+  mapApiToQuestionCandidate,
+} from './api-questoes-xtri'
 
 export interface QuestionCandidateRow {
   readonly id: string
@@ -368,43 +373,52 @@ function buildOptionsByQuestionId(
   return optionsByQuestionId
 }
 
+/**
+ * Busca uma questao especifica do ENEM por (ano, posicao).
+ *
+ * Migracao 2026-05-01: usa api.questoes.xtri.online em vez do banco antigo.
+ * O parametro `client` e mantido por backward-compat na assinatura mas nao
+ * eh mais utilizado. Sem fallback (PO confirmou que API nao falha).
+ */
 async function fetchCandidatesForItem(params: {
   sourceYear: number
   sourceQuestion: number
-  client: SupabaseClient
+  client?: SupabaseClient
 }): Promise<QuestionCandidateRow[]> {
-  const { data } = await params.client
-    .from('questions')
-    .select('id, stem, source_year, source_question, source_exam, difficulty, support_text, image_url, image_alt, created_at')
-    .eq('source', 'ENEM')
-    .eq('source_year', params.sourceYear)
-    .eq('source_question', params.sourceQuestion)
-
-  return (data ?? []) as QuestionCandidateRow[]
+  // Tenta sem language primeiro (cobre 96% das questoes).
+  // Se for posicao 1-5 LC, a API retorna 1 das 2 (Ingles ou Espanhol) — para
+  // cobertura total de ambas, o caller pode chamar 2x com language explicito.
+  const apiQ = await fetchQuestionByYearIndex(params.sourceYear, params.sourceQuestion)
+  if (!apiQ) return []
+  return [mapApiToQuestionCandidate(apiQ)]
 }
 
+/**
+ * Como cada ApiQuestion ja vem com `alternatives` no detalhe, refazemos o
+ * fetch via id da nova API e mapeamos. Cache poderia ser adicionado se virar
+ * gargalo (hoje cada caderno PDF gera ~40 questoes, ~10s pelo total das 2 idas
+ * por questao).
+ *
+ * Migracao 2026-05-01: usa api.questoes.xtri.online.
+ */
 async function fetchOptionsForCandidates(params: {
   candidates: ReadonlyArray<QuestionCandidateRow>
-  client: SupabaseClient
+  client?: SupabaseClient
 }): Promise<Map<string, QuestionOptionRow[]>> {
-  const questionIds = params.candidates.map((candidate) => candidate.id)
-  if (questionIds.length === 0) {
+  if (params.candidates.length === 0) {
     return new Map()
   }
-
-  const { data } = await params.client
-    .from('question_options')
-    .select('question_id, letter, text, is_correct')
-    .in('question_id', questionIds)
-
-  return buildOptionsByQuestionId(
-    ((data ?? []) as Array<{
-      question_id: string
-      letter: string
-      text: string
-      is_correct: boolean
-    }>),
-  )
+  const result = new Map<string, QuestionOptionRow[]>()
+  // Para cada candidate, refetch detail. Sequencial pra nao saturar a API
+  // (Promise.all dispara N concorrentes; ja temos paralelismo no caller).
+  for (const c of params.candidates) {
+    if (c.source_year == null || c.source_question == null) continue
+    const apiQ = await fetchQuestionByYearIndex(c.source_year, c.source_question)
+    if (apiQ) {
+      result.set(c.id, mapApiToOptions(apiQ))
+    }
+  }
+  return result
 }
 
 export async function resolveItem(

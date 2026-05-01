@@ -12,6 +12,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getInepSupabaseClient } from '../lib/inep-supabase'
 import { getQuestionBankSupabaseClient } from '../lib/question-bank-supabase'
+import {
+  AREA_TO_DISCIPLINE,
+  fetchQuestionsByDiscipline,
+  fetchQuestionsByYearIndexBatch,
+  filterValidForTri,
+  mapApiToOptions,
+  mapApiToQuestionCandidate,
+} from './api-questoes-xtri'
 import type { SimuladoResult } from '../types/supabase'
 import type {
   AreaSigla,
@@ -1188,37 +1196,35 @@ async function fetchTopicMatchedRecommendations(params: {
     return []
   }
 
-  const { data: topicRaw } = await params.provasClient
-    .from('questions')
-    .select('id, stem, source_year, source_question, source_exam, difficulty, support_text, image_url, image_alt')
-    .eq('source', 'ENEM')
-    .in('subject_id', params.subjectIds)
-    .or(searchFilter)
-    .order('source_year', { ascending: false })
-    .limit(160)
-
-  const candidateRows = (topicRaw ?? []).filter(
-    (row) => !isQuestionQuarantined(row.id as string),
-  ) as QuestionCandidateRow[]
+  // Migracao 2026-05-01: api.questoes.xtri.online substitui banco antigo.
+  // A API nao tem busca textual server-side, entao puxamos as questoes da
+  // disciplina (ultimos 3 anos = ~135) e a relevancia textual e calculada
+  // localmente em scoreTopicTextRelevance abaixo. Excluimos abandonadas
+  // (in_item_aban) e ENEM 2025 sem param_b (microdados nao saidos — opcao β).
+  const discipline = AREA_TO_DISCIPLINE[params.area]
+  const recentYears = [2024, 2023, 2022]
+  const apiQuestionsByYear = await Promise.all(
+    recentYears.map((year) =>
+      fetchQuestionsByDiscipline(year, discipline, { includeDetails: true }),
+    ),
+  )
+  const apiQuestionsAll = filterValidForTri(apiQuestionsByYear.flat(), {
+    requireParamB: true,
+  })
+  const candidateRows: QuestionCandidateRow[] = apiQuestionsAll
+    .map(mapApiToQuestionCandidate)
+    .filter((row) => !isQuestionQuarantined(row.id))
 
   if (candidateRows.length === 0) {
     return []
   }
 
-  const qIds = candidateRows.map((question) => question.id as string)
-  const { data: allOptions } = await params.provasClient
-    .from('question_options')
-    .select('question_id, letter, text, is_correct')
-    .in('question_id', qIds)
-
-  const optionsByQuestionId = buildOptionsByQuestionId(
-    ((allOptions ?? []) as Array<{
-      question_id: string
-      letter: string
-      text: string
-      is_correct: boolean
-    }>),
-  )
+  // Como ja temos as ApiQuestion com alternativas (includeDetails:true acima),
+  // mapeamos pra o formato legado sem ir mais a rede.
+  const optionsByQuestionId = new Map<string, ReadonlyArray<QuestionOptionRow>>()
+  for (const apiQ of apiQuestionsAll) {
+    optionsByQuestionId.set(String(apiQ.id), mapApiToOptions(apiQ))
+  }
 
   const chosen = await chooseQuestionRows(candidateRows, optionsByQuestionId)
   const difficultyByBucket: Record<string, number> = {
@@ -1480,37 +1486,27 @@ async function computeQuestoesRecomendadas(
             )
 
             if (sorted.length > 0) {
-              // 1d. Buscar questões com texto completo no banco de provas
-              const orFilter = sorted
-                .map(c => `and(source_year.eq.${c.ano},source_question.eq.${c.posicao})`)
-                .join(',')
-
-              const { data: questoesRaw } = await provasClient
-                .from('questions')
-                .select('id, stem, source_year, source_question, source_exam, difficulty, support_text, image_url, image_alt')
-                .eq('source', 'ENEM')
-                .or(orFilter)
-                .limit(80)
-
-              const candidateRows = (questoesRaw ?? []).filter(
-                (row) => !isQuestionQuarantined(row.id as string),
-              ) as QuestionCandidateRow[]
+              // 1d. Migracao 2026-05-01: api.questoes.xtri.online em vez do
+              // banco antigo. Faz batch fetch dos pares (ano, posicao) em
+              // paralelo. As ApiQuestion ja vem com alternativas no detail.
+              const apiResults = await fetchQuestionsByYearIndexBatch(
+                sorted.map((c) => ({ year: c.ano, index: c.posicao })),
+              )
+              const apiQuestionsRaw = apiResults.filter(
+                (q): q is NonNullable<typeof q> => q != null,
+              )
+              const apiQuestions = filterValidForTri(apiQuestionsRaw, {
+                requireParamB: true,
+              })
+              const candidateRows: QuestionCandidateRow[] = apiQuestions
+                .map(mapApiToQuestionCandidate)
+                .filter((row) => !isQuestionQuarantined(row.id))
 
               if (candidateRows.length > 0) {
-                const qIds = candidateRows.map(q => q.id as string)
-                const { data: allOptions } = await provasClient
-                  .from('question_options')
-                  .select('question_id, letter, text, is_correct')
-                  .in('question_id', qIds)
-
-                const optsByQ = buildOptionsByQuestionId(
-                  ((allOptions ?? []) as Array<{
-                    question_id: string
-                    letter: string
-                    text: string
-                    is_correct: boolean
-                  }>),
-                )
+                const optsByQ = new Map<string, ReadonlyArray<QuestionOptionRow>>()
+                for (const apiQ of apiQuestions) {
+                  optsByQ.set(String(apiQ.id), mapApiToOptions(apiQ))
+                }
                 const questoes = await chooseQuestionRows(candidateRows, optsByQ)
 
                 const pairParamMap = new Map(sorted.map(c => [`${c.ano}_${c.posicao}`, c]))
@@ -1567,35 +1563,28 @@ async function computeQuestoesRecomendadas(
 
       // Completa com fallback por área sem sobrescrever o que já foi personalizado.
       if (recomendadas.length < TARGET_QUESTOES_POR_AREA) {
-        const subjectIds = subjectsByArea.get(area) ?? []
-        if (subjectIds.length > 0) {
-          const { data: questoesFallbackRaw } = await provasClient
-            .from('questions')
-            .select('id, stem, source_year, source_question, source_exam, difficulty, support_text, image_url, image_alt')
-            .eq('source', 'ENEM')
-            .in('subject_id', subjectIds)
-            .order('source_year', { ascending: false })
-            .limit(120)
-
-          const candidateRows = (questoesFallbackRaw ?? []).filter(
-            (row) => !isQuestionQuarantined(row.id as string),
-          ) as QuestionCandidateRow[]
+        // Migracao 2026-05-01: api.questoes.xtri.online em vez do banco antigo.
+        // Fallback usa ultimos 3 anos da disciplina (ja calibrados) — ENEM 2025
+        // entra quando microdados sairem (filtro requireParamB).
+        const discipline = AREA_TO_DISCIPLINE[area]
+        const fallbackYears = [2024, 2023, 2022]
+        const apiByYear = await Promise.all(
+          fallbackYears.map((y) =>
+            fetchQuestionsByDiscipline(y, discipline, { includeDetails: true }),
+          ),
+        )
+        const apiQuestionsFallback = filterValidForTri(apiByYear.flat(), {
+          requireParamB: true,
+        })
+        const candidateRows: QuestionCandidateRow[] = apiQuestionsFallback
+          .map(mapApiToQuestionCandidate)
+          .filter((row) => !isQuestionQuarantined(row.id))
 
           if (candidateRows.length > 0) {
-            const qIds = candidateRows.map(q => q.id as string)
-            const { data: allOptions } = await provasClient
-              .from('question_options')
-              .select('question_id, letter, text, is_correct')
-              .in('question_id', qIds)
-
-            const optsByQ = buildOptionsByQuestionId(
-              ((allOptions ?? []) as Array<{
-                question_id: string
-                letter: string
-                text: string
-                is_correct: boolean
-              }>),
-            )
+            const optsByQ = new Map<string, ReadonlyArray<QuestionOptionRow>>()
+            for (const apiQ of apiQuestionsFallback) {
+              optsByQ.set(String(apiQ.id), mapApiToOptions(apiQ))
+            }
             const questoesFallback = await chooseQuestionRows(candidateRows, optsByQ)
 
             const diffMap: Record<string, number> = { VERY_EASY: -1.5, EASY: -0.5, MEDIUM: 0.5, HARD: 1.5, VERY_HARD: 2.5 }
@@ -1635,7 +1624,6 @@ async function computeQuestoesRecomendadas(
               MAX_QUESTOES_AREA_FALLBACK_POR_AREA,
             )
           }
-        }
       }
 
       // Distribuir as questões recomendadas entre as top habilidades por numeroHabilidade.
