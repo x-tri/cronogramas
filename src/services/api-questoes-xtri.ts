@@ -103,10 +103,27 @@ async function apiGet<T>(path: string): Promise<T> {
 }
 
 /**
+ * Indices 1-5 do caderno ENEM sao linguagem estrangeira (LC) e tem 2 versoes
+ * (Ingles e Espanhol). Quando o caller nao especifica, default = Ingles (95%+
+ * dos alunos brasileiros). Caller pode passar 'espanhol' explicitamente ou
+ * `null` para nao filtrar (devolvendo qualquer uma das 2).
+ */
+const DEFAULT_LC_LANGUAGE: ApiLanguage = 'ingles'
+
+function resolveLanguageForIndex(
+  index: number,
+  language: ApiLanguage | undefined,
+): ApiLanguage | null {
+  if (language !== undefined) return language
+  if (index >= 1 && index <= 5) return DEFAULT_LC_LANGUAGE
+  return null
+}
+
+/**
  * Busca uma questao especifica pelo numero (index) na prova de um ano.
  * Quando `language` for fornecido, filtra entre Ingles/Espanhol (LC tem 2
- * versoes nas posicoes 1-5 da prova). Para outras areas, language deve ser
- * null/undefined.
+ * versoes nas posicoes 1-5 da prova). Quando `language` for omitido, aplica
+ * default (Ingles) para indices 1-5; demais indices nao precisam de filtro.
  *
  * Retorna null se nao achar.
  */
@@ -116,13 +133,28 @@ export async function fetchQuestionByYearIndex(
   language?: ApiLanguage,
 ): Promise<ApiQuestion | null> {
   const qs = new URLSearchParams({ index: String(index) })
-  if (language) qs.set('language', language)
+  const effective = resolveLanguageForIndex(index, language)
+  if (effective) qs.set('language', effective)
   const list = await apiGet<ApiPaginated<ApiQuestion>>(
     `/exams/${year}/questions/?${qs.toString()}`,
   )
-  if (!list.results || list.results.length === 0) return null
-  // O endpoint listing nao traz `context`, `alternatives` etc. — buscar detail.
-  return await fetchQuestionDetail(list.results[0]!.id)
+  if (list.results && list.results.length > 0) {
+    // O endpoint listing nao traz `context`, `alternatives` etc. — buscar detail.
+    return await fetchQuestionDetail(list.results[0]!.id)
+  }
+  // Fallback: filtro pelo default (Ingles) pode dar 0 resultados em provas
+  // antigas (ex: ENEM 2009 nao tinha Ingles/Espanhol como filtro). Caller
+  // que passou language explicito recebe null direto; quem caiu no default
+  // tenta de novo sem filtro.
+  if (effective && language === undefined) {
+    const fb = await apiGet<ApiPaginated<ApiQuestion>>(
+      `/exams/${year}/questions/?index=${encodeURIComponent(String(index))}`,
+    )
+    if (fb.results && fb.results.length > 0) {
+      return await fetchQuestionDetail(fb.results[0]!.id)
+    }
+  }
+  return null
 }
 
 export async function fetchQuestionDetail(id: number): Promise<ApiQuestion> {
@@ -153,10 +185,16 @@ export async function fetchQuestionsByYearIndexBatch(
 export async function fetchQuestionsByDiscipline(
   year: number,
   discipline: ApiDiscipline,
-  options?: { language?: ApiLanguage; includeDetails?: boolean },
+  options?: { language?: ApiLanguage | null; includeDetails?: boolean },
 ): Promise<ApiQuestion[]> {
   const qs = new URLSearchParams({ discipline })
-  if (options?.language) qs.set('language', options.language)
+  // Default Ingles para LC (alinhado com fetchQuestionByYearIndex). Caller
+  // passa `null` explicito para desativar e receber as 2 versoes.
+  const effectiveLang =
+    options?.language !== undefined
+      ? options.language
+      : (discipline === 'linguagens' ? DEFAULT_LC_LANGUAGE : null)
+  if (effectiveLang) qs.set('language', effectiveLang)
   let url: string | null = `/exams/${year}/questions/?${qs.toString()}`
   const collected: ApiQuestion[] = []
   while (url) {

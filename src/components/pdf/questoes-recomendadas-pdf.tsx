@@ -96,6 +96,7 @@ const s = StyleSheet.create({
   questaoBox: { borderWidth: 0.5, borderColor: '#e3e2e0', borderRadius: 4, overflow: 'hidden' },
   questaoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4 },
   questaoNumero: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#1d1d1f' },
+  questaoTri: { fontSize: 7, fontFamily: 'Helvetica', color: '#71717a' },
   // Texto de apoio
   textoApoioBox: { marginHorizontal: 8, marginBottom: 4, paddingLeft: 6, paddingVertical: 4, paddingRight: 4, borderLeftWidth: 3, borderLeftColor: '#3b82f6', backgroundColor: '#f7f6f3', borderRadius: 2 },
   textoApoio: { fontSize: 7, fontStyle: 'italic', color: '#374151', lineHeight: 1.5 },
@@ -436,6 +437,13 @@ function QuestionCard({
           {questao.posicaoCaderno ? ` -- Q${questao.posicaoCaderno}` : ''}
           {' -- '}{area}
         </Text>
+        <Text style={s.questaoTri}>
+          {/* dificuldade pode ser 0 quando o algoritmo nao pegou param_b
+              (ex: ENEM 2025 sem microdados); mostra travessao nesses casos */}
+          TRI: {questao.dificuldade && questao.dificuldade !== 0
+            ? questao.dificuldade.toFixed(2)
+            : '—'}
+        </Text>
       </View>
 
       {textoApoioLimpo ? (
@@ -465,13 +473,16 @@ function QuestionCard({
         <View style={s.enunciadoBox}>
           <Text style={s.enunciado}>{enunciadoLimpo}</Text>
         </View>
-      ) : (
+      ) : !textoApoioLimpo ? (
+        // So mostra fallback "Item NNNNN" se NEM enunciado NEM texto de apoio
+        // existirem. Quando context (textoApoio) ja tem o conteudo da questao,
+        // a label tecnica e ruido — alternativas + texto de apoio bastam.
         <View style={s.semConteudoBox}>
           <Text style={s.semConteudoText}>
             Questao ENEM {questao.ano} -- Item {questao.coItem} -- {AREA_NOMES[questao.area] ?? questao.area}
           </Text>
         </View>
-      )}
+      ) : null}
 
       {questao.alternativas && questao.alternativas.length > 0 ? (
         <View style={s.alternativasBox}>

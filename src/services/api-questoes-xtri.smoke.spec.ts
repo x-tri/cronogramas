@@ -151,6 +151,38 @@ describe('smoke api.questoes.xtri.online (rodar com SMOKE_API=1)', () => {
     60_000,
   )
 
+  it.runIf(SHOULD_RUN)(
+    'index 1-5 LC default Ingles (alinhado com a maioria dos alunos BR)',
+    async () => {
+      const q = await fetchQuestionByYearIndex(2024, 1)
+      expect(q).not.toBeNull()
+      expect(q!.discipline).toBe('linguagens')
+      expect(q!.language).toBe('ingles')
+      console.log(`  ✓ Q1/2024 default = ingles (era aleatoria antes)`)
+    },
+    30_000,
+  )
+
+  it.runIf(SHOULD_RUN)(
+    'index 1-5 LC com language=espanhol explicito retorna espanhol',
+    async () => {
+      const q = await fetchQuestionByYearIndex(2024, 1, 'espanhol')
+      expect(q).not.toBeNull()
+      expect(q!.language).toBe('espanhol')
+    },
+    30_000,
+  )
+
+  it.runIf(SHOULD_RUN)(
+    'index >= 6 LC nao tem language (ja unico)',
+    async () => {
+      const q = await fetchQuestionByYearIndex(2024, 17)
+      expect(q).not.toBeNull()
+      expect(q!.language).toBeNull()
+    },
+    30_000,
+  )
+
   it('skipa em CI (sem SMOKE_API)', () => {
     if (!SHOULD_RUN) console.log('  ⚠ skip — defina SMOKE_API=1 pra rodar')
     expect(true).toBe(true)
