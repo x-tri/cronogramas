@@ -1,4 +1,5 @@
 import type { DataRepository } from './repository'
+import type { HorarioOficial } from '../types/domain'
 import type {
   CronogramaRow,
   BlocoCronogramaRow,
@@ -170,9 +171,41 @@ export function createSupabaseRepository(): DataRepository {
     },
 
     schedules: {
-      getOfficialSchedule: async (turma) => {
-        // TODO: Migrar para Supabase quando tabela existir
-        return getHorariosPorTurma(turma)
+      getOfficialSchedule: async (turma, schoolId, anoLetivo) => {
+        // Sem schoolId, mantem comportamento legacy (mock Marista por turma).
+        // Quando vier schoolId, le do banco school_schedules — usado por
+        // escolas que ja tiveram a grade cadastrada (ex: Dom Bosco/2026 via
+        // migration 029). Fallback no mock se a query nao retornar nada
+        // (ex: Marista, que ainda nao foi migrado).
+        if (!schoolId) {
+          return getHorariosPorTurma(turma)
+        }
+        const ano = anoLetivo ?? 2026
+        const { data, error } = await supabase
+          .from('school_schedules')
+          .select('id, turma, dia_semana, horario_inicio, horario_fim, turno, disciplina, professor')
+          .eq('school_id', schoolId)
+          .eq('turma', turma)
+          .eq('ano_letivo', ano)
+          .order('dia_semana')
+          .order('horario_inicio')
+        if (error) {
+          console.warn('[supabase-repository] school_schedules falhou, fallback mock:', error.message)
+          return getHorariosPorTurma(turma)
+        }
+        if (!data || data.length === 0) {
+          return getHorariosPorTurma(turma)
+        }
+        return data.map((row): HorarioOficial => ({
+          id: row.id as string,
+          turma: row.turma as string,
+          diaSemana: row.dia_semana as HorarioOficial['diaSemana'],
+          horarioInicio: row.horario_inicio as string,
+          horarioFim: row.horario_fim as string,
+          turno: row.turno as HorarioOficial['turno'],
+          disciplina: row.disciplina as string,
+          professor: (row.professor as string | null) ?? null,
+        }))
       },
     },
 

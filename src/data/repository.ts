@@ -13,7 +13,22 @@ export type StudentRepository = {
 }
 
 export type ScheduleRepository = {
-  getOfficialSchedule: (turma: string) => Promise<HorarioOficial[]>
+  /**
+   * Carrega a grade oficial de uma turma.
+   *
+   * @param turma  Identificador da turma como salvo em `students.turma`
+   *               (ex: 'A' para Marista; 'Turma 300' para Dom Bosco).
+   * @param schoolId  Opcional. Quando fornecido, busca em `school_schedules`
+   *                  filtrando por escola. Quando omitido, faz fallback no
+   *                  mock por turma (legado Marista). Permite que escolas
+   *                  com turmas homonimas (ex: 'A') nao colidam.
+   * @param anoLetivo Opcional, default 2026.
+   */
+  getOfficialSchedule: (
+    turma: string,
+    schoolId?: string | null,
+    anoLetivo?: number,
+  ) => Promise<HorarioOficial[]>
 }
 
 export type CronogramaRepository = {

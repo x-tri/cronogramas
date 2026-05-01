@@ -89,9 +89,14 @@ export function StudentSearch({ variant = 'modal' }: StudentSearchProps) {
 
       setStudent(student)
 
-      // Load official schedule for the student's class
+      // Load official schedule for the student's class.
+      // Passa escolaId pra suportar escolas com turmas no mesmo nome (ex: 'A',
+      // 'Turma 300') e ler do banco school_schedules quando disponivel.
       setLoadingSchedule(true)
-      const schedule = await repo.schedules.getOfficialSchedule(student.turma)
+      const schedule = await repo.schedules.getOfficialSchedule(
+        student.turma,
+        student.escolaId ?? null,
+      )
       setOfficialSchedule(schedule)
 
       // Load existing cronograma and blocks for this student
