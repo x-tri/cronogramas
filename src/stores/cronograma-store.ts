@@ -504,29 +504,3 @@ export function selectBlocksForCell(
   return state.blocks.filter((b) => b.diaSemana === dia && b.turno === turno)
 }
 
-export function selectOfficialForCell(
-  state: CronogramaState,
-  dia: DiaSemana,
-  turno: Turno
-): HorarioOficial[] {
-  return state.officialSchedule.filter(
-    (h) => h.diaSemana === dia && h.turno === turno
-  )
-}
-
-export function isSlotOccupiedByOfficial(
-  state: CronogramaState,
-  dia: DiaSemana,
-  turno: Turno,
-  slotIndex: number
-): boolean {
-  const slot = getSlotByIndex(turno, slotIndex)
-  if (!slot) return false
-
-  return state.officialSchedule.some(
-    (h) =>
-      h.diaSemana === dia &&
-      h.turno === turno &&
-      h.horarioInicio === slot.inicio
-  )
-}

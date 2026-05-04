@@ -1,5 +1,5 @@
 import type { BlocoCronograma, DiaSemana, HorarioOficial, Turno } from '../../types/domain'
-import { TURNOS_CONFIG } from '../../constants/time-slots'
+import { TURNOS_CONFIG, isPlaceholderHorario } from '../../constants/time-slots'
 import { TimeSlot } from './time-slot'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 
@@ -38,9 +38,12 @@ export function KanbanCell({
   const slots = slotsOverride?.[turno] ?? turnoConfig.slots
 
   const getOfficialForSlot = (slotInicio: string): HorarioOficial | undefined => {
-    return officialSchedule.find(
+    const found = officialSchedule.find(
       (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slotInicio
     )
+    // Placeholder (disciplina='—') indica slot existe mas sem aula real;
+    // devolve undefined pra UI mostrar slot vazio editavel.
+    return found && !isPlaceholderHorario(found) ? found : undefined
   }
 
   const getBlockForSlot = (slotInicio: string): BlocoCronograma | undefined => {

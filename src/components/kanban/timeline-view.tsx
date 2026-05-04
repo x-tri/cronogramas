@@ -1,7 +1,7 @@
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, DIAS_SEMANA_LABELS, TURNOS, TURNO_LABELS } from '../../types/domain'
 import type { BlocoCronograma, DiaSemana, Turno } from '../../types/domain'
-import { TURNOS_CONFIG } from '../../constants/time-slots'
+import { TURNOS_CONFIG, isPlaceholderHorario } from '../../constants/time-slots'
 import { detectAreaFromTitle } from '../../constants/colors'
 import { BloquearTurnoButtons } from '../cronograma/bloquear-turno-buttons'
 
@@ -34,9 +34,13 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
   const isToday = (date: Date) => new Date().toDateString() === date.toDateString()
 
   function getOfficial(dia: DiaSemana, turno: Turno, slotInicio: string) {
-    return officialSchedule.find(
+    const found = officialSchedule.find(
       (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slotInicio
     )
+    // Placeholder ('—'): slot existe na grade mas sem aula real (ex: Dom Bosco
+    // tarde sem atividade definida). Devolve undefined para UI renderizar
+    // celula vazia clicavel.
+    return found && !isPlaceholderHorario(found) ? found : undefined
   }
 
   function getBlock(dia: DiaSemana, turno: Turno, slotInicio: string) {

@@ -3,7 +3,7 @@ import type { DragEndEvent, DragStartEvent, DragOverEvent, DropAnimation } from 
 import { useState, useCallback, useMemo } from 'react'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, DIAS_SEMANA_LABELS, TURNOS, TURNO_LABELS, type BlocoCronograma, type DiaSemana, type Turno } from '../../types/domain'
-import { TURNOS_CONFIG, getSlotByIndex } from '../../constants/time-slots'
+import { TURNOS_CONFIG, getSlotByIndex, isPlaceholderHorario } from '../../constants/time-slots'
 import { getWeekBounds } from '../week-utils'
 import { detectAreaFromTitle } from '../../constants/colors'
 import { KanbanSlot } from './kanban-slot'
@@ -53,9 +53,10 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
   const isToday = (date: Date) => new Date().toDateString() === date.toDateString()
 
   function getOfficial(dia: DiaSemana, turno: Turno, slotInicio: string) {
-    return officialSchedule.find(
+    const found = officialSchedule.find(
       (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slotInicio
     )
+    return found && !isPlaceholderHorario(found) ? found : undefined
   }
 
   function getBlock(dia: DiaSemana, turno: Turno, slotInicio: string) {
@@ -82,8 +83,11 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
     const { dia, turno, slotIndex } = dropData
     const slot = getSlotByIndex(turno, slotIndex)
     if (!slot) { setDropTarget(null); return }
+    // Slot eh "ocupado por aula oficial" so se for aula real (nao placeholder).
+    // Placeholders (disciplina='—') sao slots disponiveis pra coord cadastrar atividades.
     const isOccupiedByOfficial = officialSchedule.some(
       (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slot.inicio
+        && !isPlaceholderHorario(h)
     )
     if (isOccupiedByOfficial) { setDropTarget({ dia, turno, slotIndex }); setDropMode('blocked'); return }
     const occupyingBlock = blocks.find(
@@ -104,8 +108,11 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
     const { dia, turno, slotIndex } = dropData
     const slot = getSlotByIndex(turno, slotIndex)
     if (!slot) return
+    // Slot eh "ocupado por aula oficial" so se for aula real (nao placeholder).
+    // Placeholders (disciplina='—') sao slots disponiveis pra coord cadastrar atividades.
     const isOccupiedByOfficial = officialSchedule.some(
       (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slot.inicio
+        && !isPlaceholderHorario(h)
     )
     if (isOccupiedByOfficial) return
     const targetBlock = blocks.find(

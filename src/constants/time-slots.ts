@@ -1,5 +1,17 @@
 import type { DiaConfig, DiaSemana, Turno, TurnoConfig } from '../types/domain'
 
+/**
+ * Marker que indica "slot existe na grade mas nao tem aula real" — usado
+ * para placeholders de contraturno em escolas onde o coord ainda nao definiu
+ * atividades (ex: Dom Bosco tarde, migration 032). Frontend renderiza slot
+ * editavel; algoritmos de "ocupacao" ignoram.
+ */
+export const PLACEHOLDER_DISCIPLINA = '—'
+
+export function isPlaceholderHorario(h: { disciplina: string }): boolean {
+  return h.disciplina === PLACEHOLDER_DISCIPLINA
+}
+
 export const TURNOS_CONFIG: Record<Turno, TurnoConfig> = {
   manha: {
     label: 'Manhã',
