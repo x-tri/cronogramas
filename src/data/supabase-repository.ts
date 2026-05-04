@@ -178,6 +178,7 @@ export function createSupabaseRepository(): DataRepository {
         // migration 029). Fallback no mock se a query nao retornar nada
         // (ex: Marista, que ainda nao foi migrado).
         if (!schoolId) {
+          logRepository('[getOfficialSchedule] schoolId vazio -> fallback mock', { turma })
           return getHorariosPorTurma(turma)
         }
         const ano = anoLetivo ?? 2026
@@ -194,8 +195,12 @@ export function createSupabaseRepository(): DataRepository {
           return getHorariosPorTurma(turma)
         }
         if (!data || data.length === 0) {
+          logRepository('[getOfficialSchedule] school_schedules vazio (RLS bloqueou ou turma sem cadastro) -> fallback mock', {
+            schoolId, turma, ano,
+          })
           return getHorariosPorTurma(turma)
         }
+        logRepository('[getOfficialSchedule] retornando do banco', { schoolId, turma, ano, qtd: data.length })
         return data.map((row): HorarioOficial => ({
           id: row.id as string,
           turma: row.turma as string,
