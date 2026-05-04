@@ -436,7 +436,7 @@ function AddUserModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-[#e5e7eb] bg-white shadow-2xl"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-[#e5e7eb] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
