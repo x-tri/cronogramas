@@ -43,6 +43,7 @@ export function StudentSearch({ variant = 'modal' }: StudentSearchProps) {
     setLoadingStudent,
     setStudent,
     setOfficialSchedule,
+    applySlotsOverrideFromSchedule,
     setLoadingSchedule,
     loadCronograma,
   } = useCronogramaStore()
@@ -98,6 +99,9 @@ export function StudentSearch({ variant = 'modal' }: StudentSearchProps) {
         student.escolaId ?? null,
       )
       setOfficialSchedule(schedule)
+      // Deriva slots da grade da escola (Dom Bosco tem horarios diferentes
+      // do default Marista). Se identicos ao default, override fica null.
+      applySlotsOverrideFromSchedule(schedule)
 
       // Load existing cronograma and blocks for this student
       await loadCronograma(student.id)

@@ -74,6 +74,61 @@ describe('useCronogramaStore', () => {
     })
   })
 
+  describe('slotsOverride (Opção D — escolas com grade diferente)', () => {
+    it('schedule vazio -> override nulo', () => {
+      const store = useCronogramaStore.getState()
+      store.setSlotsOverride({
+        manha: [{ inicio: '07:00', fim: '08:00' }],
+        tarde: [],
+        noite: [],
+      })
+      store.applySlotsOverrideFromSchedule([])
+      expect(useCronogramaStore.getState().slotsOverride).toBeNull()
+    })
+
+    it('schedule com horarios identicos ao default Marista -> override nulo (sem ruido)', () => {
+      const store = useCronogramaStore.getState()
+      // Slot manha do Marista: 07:15..08:05
+      store.applySlotsOverrideFromSchedule([
+        { id: '1', turma: 'A', diaSemana: 'segunda', horarioInicio: '07:15', horarioFim: '08:05', turno: 'manha', disciplina: 'X', professor: null },
+        { id: '2', turma: 'A', diaSemana: 'segunda', horarioInicio: '08:05', horarioFim: '09:05', turno: 'manha', disciplina: 'Y', professor: null },
+        { id: '3', turma: 'A', diaSemana: 'segunda', horarioInicio: '09:05', horarioFim: '09:55', turno: 'manha', disciplina: 'Z', professor: null },
+        { id: '4', turma: 'A', diaSemana: 'segunda', horarioInicio: '09:55', horarioFim: '11:05', turno: 'manha', disciplina: 'W', professor: null },
+        { id: '5', turma: 'A', diaSemana: 'segunda', horarioInicio: '11:05', horarioFim: '11:55', turno: 'manha', disciplina: 'V', professor: null },
+        { id: '6', turma: 'A', diaSemana: 'segunda', horarioInicio: '11:55', horarioFim: '12:45', turno: 'manha', disciplina: 'U', professor: null },
+        { id: '7', turma: 'A', diaSemana: 'segunda', horarioInicio: '12:45', horarioFim: '13:35', turno: 'manha', disciplina: 'T', professor: null },
+      ])
+      expect(useCronogramaStore.getState().slotsOverride).toBeNull()
+    })
+
+    it('schedule estilo Dom Bosco (07:20, 09:50...) -> popula override com horarios reais', () => {
+      const store = useCronogramaStore.getState()
+      store.applySlotsOverrideFromSchedule([
+        { id: '1', turma: 'Turma 301', diaSemana: 'segunda', horarioInicio: '07:20', horarioFim: '08:05', turno: 'manha', disciplina: 'BIO', professor: 'X' },
+        { id: '2', turma: 'Turma 301', diaSemana: 'segunda', horarioInicio: '08:05', horarioFim: '08:50', turno: 'manha', disciplina: 'ART', professor: 'Y' },
+        { id: '3', turma: 'Turma 301', diaSemana: 'quarta', horarioInicio: '17:15', horarioFim: '18:00', turno: 'tarde', disciplina: 'EDF', professor: 'Z' },
+      ])
+      const ov = useCronogramaStore.getState().slotsOverride
+      expect(ov).not.toBeNull()
+      expect(ov!.manha[0]).toEqual({ inicio: '07:20', fim: '08:05' })
+      expect(ov!.manha[1]).toEqual({ inicio: '08:05', fim: '08:50' })
+      expect(ov!.tarde[0]).toEqual({ inicio: '17:15', fim: '18:00' })
+    })
+
+    it('turnos sem schedule mantem default (ex: noite vazio -> default Marista)', () => {
+      const store = useCronogramaStore.getState()
+      store.applySlotsOverrideFromSchedule([
+        { id: '1', turma: 'Turma 301', diaSemana: 'segunda', horarioInicio: '07:20', horarioFim: '08:05', turno: 'manha', disciplina: 'BIO', professor: 'X' },
+      ])
+      const ov = useCronogramaStore.getState().slotsOverride
+      expect(ov).not.toBeNull()
+      expect(ov!.manha.length).toBe(1)
+      // tarde e noite caem em fallback ao default Marista (TURNOS_CONFIG)
+      expect(ov!.tarde.length).toBeGreaterThan(0)
+      expect(ov!.noite.length).toBeGreaterThan(0)
+    })
+  })
+
   describe('cronograma actions', () => {
     it('should create and load a cronograma', async () => {
       const store = useCronogramaStore.getState()

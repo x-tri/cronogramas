@@ -12,13 +12,28 @@ import type {
   SimuladoHistoryItem,
   SimuladoResult,
 } from '../types/supabase'
-import { getSlotByIndex } from '../constants/time-slots'
+import { getSlotByIndex, TURNOS_CONFIG } from '../constants/time-slots'
 import { getRepository } from '../data/factory'
+
+/**
+ * Override de slots quando a escola tem grade horaria diferente da default
+ * (ex: Dom Bosco com 07:20 em vez de Marista 07:15). Derivado dinamicamente
+ * do `officialSchedule` carregado em student-search.tsx. Quando null,
+ * componentes usam TURNOS_CONFIG[turno].slots (default Marista).
+ */
+export type TimeSlotsByTurno = Readonly<Record<Turno, ReadonlyArray<{ inicio: string; fim: string }>>>
 
 type CronogramaState = {
   // Data
   currentStudent: Aluno | null
   officialSchedule: HorarioOficial[]
+  /**
+   * Quando definido, sobrescreve `TURNOS_CONFIG[turno].slots` da grade
+   * Kanban/Timeline. Populado a partir do officialSchedule quando este
+   * tem horarios distintos do default Marista (ex: Dom Bosco). Quando
+   * null, consumidores caem no TURNOS_CONFIG (Marista).
+   */
+  slotsOverride: TimeSlotsByTurno | null
   cronograma: Cronograma | null
   blocks: BlocoCronograma[]
   selectedWeek: Date
@@ -37,6 +52,15 @@ type CronogramaState = {
   // Actions
   setStudent: (student: Aluno | null) => void
   setOfficialSchedule: (schedule: HorarioOficial[]) => void
+  /** Define override manualmente (uso em testes / casos especiais). */
+  setSlotsOverride: (override: TimeSlotsByTurno | null) => void
+  /**
+   * Deriva slots distintos do `schedule` (manha/tarde/noite separados),
+   * compara com TURNOS_CONFIG default e:
+   *   - se DIFERENTES (ou contagem distinta): popula slotsOverride
+   *   - se identicos ou schedule vazio: zera slotsOverride
+   */
+  applySlotsOverrideFromSchedule: (schedule: HorarioOficial[]) => void
   setCronograma: (cronograma: Cronograma | null) => void
   setBlocks: (blocks: BlocoCronograma[]) => void
   setSimuladoHistory: (history: SimuladoHistoryItem[]) => void
@@ -89,6 +113,7 @@ type CronogramaState = {
 const initialState = {
   currentStudent: null,
   officialSchedule: [],
+  slotsOverride: null as TimeSlotsByTurno | null,
   cronograma: null,
   blocks: [],
   selectedWeek: new Date(),
@@ -116,6 +141,54 @@ export const useCronogramaStore = create<CronogramaState>()(
           selectedSimuladoResult: null,
         }),
       setOfficialSchedule: (schedule) => set({ officialSchedule: schedule }),
+
+      setSlotsOverride: (override) => set({ slotsOverride: override }),
+
+      applySlotsOverrideFromSchedule: (schedule) => {
+        if (!schedule || schedule.length === 0) {
+          set({ slotsOverride: null })
+          return
+        }
+        // Deriva slots distintos por turno, ordenados por horario_inicio.
+        const byTurno: Record<Turno, Map<string, string>> = {
+          manha: new Map(),
+          tarde: new Map(),
+          noite: new Map(),
+        }
+        for (const h of schedule) {
+          byTurno[h.turno].set(h.horarioInicio, h.horarioFim)
+        }
+        const toSlots = (m: Map<string, string>) =>
+          [...m.entries()]
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([inicio, fim]) => ({ inicio, fim }))
+        const derived: TimeSlotsByTurno = {
+          manha: toSlots(byTurno.manha),
+          tarde: toSlots(byTurno.tarde),
+          noite: toSlots(byTurno.noite),
+        }
+        // Se identico ao default Marista em todos os turnos, nao precisa
+        // override (evita recalculo inutil downstream).
+        const identical = (['manha', 'tarde', 'noite'] as const).every((t) => {
+          const def = TURNOS_CONFIG[t].slots
+          const got = derived[t]
+          if (def.length !== got.length) return got.length === 0
+          return def.every((s, i) => s.inicio === got[i]?.inicio && s.fim === got[i]?.fim)
+        })
+        if (identical) {
+          set({ slotsOverride: null })
+          return
+        }
+        // Para turnos sem horarios no schedule (ex: noite vazio em Dom Bosco),
+        // mantem o default em vez de array vazio (UI continua mostrando grade
+        // do TURNOS_CONFIG nesse turno).
+        const merged: TimeSlotsByTurno = {
+          manha: derived.manha.length > 0 ? derived.manha : TURNOS_CONFIG.manha.slots,
+          tarde: derived.tarde.length > 0 ? derived.tarde : TURNOS_CONFIG.tarde.slots,
+          noite: derived.noite.length > 0 ? derived.noite : TURNOS_CONFIG.noite.slots,
+        }
+        set({ slotsOverride: merged })
+      },
       setCronograma: (cronograma) => set({ cronograma }),
       setBlocks: (blocks) => set({ blocks }),
       setSimuladoHistory: (history) => set({ simuladoHistory: history }),

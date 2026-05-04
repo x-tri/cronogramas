@@ -32,6 +32,10 @@ export function KanbanCell({
 }: KanbanCellProps) {
   const turnoConfig = TURNOS_CONFIG[turno]
   const blocks = useCronogramaStore((state) => state.blocks)
+  const slotsOverride = useCronogramaStore((state) => state.slotsOverride)
+  // Quando a escola tem grade diferente do default Marista (ex: Dom Bosco),
+  // o store popula slotsOverride a partir do officialSchedule do aluno.
+  const slots = slotsOverride?.[turno] ?? turnoConfig.slots
 
   const getOfficialForSlot = (slotInicio: string): HorarioOficial | undefined => {
     return officialSchedule.find(
@@ -47,7 +51,7 @@ export function KanbanCell({
 
   return (
     <div className="bg-white rounded border border-[#f1f1ef] p-1 space-y-0.5">
-      {turnoConfig.slots.map((slot, index) => {
+      {slots.map((slot, index) => {
         const officialClass = getOfficialForSlot(slot.inicio)
         const customBlock = getBlockForSlot(slot.inicio)
 

@@ -19,6 +19,7 @@ export function AlunoAvulsoForm({ variant = 'compact' }: AlunoAvulsoFormProps) {
   const repo = useRepository()
   const setStudent = useCronogramaStore((state) => state.setStudent)
   const setOfficialSchedule = useCronogramaStore((state) => state.setOfficialSchedule)
+  const setSlotsOverride = useCronogramaStore((state) => state.setSlotsOverride)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,8 +42,10 @@ export function AlunoAvulsoForm({ variant = 'compact' }: AlunoAvulsoFormProps) {
       })
 
       setStudent(aluno)
-      // Aluno avulso não tem horário oficial
+      // Aluno avulso não tem horário oficial — limpa override tambem para
+      // a grade voltar a usar TURNOS_CONFIG default.
       setOfficialSchedule([])
+      setSlotsOverride(null)
       
       // Fecha o formulário e limpa
       setIsOpen(false)

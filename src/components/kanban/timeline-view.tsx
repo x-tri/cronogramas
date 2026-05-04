@@ -27,6 +27,7 @@ const TURNO_BANNER: Record<Turno, { bg: string; icon: string }> = {
 
 export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineViewProps) {
   const officialSchedule = useCronogramaStore((s) => s.officialSchedule)
+  const slotsOverride = useCronogramaStore((s) => s.slotsOverride)
   const blocks = useCronogramaStore((s) => s.blocks)
   const removeBlock = useCronogramaStore((s) => s.removeBlock)
 
@@ -93,6 +94,8 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
 
         {TURNOS.map((turno) => {
           const config = TURNOS_CONFIG[turno]
+          // Override de slots para escolas com grade diferente (Dom Bosco etc.)
+          const slots = slotsOverride?.[turno] ?? config.slots
           const banner = TURNO_BANNER[turno]
 
           return (
@@ -131,7 +134,7 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
               </div>
 
               {/* ===== SLOT ROWS ===== */}
-              {config.slots.map((slot, slotIndex) => (
+              {slots.map((slot, slotIndex) => (
                 <div key={slot.inicio} className="timetable-grid timetable-row">
                   {/* Time cell */}
                   <div className="timetable-time-cell">

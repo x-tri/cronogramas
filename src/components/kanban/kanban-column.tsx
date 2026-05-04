@@ -1,6 +1,7 @@
 import type { BlocoCronograma, DiaSemana, HorarioOficial, Turno } from '../../types/domain'
 import { DIAS_SEMANA_LABELS, TURNO_LABELS, TURNOS } from '../../types/domain'
 import { DIAS_CONFIG, TURNOS_CONFIG } from '../../constants/time-slots'
+import { useCronogramaStore } from '../../stores/cronograma-store'
 import { KanbanCell } from './kanban-cell'
 
 interface KanbanColumnProps {
@@ -33,8 +34,12 @@ export function KanbanColumn({
   const diaConfig = DIAS_CONFIG[dia]
   const isWeekend = diaConfig.livre
 
-  // Calcular ocupação do dia
-  const totalSlots = TURNOS.reduce((acc, t) => acc + TURNOS_CONFIG[t].slots.length, 0)
+  // Calcular ocupação do dia (usa slotsOverride da escola se presente)
+  const slotsOverride = useCronogramaStore((s) => s.slotsOverride)
+  const totalSlots = TURNOS.reduce((acc, t) => {
+    const slots = slotsOverride?.[t] ?? TURNOS_CONFIG[t].slots
+    return acc + slots.length
+  }, 0)
   const officialCount = officialSchedule.filter((h) => h.diaSemana === dia).length
   const blockCount = blocks.filter((b) => b.diaSemana === dia).length
   const occupiedCount = officialCount + blockCount
