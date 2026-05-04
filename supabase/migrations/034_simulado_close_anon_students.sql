@@ -1,0 +1,21 @@
+-- Migration 034 (SIMULADO db): fecha leitura anonima de students
+--
+-- Auditoria 2026-05-04 expos policy `anon_read_students` (role=anon, true)
+-- na tabela students do banco SIMULADO — qualquer um, mesmo sem login,
+-- podia ler nome, matricula, turma e school_id de TODOS os alunos via
+-- chamada REST direta com a anon key.
+--
+-- Policies estritas substitutas ja existem:
+--   - school_admin_manage_students (school_id filter)
+--   - student_view_school_students (school_id filter)
+--   - super_admin_full_access_students
+--   - service_role_bypass_students
+--
+-- Aluno frontend (aluno/src) sempre faz query apos auth (enabled: !!user
+-- + useAuth), entao fechar anon nao quebra fluxo legitimo.
+--
+-- IMPORTANTE: aplicar APENAS no banco SIMULADO (axtmozyrnsrhqrnktshz),
+-- nao no MENTOR. Usar `supabase link --project-ref axtmozyrnsrhqrnktshz`
+-- antes de db query --file.
+
+DROP POLICY IF EXISTS "anon_read_students" ON public.students;
