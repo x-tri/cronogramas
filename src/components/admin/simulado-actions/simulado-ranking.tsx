@@ -266,25 +266,6 @@ export function SimuladoRanking({
   const mediaArea = useMemo(() => mediaAcertosPorArea(filtradas), [filtradas]);
   const triPorArea = useMemo(() => mediaTriPorArea(filtradas), [filtradas]);
   const histograma = useMemo(() => histogramaNotas(filtradas, 50), [filtradas]);
-
-  // Diagnostico (incidente 2026-05-04 — historgrama vazio para Marista):
-  // imprime amostra das medias e contagens. Remover quando a causa for fechada.
-  useEffect(() => {
-    if (filtradas.length === 0) return;
-    const sample = filtradas.slice(0, 3).map((r) => ({
-      tri_lc: r.tri_lc, tipoLc: typeof r.tri_lc,
-      tri_ch: r.tri_ch, tipoCh: typeof r.tri_ch,
-      tri_cn: r.tri_cn, tri_mt: r.tri_mt,
-    }));
-    const counts = histograma.map((b) => `${b.min}:${b.count}`).join(' ');
-    // eslint-disable-next-line no-console
-    console.info('[simulado-ranking] diagnostico histograma', {
-      total: filtradas.length,
-      stats: { media: stats.media, melhor: stats.melhor, pior: stats.pior },
-      sample,
-      counts,
-    });
-  }, [filtradas, histograma, stats]);
   const turmas = useMemo(() => turmasPresentes(respostas), [respostas]);
 
   const naoResponderamFiltered = useMemo(() => {
@@ -702,7 +683,11 @@ export function SimuladoRanking({
                     return (
                       <div
                         key={b.min}
-                        className="flex-1 flex flex-col items-center justify-end"
+                        // h-full essencial pro `height: X%` da barra interna
+                        // resolver — sem isso, o div intermediario tem altura
+                        // auto (=0) e a barra cai no min-h-[2px] (incidente
+                        // 2026-05-04: card "Distribuicao TRI" sem barras).
+                        className="h-full flex-1 flex flex-col items-center justify-end"
                         title={`${b.min}–${b.max}: ${b.count} aluno${b.count === 1 ? "" : "s"}`}
                       >
                         <div
