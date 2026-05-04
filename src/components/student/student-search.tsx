@@ -94,6 +94,15 @@ export function StudentSearch({ variant = 'modal' }: StudentSearchProps) {
       // Passa escolaId pra suportar escolas com turmas no mesmo nome (ex: 'A',
       // 'Turma 300') e ler do banco school_schedules quando disponivel.
       setLoadingSchedule(true)
+      // Diagnostico (incidente 2026-05-04 — coord Marista vendo grade Dom Bosco):
+      // imprime escolaId/turma do aluno carregado pra cruzar com retorno do
+      // getOfficialSchedule no console. Remover quando a causa raiz for fechada.
+      console.info('[student-search] carregando schedule', {
+        matricula: student.matricula,
+        turma: student.turma,
+        escolaId: student.escolaId,
+        escolaNome: student.escolaNome ?? null,
+      })
       const schedule = await repo.schedules.getOfficialSchedule(
         student.turma,
         student.escolaId ?? null,

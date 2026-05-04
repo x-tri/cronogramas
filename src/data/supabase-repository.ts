@@ -184,7 +184,7 @@ export function createSupabaseRepository(): DataRepository {
         const ano = anoLetivo ?? 2026
         const { data, error } = await supabase
           .from('school_schedules')
-          .select('id, turma, dia_semana, horario_inicio, horario_fim, turno, disciplina, professor')
+          .select('id, school_id, turma, dia_semana, horario_inicio, horario_fim, turno, disciplina, professor')
           .eq('school_id', schoolId)
           .eq('turma', turma)
           .eq('ano_letivo', ano)
@@ -200,8 +200,23 @@ export function createSupabaseRepository(): DataRepository {
           })
           return getHorariosPorTurma(turma)
         }
-        logRepository('[getOfficialSchedule] retornando do banco', { schoolId, turma, ano, qtd: data.length })
-        return data.map((row): HorarioOficial => ({
+        // Defesa client-side: mesmo o RLS+`.eq('school_id')` ja filtrando,
+        // garantimos que NENHUMA row de outra escola escape (incidente
+        // 2026-05-04 — coord Marista vendo grade Dom Bosco). Se algo
+        // escapar, descarta + log warn pra rastrear no console do user.
+        const valid = data.filter((r) => r.school_id === schoolId)
+        if (valid.length !== data.length) {
+          const distinct = [...new Set(data.map((r) => r.school_id))]
+          console.warn(
+            '[getOfficialSchedule] schedules de outra escola descartados',
+            { schoolIdSolicitado: schoolId, turma, ano, total: data.length, validos: valid.length, schoolIdsRetornados: distinct },
+          )
+        }
+        if (valid.length === 0) {
+          return getHorariosPorTurma(turma)
+        }
+        logRepository('[getOfficialSchedule] retornando do banco', { schoolId, turma, ano, qtd: valid.length })
+        return valid.map((row): HorarioOficial => ({
           id: row.id as string,
           turma: row.turma as string,
           diaSemana: row.dia_semana as HorarioOficial['diaSemana'],
