@@ -149,7 +149,15 @@ export function SimuladoRanking({
         return;
       }
 
-      // Normaliza: move name/turma de nested pra flat
+      // Normaliza: move name/turma de nested pra flat.
+      // tri_* sao `numeric` no Postgres — PostgREST serializa como STRING
+      // em JSON pra preservar precisao. Sem coercao, agregadores fariam
+      // string concat (`0 + "780.50"` = `"0780.50"`) e a media virava NaN
+      // (sintoma: histograma "Distribuicao de notas" sempre vazio).
+      // Coerce uma vez no boundary, todos os agregadores recebem number.
+      const toNum = (v: unknown): number | null =>
+        v == null ? null : Number.isFinite(Number(v)) ? Number(v) : null;
+
       const normalizadas: RankingResposta[] = (respostasRes.data ?? []).map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (r: any) => ({
@@ -157,10 +165,10 @@ export function SimuladoRanking({
           student_id: r.student_id,
           student_name: r.students?.name ?? null,
           student_turma: r.students?.turma ?? null,
-          tri_lc: r.tri_lc,
-          tri_ch: r.tri_ch,
-          tri_cn: r.tri_cn,
-          tri_mt: r.tri_mt,
+          tri_lc: toNum(r.tri_lc),
+          tri_ch: toNum(r.tri_ch),
+          tri_cn: toNum(r.tri_cn),
+          tri_mt: toNum(r.tri_mt),
           acertos_lc: r.acertos_lc,
           acertos_ch: r.acertos_ch,
           acertos_cn: r.acertos_cn,
