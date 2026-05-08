@@ -60,16 +60,16 @@ export interface RankedStudent {
 }
 
 /**
- * Computa média das áreas SUBMETIDAS (sem redação).
- * Áreas com TRI null = não foram submetidas pelo aluno (entrega parcial)
- * e são ignoradas no cálculo. Retorna null só se nenhuma área foi submetida.
+ * Computa a média final objetiva do ENEM no ranking.
+ *
+ * Regra XTRI: o denominador é sempre 4 áreas. Se o aluno fez só um dia/área,
+ * a nota final segue sendo soma(LC, CH, CN, MT) / 4, com áreas ausentes
+ * contribuindo 0. Retorna null só se nenhuma área foi submetida.
  */
 export function mediaTriSimples(r: RankingResposta): number | null {
-  const submetidas = [r.tri_lc, r.tri_ch, r.tri_cn, r.tri_mt].filter(
-    (x): x is number => x != null,
-  );
-  if (submetidas.length === 0) return null;
-  return submetidas.reduce((a, b) => a + b, 0) / submetidas.length;
+  const notas = [r.tri_lc, r.tri_ch, r.tri_cn, r.tri_mt];
+  if (notas.every((x) => x == null)) return null;
+  return notas.reduce<number>((soma, nota) => soma + (nota ?? 0), 0) / 4;
 }
 
 /**

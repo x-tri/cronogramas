@@ -128,7 +128,7 @@ export function StudentSimuladoDetailDrawer({
           <section className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-[#e5e7eb] bg-white p-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#71717a]">
-                Média TRI
+                Média final
               </p>
               <p className="mt-1 text-base font-black text-[#1d1d1f]">
                 {formatScore(mediaTri)}

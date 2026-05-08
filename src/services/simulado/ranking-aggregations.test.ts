@@ -43,15 +43,14 @@ describe("mediaTriSimples", () => {
     expect(mediaTriSimples(r)).toBe(550);
   });
 
-  it("calcula média parcial ignorando áreas não submetidas (null)", () => {
-    // Aluno só submeteu LC e MT — média deve ser dos 2, não null
+  it("calcula média final com divisor fixo 4 quando há entrega parcial", () => {
     const r = makeResposta({ tri_lc: 400, tri_ch: null, tri_cn: null, tri_mt: 600 });
-    expect(mediaTriSimples(r)).toBe(500);
+    expect(mediaTriSimples(r)).toBe(250);
   });
 
-  it("calcula média de 1 área só (entrega super parcial)", () => {
+  it("divide por 4 mesmo quando só uma área foi submetida", () => {
     const r = makeResposta({ tri_lc: 750, tri_ch: null, tri_cn: null, tri_mt: null });
-    expect(mediaTriSimples(r)).toBe(750);
+    expect(mediaTriSimples(r)).toBe(187.5);
   });
 
   it("retorna null SÓ se NENHUMA área foi submetida", () => {
@@ -103,16 +102,17 @@ describe("rankRespostas", () => {
     expect(ranked[1]!.mediaTri).toBeNull();
   });
 
-  it("respostas parciais entram no ranking com a média das áreas submetidas", () => {
-    // r1 só LC=800 → média 800
+  it("respostas parciais entram no ranking pela média final dividida por 4", () => {
+    // r1 só LC=800 → média final 200
     // r2 todas 500 → média 500
-    // r1 deve ficar EM PRIMEIRO mesmo sendo parcial
+    // r2 deve ficar em primeiro porque completou as 4 áreas
     const r1 = makeResposta({ id: "r1", tri_lc: 800, tri_ch: null, tri_cn: null, tri_mt: null });
     const r2 = makeResposta({ id: "r2", tri_lc: 500, tri_ch: 500, tri_cn: 500, tri_mt: 500 });
     const ranked = rankRespostas([r1, r2]);
-    expect(ranked[0]!.resposta.id).toBe("r1");
-    expect(ranked[0]!.mediaTri).toBe(800);
-    expect(ranked[1]!.resposta.id).toBe("r2");
+    expect(ranked[0]!.resposta.id).toBe("r2");
+    expect(ranked[0]!.mediaTri).toBe(500);
+    expect(ranked[1]!.resposta.id).toBe("r1");
+    expect(ranked[1]!.mediaTri).toBe(200);
   });
 
   it("array vazio retorna array vazio", () => {
@@ -133,6 +133,18 @@ describe("statsGrupo", () => {
     expect(stats.melhor).toBe(600);
     expect(stats.pior).toBe(400);
     expect(stats.desvio).toBeCloseTo(81.65, 1); // sqrt(((100)^2*2)/3)
+  });
+
+  it("inclui entregas parciais nas estatísticas com divisor fixo 4", () => {
+    const respostas = [
+      makeResposta({ tri_lc: 800, tri_ch: null, tri_cn: null, tri_mt: null }), // 200
+      makeResposta({ tri_lc: 500, tri_ch: 500, tri_cn: 500, tri_mt: 500 }), // 500
+    ];
+    const stats = statsGrupo(respostas);
+    expect(stats.count).toBe(2);
+    expect(stats.media).toBe(350);
+    expect(stats.melhor).toBe(500);
+    expect(stats.pior).toBe(200);
   });
 
   it("retorna nulls quando não há respostas válidas", () => {

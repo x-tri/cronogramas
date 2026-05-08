@@ -197,7 +197,6 @@ export function SimuladoRanking({
         if (studentsRes.error) {
           // Nao bloqueia o painel inteiro — ranking/stats/histograma ja estao
           // prontos. Apenas avisa dev via console e limpa a lista.
-          // eslint-disable-next-line no-console
           console.warn(
             "Falha ao carregar alunos nao-respondentes:",
             studentsRes.error.message,
@@ -381,7 +380,7 @@ export function SimuladoRanking({
             <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <StatCard label="Alunos" value={String(stats.count)} emoji="👥" />
               <StatCard
-                label="Média da turma"
+                label="Média final"
                 value={formatScore(stats.media)}
                 emoji="📊"
                 accent
@@ -392,13 +391,13 @@ export function SimuladoRanking({
                 emoji="📈"
               />
               <StatCard
-                label="Maior TRI"
+                label="Maior média"
                 value={formatScore(stats.melhor)}
                 emoji="🥇"
                 positive
               />
               <StatCard
-                label="Menor TRI"
+                label="Menor média"
                 value={formatScore(stats.pior)}
                 emoji="📉"
                 negative
@@ -436,7 +435,7 @@ export function SimuladoRanking({
                       <th className="px-2 py-2 text-center font-semibold">CH</th>
                       <th className="px-2 py-2 text-center font-semibold">CN</th>
                       <th className="px-2 py-2 text-center font-semibold">MT</th>
-                      <th className="px-2 py-2 text-center font-semibold">Média</th>
+                      <th className="px-2 py-2 text-center font-semibold">Média final</th>
                       <th className="px-2 py-2 text-center font-semibold">± turma</th>
                       <th className="px-2 py-2 text-center font-semibold">Acertos</th>
                       <th className="px-3 py-2 text-left font-semibold">Enviou</th>
