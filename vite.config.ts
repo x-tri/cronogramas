@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss()],
   // base: './' garante paths relativos no bundle — funciona tanto em root
   // quanto em subdir quando o build e subido via Hostinger file manager.
@@ -24,7 +24,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: mode !== 'production',
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
@@ -69,4 +69,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

@@ -169,7 +169,6 @@ describe('SimuladoAnalyzer', () => {
         return item.id === latestHistoryItem.id ? latestResult : olderResult
       },
     )
-    vi.mocked(simuladoService.diagnoseStudentAnswers).mockResolvedValue(undefined)
   })
 
   it('renderiza o botão Simulado no estado inicial', async () => {

@@ -204,7 +204,11 @@ export function ShareDropdown({ variant = 'default' }: { variant?: 'default' | '
 
       const text = `*Cronograma de Estudos*${simulado?.exam?.title ? `\n*Simulado:* ${simulado.exam.title}` : ''}\n\nAluno: ${currentStudent.nome}\nMatrícula: ${currentStudent.matricula}\nTurma: ${currentStudent.turma}\nSemana: ${formatWeekStr()}${triScoresText}\n\n_PDF baixado - anexe na conversa_`
 
-      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`)
+      window.open(
+        `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`,
+        '_blank',
+        'noopener,noreferrer',
+      )
     } catch (error) {
       console.error('Erro ao gerar PDF:', error)
     } finally {

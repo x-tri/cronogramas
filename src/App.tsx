@@ -263,7 +263,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-[#f5f5f7]">
       <header className="sticky top-0 z-50 border-b border-[#e0e4ea] bg-white/92 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1600px] items-center gap-2 px-3 py-1.5">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-2 px-3 py-1.5 sm:flex-nowrap">
           {/* Logo — compact */}
           <img src="/logo-xtri.png" alt="XTRI" className="h-7 w-7 shrink-0" />
 
@@ -271,13 +271,13 @@ function AppContent() {
           <div
             role="group"
             aria-label="Alternar entre Mentoria e Simulados"
-            className="flex items-center gap-0.5 rounded-lg border border-[#e5e7eb] bg-[#f8fafc] p-0.5"
+            className="order-2 flex w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-[#e5e7eb] bg-[#f8fafc] p-0.5 sm:order-none sm:w-auto"
           >
             <button
               type="button"
               onClick={() => setCoordView("mentor")}
               aria-pressed={coordView === "mentor"}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition-all ${
+              className={`flex-1 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-bold transition-all sm:flex-none ${
                 coordView === "mentor"
                   ? "bg-[#2563eb] text-white shadow-sm"
                   : "text-[#64748b] hover:text-[#0f172a]"
@@ -289,7 +289,7 @@ function AppContent() {
               type="button"
               onClick={() => setCoordView("simulados")}
               aria-pressed={coordView === "simulados"}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition-all ${
+              className={`flex-1 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-bold transition-all sm:flex-none ${
                 coordView === "simulados"
                   ? "bg-[#2563eb] text-white shadow-sm"
                   : "text-[#64748b] hover:text-[#0f172a]"
@@ -301,7 +301,7 @@ function AppContent() {
               type="button"
               onClick={() => setCoordView("materiais")}
               aria-pressed={coordView === "materiais"}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition-all ${
+              className={`flex-1 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-bold transition-all sm:flex-none ${
                 coordView === "materiais"
                   ? "bg-[#2563eb] text-white shadow-sm"
                   : "text-[#64748b] hover:text-[#0f172a]"
@@ -374,7 +374,7 @@ function AppContent() {
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1" />
               </svg>
-              Sair
+              <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </div>

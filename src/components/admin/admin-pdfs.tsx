@@ -193,7 +193,7 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
         </header>
       )}
 
-      <main className={embedded ? "px-6 py-4 space-y-6" : "mx-auto max-w-6xl px-6 py-6 space-y-4"}>
+      <main className={embedded ? "space-y-6 px-4 py-4 sm:px-6" : "mx-auto max-w-6xl space-y-4 px-4 py-6 sm:px-6"}>
         {/* Stats */}
         <div className="rounded-2xl border border-[#e5e7eb] bg-white p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
@@ -204,22 +204,22 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
           </h2>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4">
             <p className="text-2xl font-semibold text-[#1d1d1f]">{filtered.length}</p>
             <p className="text-xs text-[#64748b]">PDFs gerados</p>
           </div>
-          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
+          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4">
             <p className="text-2xl font-semibold text-[#1d1d1f]">{formatFileSize(totalSize)}</p>
             <p className="text-xs text-[#64748b]">Espaco ocupado</p>
           </div>
-          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
+          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4">
             <p className="text-2xl font-semibold text-[#1d1d1f]">
               {[...new Set(filtered.map((r) => r.aluno_id))].length}
             </p>
             <p className="text-xs text-[#64748b]">Alunos atendidos</p>
           </div>
-          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 flex-1">
+          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4">
             <p className="text-2xl font-semibold text-[#1d1d1f]">
               {downloadedCount}<span className="text-sm font-normal text-[#94a3b8]"> / {filtered.length}</span>
             </p>
@@ -273,8 +273,8 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
         </div>
 
         {/* Table */}
-        <div className="rounded-2xl border border-[#e5e7eb] bg-white overflow-hidden">
-          <table className="w-full">
+        <div className="max-w-full overflow-x-auto rounded-2xl border border-[#e5e7eb] bg-white">
+          <table className="min-w-[640px] w-full">
             <thead>
               <tr className="border-b border-[#e5e7eb] bg-[#f8fafc]">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b]">Aluno</th>

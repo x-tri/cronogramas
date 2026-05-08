@@ -176,15 +176,15 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
             <form onSubmit={handleSubmit} className="space-y-4 animate-[fadeIn_0.2s_ease-out]">
               <div className="space-y-1.5">
                 <label htmlFor="username" className="text-sm font-medium text-[#1d1d1f]">
-                  Usuário
+                  Email ou usuário
                 </label>
                 <input
                   id="username"
                   name="username"
-                  type="email"
+                  type="text"
                   autoComplete="username"
                   className="w-full rounded-lg border border-[#d1d5db] bg-[#fafafa] px-3 py-2.5 text-sm text-[#1d1d1f] outline-none transition-all placeholder:text-[#9ca3af] focus:border-[#2563eb] focus:bg-white focus:ring-2 focus:ring-[#2563eb]/20"
-                  placeholder="Digite seu email"
+                  placeholder="Digite seu email ou usuário"
                   required
                   value={emailLogin}
                   onChange={(e) => handleIdentifierChange(e.target.value)}

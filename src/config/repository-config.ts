@@ -6,7 +6,7 @@
  * Modos disponíveis:
  * - 'supabase': Usa Supabase (requer VITE_SUPABASE_URL e VITE_SUPABASE_KEY)
  * - 'mock': Usa dados em memória com persistência localStorage
- * - 'auto': Tenta Supabase primeiro, fallback para mock
+ * - 'auto': Tenta Supabase primeiro, fallback para mock apenas em dev/test
  */
 
 export type RepositoryMode = 'supabase' | 'mock' | 'auto'
@@ -23,14 +23,14 @@ function getConfigFromEnv(): Partial<RepositoryConfig> {
   const mode = import.meta.env.VITE_REPOSITORY_MODE as RepositoryMode | undefined
   
   return {
-    mode: mode ?? 'auto',
+    mode: mode ?? (import.meta.env.PROD ? 'supabase' : 'auto'),
     localStorageKey: import.meta.env.VITE_LOCAL_STORAGE_KEY ?? 'xtri-cronogramas-data',
     debug: import.meta.env.VITE_DEBUG === 'true',
   }
 }
 
 export const repositoryConfig: RepositoryConfig = {
-  mode: 'auto',
+  mode: import.meta.env.PROD ? 'supabase' : 'auto',
   localStorageKey: 'xtri-cronogramas-data',
   debug: false,
   ...getConfigFromEnv(),
@@ -46,6 +46,7 @@ export function isSupabaseConfigured(): boolean {
 /** Determina o modo efetivo baseado na configuração e disponibilidade */
 export function getEffectiveMode(): 'supabase' | 'mock' {
   const { mode } = repositoryConfig
+  const allowMock = !import.meta.env.PROD || import.meta.env.MODE === 'test'
   
   if (mode === 'supabase') {
     if (!isSupabaseConfigured()) {
@@ -59,10 +60,18 @@ export function getEffectiveMode(): 'supabase' | 'mock' {
   }
   
   if (mode === 'mock') {
+    if (!allowMock) {
+      throw new Error('Modo mock bloqueado em produção. Configure VITE_REPOSITORY_MODE=supabase.')
+    }
     return 'mock'
   }
   
   // mode === 'auto'
+  if (!allowMock && !isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase obrigatório em produção. Configure VITE_SUPABASE_URL e VITE_SUPABASE_KEY.'
+    )
+  }
   return isSupabaseConfigured() ? 'supabase' : 'mock'
 }
 

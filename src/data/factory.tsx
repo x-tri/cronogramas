@@ -86,8 +86,8 @@ export function initializeRepository(): RepositoryInitialization {
   } catch (error) {
     initializationError = error instanceof Error ? error : new Error(String(error))
     
-    // Em caso de erro, tenta fallback para mock
-    if (mode === 'supabase') {
+    // Em produção, falha fechado: dados mock nunca substituem Supabase real.
+    if (mode === 'supabase' && !import.meta.env.PROD) {
       console.warn('[Repository] Erro ao inicializar Supabase, fallback para Mock')
       repositoryInstance = createMockRepository()
       return {

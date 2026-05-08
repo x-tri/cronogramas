@@ -3,7 +3,6 @@ export {
   getSimuladoResultByHistoryItem,
   listStudentSimulados,
 } from './simulado/analyze'
-export { diagnoseStudentAnswers } from './simulado/diagnostics'
 export {
   getLatestSimuladoResult,
   getStudentAnswersSimuladoResult,
