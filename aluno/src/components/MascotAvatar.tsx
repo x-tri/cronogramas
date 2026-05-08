@@ -75,14 +75,23 @@ export function MascotAvatar({
   const src = getFrameSrc(level, animation, frameIndex);
 
   return (
-    <img
-      src={src}
-      alt={`Mascote nível ${level}`}
-      width={size}
-      height={size}
-      className={cn("object-contain", className)}
-      style={{ imageRendering: "auto" }}
-    />
+    <span
+      className={cn("inline-flex items-center justify-center overflow-hidden", className)}
+      style={{ width: size, height: size }}
+    >
+      <img
+        src={src}
+        alt={`Mascote nível ${level}`}
+        width={size}
+        height={size}
+        className="h-full w-full object-contain"
+        style={{
+          imageRendering: "auto",
+          transform: "scale(1.7)",
+          transformOrigin: "center center",
+        }}
+      />
+    </span>
   );
 }
 

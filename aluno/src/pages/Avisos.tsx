@@ -2,13 +2,11 @@ import { useStudentProfile } from "@/hooks/useStudentData";
 import { useNotifications, type StudentNotification } from "@/hooks/useNotifications";
 import { useGamification } from "@/hooks/useGamification";
 import { useStudentPdfs, type StudentPdf } from "@/hooks/useStudentPdfs";
-import { useSimuladosPendentes } from "@/hooks/useSimulados";
 import { useTrackPdfDownload } from "@/hooks/useTrackPdfDownload";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Zap, Flame, ArrowRight, FileText, Download, ClipboardList } from "lucide-react";
-import { MascotWithBubble } from "@/components/MascotWithBubble";
+import { Zap, Flame, ArrowRight, FileText, Download } from "lucide-react";
 
 const COLOR_MAP = {
   primary: {
@@ -37,8 +35,14 @@ const COLOR_MAP = {
   },
 } as const;
 
-const LEVEL_COLORS = ["", "text-muted-foreground", "text-primary", "text-emerald-500", "text-violet-500", "text-amber-500"];
-const LEVEL_BG = ["", "bg-muted", "bg-primary/10", "bg-emerald-500/10", "bg-violet-500/10", "bg-amber-500/10"];
+const LEVEL_META = [
+  { emoji: "", color: "" },
+  { emoji: "🌱", color: "text-muted-foreground bg-muted" },
+  { emoji: "🔥", color: "text-primary bg-primary/10" },
+  { emoji: "🎯", color: "text-emerald-600 bg-emerald-500/10" },
+  { emoji: "⚔️", color: "text-violet-600 bg-violet-500/10" },
+  { emoji: "🏆", color: "text-amber-600 bg-amber-500/10" },
+] as const;
 
 export default function Avisos() {
   const { data: student } = useStudentProfile();
@@ -46,9 +50,6 @@ export default function Avisos() {
   const { data: notifications, isLoading } = useNotifications(studentKey);
   const { data: gamification } = useGamification(studentKey);
   const { data: pdfs } = useStudentPdfs(studentKey);
-  const { data: simulados } = useSimuladosPendentes();
-  const simuladoPendente = simulados?.find((s) => !s.ja_respondeu) ?? null;
-  const simuladoRespondido = simulados?.find((s) => s.ja_respondeu) ?? null;
 
   if (isLoading) {
     return (
@@ -58,76 +59,54 @@ export default function Avisos() {
     );
   }
 
-  const level = gamification?.level ?? 1;
+  const level = Math.max(1, Math.min(5, gamification?.level ?? 1));
   const xp = gamification?.xp_total ?? 0;
   const title = gamification?.title ?? "Calouro";
   const streak = gamification?.streak_weeks ?? 0;
   const xpNext = gamification?.xp_next_level ?? 100;
   const xpBase = level === 1 ? 0 : level === 2 ? 100 : level === 3 ? 300 : level === 4 ? 600 : 1000;
   const xpProgress = Math.min(Math.round(((xp - xpBase) / Math.max(xpNext - xpBase, 1)) * 100), 100);
+  const levelMeta = LEVEL_META[level];
 
   return (
     <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto">
 
-      {/* Mascote + XP Status Card */}
-      <div className="rounded-2xl border-2 bg-card overflow-hidden animate-bounce-in">
-        {/* Mascote com speech bubble */}
-        <div className="flex flex-col items-center pt-3 pb-2">
-          <MascotWithBubble level={level} gamification={gamification} size={160} />
-          <p className={cn("text-lg font-black mt-1", LEVEL_COLORS[level])}>{title}</p>
-          <p className="text-[10px] font-bold text-muted-foreground">Nível {level} de 5</p>
-        </div>
-
-        {/* Stats row */}
-        <div className="flex items-center justify-center gap-3 pb-3">
-          <div className="flex items-center gap-1 rounded-full bg-accent/10 px-3 py-1.5">
-            <Flame className="h-4 w-4 text-accent" />
-            <span className="text-xs font-black text-accent">{streak} sem.</span>
+      {/* Status compacto de XP */}
+      <div className="rounded-2xl border-2 bg-card p-4 animate-bounce-in">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5", levelMeta.color)}>
+              <span className="text-base" aria-hidden="true">{levelMeta.emoji}</span>
+              <span className="text-sm font-black">{title}</span>
+            </div>
+            <p className="mt-1 text-[10px] font-bold text-muted-foreground">Nível {level} de 5</p>
           </div>
-          <div className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1.5">
-            <Zap className="h-4 w-4 text-primary" />
-            <span className="text-xs font-black text-primary">{xp} XP</span>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1.5">
+              <Flame className="h-4 w-4 text-accent" />
+              <span className="text-xs font-black text-accent">{streak} sem.</span>
+            </div>
+            <div className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1.5">
+              <Zap className="h-4 w-4 text-primary" />
+              <span className="text-xs font-black text-primary">{xp} XP</span>
+            </div>
           </div>
         </div>
 
         {/* XP Progress Bar */}
-        <div className="px-4 pb-4 space-y-1">
+        <div className="mt-3 space-y-1">
           <div className="flex justify-between items-center">
             <span className="text-[9px] font-bold text-muted-foreground">{xp} XP</span>
             <span className="text-[9px] font-bold text-muted-foreground">{xpNext} XP</span>
           </div>
           <div className="h-3 rounded-full bg-muted overflow-hidden">
             <div
-              className={cn("h-full rounded-full transition-all duration-1000 ease-out", LEVEL_COLORS[level] ? `bg-current ${LEVEL_COLORS[level]}` : "bg-primary")}
+              className="h-full rounded-full bg-primary transition-all duration-1000 ease-out"
               style={{ width: `${Math.max(xpProgress, 2)}%` }}
             />
           </div>
         </div>
       </div>
-
-      {/* Banner de simulado disponivel (Fase 4) */}
-      {simuladoPendente && (
-        <SimuladoBanner
-          title={simuladoPendente.title}
-          onClick={() =>
-            (window.location.href = `/simulados/${simuladoPendente.id}/responder`)
-          }
-          ctaLabel="Preencher gabarito"
-          tone="accent"
-          caderno_url={simuladoPendente.caderno_url}
-        />
-      )}
-      {!simuladoPendente && simuladoRespondido && (
-        <SimuladoBanner
-          title={simuladoRespondido.title}
-          onClick={() =>
-            (window.location.href = `/simulados/${simuladoRespondido.id}/resultado`)
-          }
-          ctaLabel="Ver meu resultado"
-          tone="success"
-          caderno_url={simuladoRespondido.caderno_url}
-        />
-      )}
 
       {/* Feed de Notificações */}
       {notifications && notifications.length > 0 ? (
@@ -136,7 +115,7 @@ export default function Avisos() {
             Pra você hoje
           </h2>
           {notifications.map((notif, idx) => (
-            <NotificationCard key={notif.type} notification={notif} index={idx} />
+            <NotificationCard key={`${notif.type}-${idx}`} notification={notif} index={idx} />
           ))}
         </div>
       ) : (
@@ -255,6 +234,7 @@ function PdfCard({ pdf, index, studentId, matricula, schoolId }: PdfCardProps) {
 function NotificationCard({ notification, index }: { notification: StudentNotification; index: number }) {
   const navigate = useNavigate();
   const colors = COLOR_MAP[notification.color] ?? COLOR_MAP.primary;
+  const progress = Math.max(0, Math.min(100, notification.progress ?? 0));
 
   return (
     <div
@@ -286,10 +266,10 @@ function NotificationCard({ notification, index }: { notification: StudentNotifi
           <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "hsl(var(--muted))" }}>
             <div
               className={cn("h-full rounded-full transition-all duration-1000 ease-out", colors.progress)}
-              style={{ width: `${Math.max(notification.progress, 2)}%` }}
+              style={{ width: `${Math.max(progress, 2)}%` }}
             />
           </div>
-          <p className="text-[9px] font-black text-muted-foreground text-right">{notification.progress}%</p>
+          <p className="text-[9px] font-black text-muted-foreground text-right">{progress}%</p>
         </div>
       )}
 
@@ -305,87 +285,6 @@ function NotificationCard({ notification, index }: { notification: StudentNotifi
           {notification.action_label}
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// SimuladoBanner — destaque no topo do feed quando ha simulado disponivel
-// ---------------------------------------------------------------------------
-
-interface SimuladoBannerProps {
-  readonly title: string;
-  readonly onClick: () => void;
-  readonly ctaLabel: string;
-  readonly tone: "accent" | "success";
-  readonly caderno_url?: string | null;
-}
-
-function SimuladoBanner({ title, onClick, ctaLabel, tone, caderno_url }: SimuladoBannerProps) {
-  const toneStyles =
-    tone === "accent"
-      ? {
-          border: "border-accent",
-          bg: "bg-accent/10",
-          ctaBg: "bg-accent text-white hover:bg-accent/90",
-          iconBg: "bg-accent/20 text-accent",
-        }
-      : {
-          border: "border-emerald-500/40",
-          bg: "bg-emerald-500/10",
-          ctaBg: "bg-emerald-600 text-white hover:bg-emerald-700",
-          iconBg: "bg-emerald-500/20 text-emerald-600",
-        };
-
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border-2 p-4 animate-bounce-in",
-        toneStyles.border,
-        toneStyles.bg,
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl",
-            toneStyles.iconBg,
-          )}
-        >
-          <ClipboardList className="h-5 w-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-            Simulado ENEM
-          </p>
-          <p className="mt-0.5 text-sm font-black text-foreground leading-tight">
-            {title}
-          </p>
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          "mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-black shadow-sm transition-all active:scale-[0.98]",
-          toneStyles.ctaBg,
-        )}
-      >
-        {ctaLabel}
-        <ArrowRight className="h-3.5 w-3.5" />
-      </button>
-      {caderno_url && (
-        <a
-          href={caderno_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl border-2 border-current/30 py-2 text-xs font-black text-foreground/70 hover:text-foreground transition-colors active:scale-[0.98]"
-          aria-label="Baixar caderno de questões"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Baixar Caderno
-        </a>
       )}
     </div>
   );

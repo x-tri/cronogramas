@@ -1388,6 +1388,27 @@ export type Database = {
           },
         ]
       }
+      student_nav_seen: {
+        Row: {
+          fingerprint: string
+          profile_id: string
+          section: string
+          seen_at: string
+        }
+        Insert: {
+          fingerprint: string
+          profile_id?: string
+          section: string
+          seen_at?: string
+        }
+        Update: {
+          fingerprint?: string
+          profile_id?: string
+          section?: string
+          seen_at?: string
+        }
+        Relationships: []
+      }
       topic_edges: {
         Row: {
           confidence_score: number | null

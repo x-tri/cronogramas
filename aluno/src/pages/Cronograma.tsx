@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStudentProfile, useCronogramas, useBlocos } from "@/hooks/useStudentData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, Check, Star, Trophy } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Check, Star, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"];
@@ -13,6 +13,8 @@ const DIAS_LABEL: Record<string, string> = {
   segunda: "Segunda", terca: "Terça", quarta: "Quarta", quinta: "Quinta",
   sexta: "Sexta", sabado: "Sábado", domingo: "Domingo",
 };
+
+const JS_DAY_TO_KEY = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"] as const;
 const TIPO_STYLES: Record<string, { bg: string; border: string; icon: string }> = {
   estudo: { bg: "bg-primary/10", border: "border-l-primary", icon: "📖" },
   revisão: { bg: "bg-[hsl(45,100%,92%)]", border: "border-l-[hsl(var(--secondary))]", icon: "🔄" },
@@ -29,6 +31,7 @@ export default function Cronograma() {
   const activeCron = cronogramas?.[cronIndex];
   const { data: blocos, isLoading: loadingBlocos } = useBlocos(activeCron?.id);
   const queryClient = useQueryClient();
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   const blocosByDay = useMemo(() => {
     if (!blocos) return {};
@@ -42,6 +45,23 @@ export default function Cronograma() {
   const completedCount = blocos?.filter((b) => b.concluido).length ?? 0;
   const totalCount = blocos?.length ?? 0;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  const focusDay = useMemo(() => {
+    if (!blocos?.length) return null;
+    const todayKey = JS_DAY_TO_KEY[new Date().getDay()];
+    if (blocosByDay[todayKey]?.length) return todayKey;
+
+    const firstPending = DIAS.find((dia) =>
+      blocosByDay[dia]?.some((b) => !b.concluido),
+    );
+    if (firstPending) return firstPending;
+
+    return DIAS.find((dia) => blocosByDay[dia]?.length) ?? null;
+  }, [blocos, blocosByDay]);
+
+  useEffect(() => {
+    setExpandedDay(focusDay);
+  }, [activeCron?.id, focusDay]);
 
   const toggleConcluido = async (blocoId: string, current: boolean) => {
     await supabase
@@ -133,18 +153,34 @@ export default function Cronograma() {
           if (!dayBlocos?.length) return null;
           const dayCompleted = dayBlocos.filter(b => b.concluido).length;
           const dayTotal = dayBlocos.length;
+          const isExpanded = expandedDay === dia;
           return (
-            <div key={dia} className="mb-5">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">{DIAS_LABEL[dia] || dia}</h3>
-                {dayCompleted === dayTotal && dayTotal > 0 && (
-                  <Badge className="bg-accent/15 text-accent border-0 text-[10px] font-black">
-                    <Star className="h-3 w-3 mr-0.5" /> Completo!
-                  </Badge>
-                )}
-              </div>
-              <div className="space-y-2.5">
-                {dayBlocos.map((b, idx) => {
+            <section key={dia} className="mb-3 rounded-2xl border-2 bg-card overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setExpandedDay(isExpanded ? null : dia)}
+                className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
+                aria-expanded={isExpanded}
+              >
+                <div className="min-w-0">
+                  <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">{DIAS_LABEL[dia] || dia}</h3>
+                  <p className="mt-0.5 text-[11px] font-bold text-foreground">
+                    {dayCompleted}/{dayTotal} blocos concluídos
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {dayCompleted === dayTotal && dayTotal > 0 && (
+                    <Badge className="bg-accent/15 text-accent border-0 text-[10px] font-black">
+                      <Star className="h-3 w-3 mr-0.5" /> Completo
+                    </Badge>
+                  )}
+                  <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", isExpanded && "rotate-180")} />
+                </div>
+              </button>
+
+              {isExpanded && (
+                <div className="space-y-2.5 border-t-2 border-border/70 p-3">
+                  {dayBlocos.map((b, idx) => {
                   const style = TIPO_STYLES[b.tipo?.toLowerCase()] || { bg: "bg-muted", border: "border-l-border", icon: "📋" };
                   return (
                     <div
@@ -184,9 +220,10 @@ export default function Cronograma() {
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            </div>
+                  })}
+                </div>
+              )}
+            </section>
           );
         })
       )}
