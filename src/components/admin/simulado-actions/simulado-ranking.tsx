@@ -76,7 +76,7 @@ function formatDate(iso: string): string {
 }
 
 function formatScore(n: number | null): string {
-  return n == null ? "—" : Math.round(n).toString();
+  return n == null ? "—" : n.toFixed(1);
 }
 
 function posicaoBadge(pos: number): string {
@@ -520,7 +520,7 @@ export function SimuladoRanking({
                               }
                             >
                               {row.diffTurma >= 0 ? "+" : ""}
-                              {Math.round(row.diffTurma)}
+                              {row.diffTurma.toFixed(1)}
                             </span>
                           )}
                         </td>

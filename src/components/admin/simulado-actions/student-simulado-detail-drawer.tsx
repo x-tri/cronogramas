@@ -41,7 +41,7 @@ const AREA_COLOR: Record<AreaKey, string> = {
 };
 
 function formatScore(n: number | null): string {
-  return n == null ? "—" : Math.round(n).toString();
+  return n == null ? "—" : n.toFixed(1);
 }
 
 function formatDate(iso: string): string {
@@ -158,10 +158,10 @@ export function StudentSimuladoDetailDrawer({
               >
                 {diffTurma == null
                   ? "—"
-                  : `${diffTurma >= 0 ? "+" : ""}${Math.round(diffTurma)}`}
+                  : `${diffTurma >= 0 ? "+" : ""}${diffTurma.toFixed(1)}`}
               </p>
               {mediaTurma != null && (
-                <p className="text-[9px] text-[#94a3b8] mt-0.5">média turma {Math.round(mediaTurma)}</p>
+                <p className="text-[9px] text-[#94a3b8] mt-0.5">média turma {mediaTurma.toFixed(1)}</p>
               )}
             </div>
           </section>

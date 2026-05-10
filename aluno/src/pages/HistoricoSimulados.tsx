@@ -130,7 +130,7 @@ function AreaSparkline({
             strokeWidth="1.5"
             className={cn(AREA_COLORS[area].bg)}
           >
-            <title>Score válido: {c.estimated ? "" : Math.round(points[i].value)}</title>
+            <title>Score válido: {c.estimated ? "" : points[i].value.toFixed(1)}</title>
           </circle>
         ),
       )}
@@ -149,7 +149,7 @@ function TrendBadge({ delta }: { delta: number | null }) {
   if (delta > 5) {
     return (
       <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600">
-        <TrendingUp className="h-3 w-3" />+{delta.toFixed(0)}
+        <TrendingUp className="h-3 w-3" />+{delta.toFixed(1)}
       </span>
     );
   }
@@ -157,7 +157,7 @@ function TrendBadge({ delta }: { delta: number | null }) {
     return (
       <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-red-600">
         <TrendingDown className="h-3 w-3" />
-        {delta.toFixed(0)}
+        {delta.toFixed(1)}
       </span>
     );
   }
@@ -165,7 +165,7 @@ function TrendBadge({ delta }: { delta: number | null }) {
     <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-600">
       <Minus className="h-3 w-3" />
       {delta >= 0 ? "+" : ""}
-      {delta.toFixed(0)}
+      {delta.toFixed(1)}
     </span>
   );
 }
@@ -266,7 +266,7 @@ export default function HistoricoSimulados() {
                     AREA_COLORS[area].text,
                   )}
                 >
-                  {trend.current !== null ? trend.current.toFixed(0) : "—"}
+                  {trend.current !== null ? trend.current.toFixed(1) : "—"}
                 </span>
                 <span className="text-[10px] text-muted-foreground">pts</span>
               </div>
@@ -317,7 +317,7 @@ export default function HistoricoSimulados() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-black text-foreground tabular-nums">
-                      {p.tri_total.toFixed(0)}
+                      {p.tri_total.toFixed(1)}
                     </p>
                     <p className="text-[9px] text-muted-foreground">média</p>
                   </div>
@@ -348,7 +348,7 @@ export default function HistoricoSimulados() {
                         {AREA_SHORT[a]}
                       </p>
                       <p className="text-[10px] font-black tabular-nums">
-                        {p.tri[a].toFixed(0)}
+                        {p.tri[a].toFixed(1)}
                       </p>
                     </div>
                   ))}

@@ -176,7 +176,7 @@ function triToGaugePercent(score: number | null): number {
 }
 
 function formatScore(score: number | null): string {
-  return typeof score === "number" ? score.toFixed(0) : "—";
+  return typeof score === "number" ? score.toFixed(1) : "—";
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ function Hero({
 
           <div className="flex items-baseline gap-1 leading-none">
             <p className={`text-6xl font-black tracking-tight ${mediaTier?.color}`}>
-              {mediaGeral.toFixed(0)}
+              {mediaGeral.toFixed(1)}
             </p>
             <p className="text-xs font-bold text-muted-foreground">/1000</p>
           </div>

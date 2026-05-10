@@ -59,7 +59,7 @@ const AREA_NOMES: Record<string, string> = {
 
 function round1(n: number | null): number | string {
   if (n == null) return "";
-  return Math.round(n);
+  return Math.round(n * 10) / 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ function buildRankingSheet(
     round1(r.resposta.tri_cn),
     round1(r.resposta.tri_mt),
     round1(r.mediaTri),
-    r.diffTurma == null ? "" : Math.round(r.diffTurma),
+    round1(r.diffTurma),
     r.resposta.acertos_lc,
     r.resposta.acertos_ch,
     r.resposta.acertos_cn,
