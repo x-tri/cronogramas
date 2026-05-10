@@ -59,11 +59,13 @@ export function SimuladoEditItems({
   useEffect(() => {
     if (!open || !simuladoId) return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setDirty(new Set());
-    setFilterNum("");
-    setPage(0);
+    const resetId = window.setTimeout(() => {
+      setLoading(true);
+      setError(null);
+      setDirty(new Set());
+      setFilterNum("");
+      setPage(0);
+    }, 0);
 
     supabase
       .from("simulado_itens")
@@ -90,7 +92,10 @@ export function SimuladoEditItems({
         setLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      window.clearTimeout(resetId);
+    };
   }, [open, simuladoId]);
 
   if (!open) return null;

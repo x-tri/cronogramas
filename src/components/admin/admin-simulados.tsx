@@ -18,6 +18,7 @@ import { supabase } from "../../lib/supabase";
 import { CloneSimuladoModal } from "./simulado-actions/clone-simulado-modal";
 import { ConfirmDialog } from "./simulado-actions/confirm-dialog";
 import { SimuladoEditItems } from "./simulado-actions/simulado-edit-items";
+import { SimuladoItemAudit } from "./simulado-actions/simulado-item-audit";
 import { SimuladoRanking } from "./simulado-actions/simulado-ranking";
 import { StudentTriHistoryDrawer } from "./student-tri-history-drawer";
 import { SimuladoWizard } from "./simulado-wizard";
@@ -59,6 +60,8 @@ const STATUS_STYLES: Readonly<Record<SimuladoStatus, { bg: string; fg: string; l
   published: { bg: "bg-[#dcfce7]", fg: "text-[#166534]", label: "Publicado" },
   closed:    { bg: "bg-[#fee2e2]", fg: "text-[#991b1b]", label: "Encerrado" },
 };
+
+const EMPTY_TURMAS: readonly string[] = [];
 
 function countRespostas(row: SimuladoRow): number {
   return row.simulado_respostas?.[0]?.count ?? 0;
@@ -103,6 +106,7 @@ export function AdminSimulados({
   const [actionError, setActionError] = useState<string | null>(null);
   const [drawerSimulado, setDrawerSimulado] = useState<SimuladoRow | null>(null);
   const [editItemsSimulado, setEditItemsSimulado] = useState<SimuladoRow | null>(null);
+  const [auditSimulado, setAuditSimulado] = useState<SimuladoRow | null>(null);
 
   // Estado do dialog de edição de link do caderno
   const [editLinkSimulado, setEditLinkSimulado] = useState<SimuladoRow | null>(null);
@@ -268,8 +272,8 @@ export function AdminSimulados({
   // SimuladoRanking — sem isso, `drawerSimulado?.turmas ?? []` gera novo array
   // a cada render e dispara useEffect desnecessariamente.
   const rankingTurmas = useMemo<ReadonlyArray<string>>(
-    () => drawerSimulado?.turmas ?? [],
-    [drawerSimulado?.id],
+    () => drawerSimulado?.turmas ?? EMPTY_TURMAS,
+    [drawerSimulado?.turmas],
   );
 
   const handleTriLookup = async () => {
@@ -445,6 +449,7 @@ export function AdminSimulados({
             <li key={sim.id}>
               <SimuladoCard
                 simulado={sim}
+                userRole={userRole}
                 schoolName={schoolNameById[sim.school_id] ?? "—"}
                 canClone={!isSchoolScoped && schools.length > 1}
                 onPublish={() =>
@@ -460,6 +465,7 @@ export function AdminSimulados({
                 onViewResponses={() => setDrawerSimulado(sim)}
                 onEditLink={() => openEditLink(sim)}
                 onEditItems={() => setEditItemsSimulado(sim)}
+                onAudit={() => setAuditSimulado(sim)}
               />
             </li>
           ))}
@@ -546,6 +552,13 @@ export function AdminSimulados({
         simuladoId={editItemsSimulado?.id ?? null}
         simuladoTitle={editItemsSimulado?.title ?? ""}
         onClose={() => setEditItemsSimulado(null)}
+      />
+
+      <SimuladoItemAudit
+        open={auditSimulado !== null}
+        simuladoId={auditSimulado?.id ?? null}
+        simuladoTitle={auditSimulado?.title ?? ""}
+        onClose={() => setAuditSimulado(null)}
       />
 
       {/* Dialog: editar link do caderno */}
@@ -637,6 +650,7 @@ function EmptyState({ onCreate }: EmptyStateProps) {
 
 interface SimuladoCardProps {
   readonly simulado: SimuladoRow;
+  readonly userRole: string | null | undefined;
   readonly schoolName: string;
   readonly canClone: boolean;
   readonly onPublish: () => void;
@@ -646,10 +660,12 @@ interface SimuladoCardProps {
   readonly onViewResponses: () => void;
   readonly onEditLink: () => void;
   readonly onEditItems: () => void;
+  readonly onAudit: () => void;
 }
 
 function SimuladoCard({
   simulado,
+  userRole,
   schoolName,
   canClone,
   onPublish,
@@ -659,6 +675,7 @@ function SimuladoCard({
   onViewResponses,
   onEditLink,
   onEditItems,
+  onAudit,
 }: SimuladoCardProps) {
   const style = STATUS_STYLES[simulado.status];
   const respostas = countRespostas(simulado);
@@ -669,6 +686,7 @@ function SimuladoCard({
 
   const isDraft = simulado.status === "draft";
   const isPublished = simulado.status === "published";
+  const canAudit = userRole === "super_admin";
 
   return (
     <article className="flex h-full flex-col rounded-lg border border-[#e5e7eb] bg-white p-4 shadow-sm">
@@ -744,6 +762,16 @@ function SimuladoCard({
             >
               Ver respostas
             </button>
+            {canAudit && (
+              <button
+                type="button"
+                onClick={onAudit}
+                className="text-xs font-medium text-[#7c3aed] hover:underline"
+                aria-label={`Auditar TRI estimada de ${simulado.title}`}
+              >
+                Auditoria TRI
+              </button>
+            )}
           </div>
         </div>
 

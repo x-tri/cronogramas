@@ -302,7 +302,7 @@ export function SimuladoAnalyzer({
         setIsLoadingReport(false)
       }
     },
-    [ensureSelectedResult],
+    [ensureSelectedResult, matricula, selectedSimuladoHistoryItem],
   )
 
   const handleCloseResult = useCallback(() => {

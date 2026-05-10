@@ -10,16 +10,24 @@ const AREA_CONFIG: Record<string, { label: string; emoji: string; color: string;
   MT: { label: "Matemática", emoji: "📐", color: "text-violet-600", bg: "bg-violet-50 border-violet-200" },
 };
 
+type PlanItemWithTopic = NonNullable<ReturnType<typeof usePlanItems>["data"]>[number] & {
+  readonly content_topics?: {
+    readonly area_sigla?: string | null;
+    readonly canonical_label?: string | null;
+  } | null;
+};
+
 export default function Conteudos() {
   const { data: student } = useStudentProfile();
   const { data: items, isLoading } = usePlanItems(student?.matricula || student?.id);
 
   const grouped = useMemo(() => {
     if (!items) return {};
-    const map: Record<string, typeof items> = {};
+    const map: Record<string, PlanItemWithTopic[]> = {};
     for (const item of items) {
-      const area = (item as any).content_topics?.area_sigla || item.fallback_area_sigla || "?";
-      (map[area] ??= []).push(item);
+      const typedItem = item as PlanItemWithTopic;
+      const area = typedItem.content_topics?.area_sigla || typedItem.fallback_area_sigla || "?";
+      (map[area] ??= []).push(typedItem);
     }
     return map;
   }, [items]);
@@ -64,7 +72,7 @@ export default function Conteudos() {
             </div>
             <div className="space-y-1.5">
               {areaItems.map((item, idx) => {
-                const topic = (item as any).content_topics;
+                const topic = item.content_topics;
                 const label = topic?.canonical_label || item.fallback_label || "—";
                 return (
                   <div

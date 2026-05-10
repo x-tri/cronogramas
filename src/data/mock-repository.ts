@@ -196,7 +196,7 @@ export function createMockRepository(): DataRepository {
     },
 
     schedules: {
-      getOfficialSchedule: async (turma, _schoolId, _anoLetivo) => {
+      getOfficialSchedule: async (turma) => {
         // Mock ignora schoolId e anoLetivo (legacy Marista hardcoded por turma).
         return delay(getHorariosPorTurma(turma))
       },

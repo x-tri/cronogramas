@@ -16,6 +16,13 @@ interface Props {
 
 const XP_CORRECT = 20;
 const XP_WRONG = 5;
+const CONFETTI_PARTICLES = Array.from({ length: 12 }, (_, i) => ({
+  id: i,
+  left: `${10 + ((i * 37) % 80)}%`,
+  delay: `${((i * 13) % 50) / 100}s`,
+  duration: `${1 + ((i * 17) % 100) / 100}s`,
+  icon: ["⭐", "🔥", "💎", "✨", "🎯", "💪"][i % 6],
+}));
 
 export function SectionQuestoes({ questoes, titulo }: Props) {
   return (
@@ -51,7 +58,6 @@ function saveQuestionResponse(
 function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: number }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [xpAwarded, setXpAwarded] = useState<number | null>(null);
   const [mascotReaction, setMascotReaction] = useState<MascotAnimation | null>(null);
   const { data: student } = useStudentProfile();
   const studentKey = student?.matricula || student?.id;
@@ -66,8 +72,6 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
     (letra: string) => {
       setSelected(letra);
       const isCorrect = letra === questao.gabarito;
-      const xp = isCorrect ? XP_CORRECT : XP_WRONG;
-      setXpAwarded(xp);
 
       // Mascote + celebração
       setMascotReaction(isCorrect ? "jump" : "hit");
@@ -92,7 +96,6 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
 
   const handleRetry = () => {
     setSelected(null);
-    setXpAwarded(null);
     setShowCelebration(false);
   };
 
@@ -115,19 +118,19 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
             </div>
           </div>
           {/* Confetti particles */}
-          {Array.from({ length: 12 }).map((_, i) => (
+          {CONFETTI_PARTICLES.map((particle) => (
             <div
-              key={i}
+              key={particle.id}
               className="absolute animate-confetti-fall"
               style={{
-                left: `${10 + Math.random() * 80}%`,
+                left: particle.left,
                 top: "-10px",
-                animationDelay: `${Math.random() * 0.5}s`,
-                animationDuration: `${1 + Math.random() * 1}s`,
+                animationDelay: particle.delay,
+                animationDuration: particle.duration,
                 fontSize: "16px",
               }}
             >
-              {["⭐", "🔥", "💎", "✨", "🎯", "💪"][i % 6]}
+              {particle.icon}
             </div>
           ))}
         </div>

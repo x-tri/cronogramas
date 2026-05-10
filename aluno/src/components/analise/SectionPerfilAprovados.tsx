@@ -1,5 +1,4 @@
 import { Users } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { PerfilAprovados } from "./types";
 
 interface Props {

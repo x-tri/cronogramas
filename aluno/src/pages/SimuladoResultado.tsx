@@ -209,7 +209,7 @@ function Hero({
       {mediaGeral != null && (
         <div className="relative flex flex-col items-center text-center gap-1.5">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-            Sua nota TRI
+            TRI estimada XTRI
           </p>
 
           <div className="flex items-baseline gap-1 leading-none">
@@ -220,9 +220,9 @@ function Hero({
           </div>
           <p
             className="text-[10px] font-semibold text-muted-foreground"
-            title={`Média ENEM = (LC + CH + CN + MT + Redação ${REDACAO_HARDCODED}) / 5`}
+            title={`Cenário simulado = (LC + CH + CN + MT + Redação ${REDACAO_HARDCODED}) / 5`}
           >
-            c/ redação {REDACAO_HARDCODED}
+            cenário c/ redação {REDACAO_HARDCODED}
           </p>
 
           <button
@@ -497,7 +497,7 @@ export default function SimuladoResultado() {
       resposta.branco_cn +
       resposta.branco_mt,
   };
-  // Media ENEM oficial: 4 areas + redacao (hardcoded 900 pra comparar com SISU)
+  // Cenário simulado: 4 áreas + redação proxy para comparação pedagógica SISU.
   const mediaGeral = mediaEnemComRedacao({
     lc: resposta.tri_lc,
     ch: resposta.tri_ch,
@@ -541,7 +541,7 @@ export default function SimuladoResultado() {
             {data.simulado?.title ?? "Simulado"}
           </p>
           <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider leading-tight">
-            Resultado oficial (TRI)
+            TRI estimada XTRI
           </p>
         </div>
       </div>

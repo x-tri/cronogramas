@@ -15,7 +15,7 @@ export default function StudentLayout() {
   const [passwordChanged, setPasswordChanged] = useState(false);
 
   // Verificar se tem student vinculado a este auth user
-  const { data: studentLink, isLoading: loadingStudent, error: studentError } = useQuery({
+  const { data: studentLink, isLoading: loadingStudent } = useQuery({
     queryKey: ["student-link", user?.id],
     queryFn: async () => {
       // Tentar refresh da sessão antes da query para evitar JWT expirado

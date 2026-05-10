@@ -47,8 +47,7 @@ export type AreaTrend = {
   readonly delta: number | null
 }
 
-const AREAS = ['lc', 'ch', 'cn', 'mt'] as const
-type Area = (typeof AREAS)[number]
+type Area = 'lc' | 'ch' | 'cn' | 'mt'
 
 /**
  * Build a compact TRI context.

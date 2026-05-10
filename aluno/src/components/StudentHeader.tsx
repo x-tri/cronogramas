@@ -14,7 +14,6 @@ export default function StudentHeader() {
   const { data: student } = useStudentProfile();
   const studentKey = student?.matricula || student?.id;
   const { data: gamification } = useGamification(studentKey);
-  const level = gamification?.level ?? 1;
   const displayName = firstName(student?.name);
 
   return (

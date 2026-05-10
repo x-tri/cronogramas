@@ -27,6 +27,13 @@ const AREA_CONFIG: Record<string, { label: string; emoji: string; gradient: stri
   MT: { label: "Matemática", emoji: "📐", gradient: "from-violet-400 to-violet-600", ring: "text-violet-500" },
 };
 
+type PlanItemWithTopic = NonNullable<ReturnType<typeof usePlanItems>["data"]>[number] & {
+  readonly content_topics?: {
+    readonly area_sigla?: string | null;
+    readonly canonical_label?: string | null;
+  } | null;
+};
+
 function AnimatedNumber({ value, suffix = "" }: { value: number; suffix?: string }) {
   return (
     <span className="tabular-nums">
@@ -110,8 +117,9 @@ export default function Desempenho() {
     if (!planItems) return [];
     const map: Record<string, { area: string; topics: string[]; level: string }> = {};
     for (const item of planItems) {
-      const area = (item as any).content_topics?.area_sigla || item.fallback_area_sigla || "?";
-      const label = (item as any).content_topics?.canonical_label || item.fallback_label || "—";
+      const typedItem = item as PlanItemWithTopic;
+      const area = typedItem.content_topics?.area_sigla || typedItem.fallback_area_sigla || "?";
+      const label = typedItem.content_topics?.canonical_label || typedItem.fallback_label || "—";
       if (!map[area]) map[area] = { area, topics: [], level: item.expected_level };
       map[area].topics.push(label);
     }

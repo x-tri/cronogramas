@@ -49,7 +49,13 @@ export default function Analise() {
   );
 }
 
-function ReportCard({ report, index }: { report: any; index: number }) {
+function ReportCard({
+  report,
+  index,
+}: {
+  report: { readonly report_data?: ReportData | null };
+  index: number;
+}) {
   const [expanded, setExpanded] = useState(index === 0);
   const data = (report.report_data || {}) as ReportData;
   const sisu = data.sisuAnalysis;

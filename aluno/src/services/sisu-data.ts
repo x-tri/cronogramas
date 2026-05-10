@@ -92,7 +92,7 @@ export function buildThermometerData(
 }
 
 /**
- * Média ENEM oficial: media simples das 4 areas mais a redacao.
+ * Cenario pedagogico: media simples das 4 areas mais uma redacao simulada.
  *
  * Por enquanto usamos REDACAO = 900 hardcoded como proxy (decisao do
  * produto: aluno ainda nao submete redacao no app, mas a media precisa

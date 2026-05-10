@@ -63,7 +63,6 @@ import {
   buildQuestionCandidateMap,
   questionRequiresVisualContext,
   resolveItem,
-  sortQuestionOptions,
   type QuestionCandidateRow,
   type QuestionOptionRow,
 } from './question-delivery'
@@ -1080,37 +1079,6 @@ async function computeBenchmarkEscola(
 
 const TARGET_QUESTOES_POR_AREA = 10
 const MAX_QUESTOES_AREA_FALLBACK_POR_AREA = 4
-
-function buildOptionsByQuestionId(
-  rows: ReadonlyArray<{
-    question_id: string
-    letter: string
-    text: string
-    is_correct: boolean
-  }>,
-): Map<string, QuestionOptionRow[]> {
-  const optionsByQuestionId = new Map<string, QuestionOptionRow[]>()
-
-  for (const row of rows) {
-    const option: QuestionOptionRow = {
-      letter: row.letter,
-      text: row.text,
-      is_correct: row.is_correct,
-    }
-    const existing = optionsByQuestionId.get(row.question_id)
-    if (existing) {
-      existing.push(option)
-    } else {
-      optionsByQuestionId.set(row.question_id, [option])
-    }
-  }
-
-  for (const [questionId, options] of optionsByQuestionId.entries()) {
-    optionsByQuestionId.set(questionId, sortQuestionOptions(options))
-  }
-
-  return optionsByQuestionId
-}
 
 async function chooseQuestionRows(
   rows: ReadonlyArray<QuestionCandidateRow>,

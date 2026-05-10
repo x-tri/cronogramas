@@ -51,7 +51,8 @@ export function MascotAvatar({
   const isLoop = animation === "idle";
 
   useEffect(() => {
-    setFrameIndex(0);
+    const id = window.setTimeout(() => setFrameIndex(0), 0);
+    return () => window.clearTimeout(id);
   }, [animation, level]);
 
   useEffect(() => {
@@ -111,7 +112,8 @@ export function MascotAvatarWithReaction({
 
   useEffect(() => {
     if (reaction && reaction !== "idle") {
-      setCurrentAnim(reaction);
+      const id = window.setTimeout(() => setCurrentAnim(reaction), 0);
+      return () => window.clearTimeout(id);
     }
   }, [reaction]);
 

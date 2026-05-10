@@ -25,6 +25,10 @@ import {
   type ErrosPorTopicoComArea,
   type TriResults,
 } from './tri-engine/engine.ts'
+import {
+  areasRealizadasFromBreakdown,
+  confidenceFromAreas,
+} from './item-audit.ts'
 import { AREAS, type AreaKey } from './tri-engine/reference-tables.ts'
 
 // ---------------------------------------------------------------------------
@@ -126,6 +130,8 @@ interface SimuladoItemRow {
 // ---------------------------------------------------------------------------
 
 const TOTAL_ITEMS = 180
+const TRI_METHOD = 'xtri_reference_anchored'
+const TRI_VERSION = '1.1'
 
 /**
  * Converte `{ "1": "A", "2": "B", ... }` em array de 180 letras em ordem.
@@ -305,6 +311,8 @@ export async function submitSimulado(
   // de simulado_itens.area, evitando depender de prefixo no string do topico.
   const errosPorTopico = groupErrorsByWithArea(answersArray, gabarito, topicos, areas)
   const errosPorHabilidade = groupErrorsBy(answersArray, gabarito, habilidades)
+  const areasRealizadas = areasRealizadasFromBreakdown(porArea)
+  const confidenceLevel = confidenceFromAreas(porArea)
 
   // 8. Persiste (RLS bypassada via service_role).
   //    Se houver corrida com step 4, o UNIQUE (simulado_id, student_id) vai
@@ -326,6 +334,11 @@ export async function submitSimulado(
       acertos_mt: porArea.MT.acertos, erros_mt: porArea.MT.erros, branco_mt: porArea.MT.branco,
       erros_por_topico: errosPorTopico,
       erros_por_habilidade: errosPorHabilidade,
+      tri_method: TRI_METHOD,
+      tri_version: TRI_VERSION,
+      correction_status: 'computed',
+      areas_realizadas: areasRealizadas,
+      confidence_level: confidenceLevel,
     })
     .select('id, submitted_at')
     .single<{ id: string; submitted_at: string }>()

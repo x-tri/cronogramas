@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useCallback, useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { isSupabaseConfigured } from '../../config/repository-config'
@@ -48,7 +48,7 @@ export function AuditPanel({ variant = 'default', coordinatorSchoolId }: { varia
   const [error, setError] = useState<string | null>(null)
   const [searchFilter, setSearchFilter] = useState('')
 
-  const loadAuditData = async () => {
+  const loadAuditData = useCallback(async () => {
     if (!isSupabaseConfigured()) {
       setError('Supabase não configurado')
       return
@@ -279,13 +279,13 @@ export function AuditPanel({ variant = 'default', coordinatorSchoolId }: { varia
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [coordinatorSchoolId])
 
   useEffect(() => {
     if (isOpen && records.length === 0) {
       void loadAuditData()
     }
-  }, [isOpen, records.length, coordinatorSchoolId])
+  }, [isOpen, records.length, loadAuditData])
 
   // Group by school
   const grouped = useMemo(() => {

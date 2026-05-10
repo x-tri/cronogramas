@@ -171,7 +171,8 @@ function useNavIndicators(): Record<IndicatorKey, boolean> {
 
   useEffect(() => {
     if (!student?.profile_id) {
-      setOptimisticSeen({});
+      const id = window.setTimeout(() => setOptimisticSeen({}), 0);
+      return () => window.clearTimeout(id);
     }
   }, [student?.profile_id]);
 
@@ -182,11 +183,11 @@ function useNavIndicators(): Record<IndicatorKey, boolean> {
     if (!current || !fingerprints[current]) return;
     if (seen[current] === fingerprints[current]) return;
 
-    setOptimisticSeen((prev) => {
-      const next = { ...prev, [current]: fingerprints[current] };
-      return next;
-    });
+    const id = window.setTimeout(() => {
+      setOptimisticSeen((prev) => ({ ...prev, [current]: fingerprints[current] }));
+    }, 0);
     markSeen.mutate({ section: current, fingerprint: fingerprints[current] });
+    return () => window.clearTimeout(id);
   }, [fingerprints, location.pathname, markSeen, seen, student?.profile_id]);
 
   return {

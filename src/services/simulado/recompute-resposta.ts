@@ -15,16 +15,21 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import {
   calcAllTRI,
-  calcTotals,
   groupErrorsBy,
   groupErrorsByWithArea,
   type ErrosPorTopicoComArea,
   type TriResults,
 } from './tri-engine/engine.ts'
+import {
+  areasRealizadasFromBreakdown,
+  confidenceFromAreas,
+} from './item-audit.ts'
 import { type AreaKey } from './tri-engine/reference-tables.ts'
 import { answersMapToArray } from './submit-simulado.ts'
 
 const TOTAL_ITEMS = 180
+const TRI_METHOD = 'xtri_reference_anchored'
+const TRI_VERSION = '1.1'
 
 interface SimuladoItemRow {
   readonly numero: number
@@ -153,6 +158,8 @@ export async function recomputeSimuladoResposta(
   const errosPorTopico: Record<string, ErrosPorTopicoComArea> =
     groupErrorsByWithArea(answersArray, gabarito, topicos, areas)
   const errosPorHabilidade = groupErrorsBy(answersArray, gabarito, habilidades)
+  const areasRealizadas = areasRealizadasFromBreakdown(totaisArea)
+  const confidenceLevel = confidenceFromAreas(totaisArea)
 
   const triDepois: Record<AreaKey, number | null> = {
     LC: scoreOf(tri, 'LC'),
@@ -175,6 +182,11 @@ export async function recomputeSimuladoResposta(
       acertos_mt: totaisArea.MT.acertos, erros_mt: totaisArea.MT.erros, branco_mt: totaisArea.MT.branco,
       erros_por_topico: errosPorTopico,
       erros_por_habilidade: errosPorHabilidade,
+      tri_method: TRI_METHOD,
+      tri_version: TRI_VERSION,
+      correction_status: 'recomputed',
+      areas_realizadas: areasRealizadas,
+      confidence_level: confidenceLevel,
     })
     .eq('id', respostaId)
 

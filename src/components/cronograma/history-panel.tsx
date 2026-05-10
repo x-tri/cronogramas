@@ -1,6 +1,5 @@
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import type { Cronograma } from '../../types/domain'
-import { ESCOLA_LABELS } from '../../types/domain'
 
 export function HistoryPanel() {
   const currentStudent = useCronogramaStore((s) => s.currentStudent)
@@ -9,11 +8,6 @@ export function HistoryPanel() {
   const isLoading = useCronogramaStore((s) => s.isLoadingVersions)
   const selectVersion = useCronogramaStore((s) => s.selectCronogramaVersion)
   const deleteVersion = useCronogramaStore((s) => s.deleteCronogramaVersion)
-
-  const studentInitials = currentStudent
-    ? currentStudent.nome.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
-    : ''
-  const schoolName = currentStudent?.escolaNome?.trim() || (currentStudent ? ESCOLA_LABELS[currentStudent.escola] : '')
 
   const handleSelect = (version: Cronograma) => {
     selectVersion(version.id)
