@@ -131,7 +131,7 @@ interface SimuladoItemRow {
 
 const TOTAL_ITEMS = 180
 const TRI_METHOD = 'xtri_reference_anchored'
-const TRI_VERSION = '1.1'
+const TRI_VERSION = '1.2'
 
 /**
  * Converte `{ "1": "A", "2": "B", ... }` em array de 180 letras em ordem.

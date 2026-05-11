@@ -131,6 +131,30 @@ describe('calcAllTRI — intermediario', () => {
 
     expect(scoreDificeis).toBeGreaterThan(scoreFaceis)
   })
+
+  it('recalibra topo de LC para 44/45 nao ultrapassar 45/45', () => {
+    const gabarito = makeGabarito('A')
+    const difficulties = makeDifficulties(1)
+    const areaLC = AREAS[0]!
+    const startLC = areaLC.range[0] - 1
+
+    // Um erro facil e 44 acertos mais dificeis: antes da calibragem,
+    // essa combinacao encostava no mx da faixa de 44 e superava o 45/45.
+    for (let i = startLC + 1; i < startLC + 45; i++) {
+      difficulties[i] = 5
+    }
+
+    const answers = makeGabarito('B')
+    for (let i = startLC + 1; i < startLC + 45; i++) {
+      answers[i] = 'A'
+    }
+
+    const score44 = calcAllTRI(answers, { gabarito, difficulties }).LC!.score
+    const score45 = calcAllTRI(makeGabarito('A'), { gabarito, difficulties }).LC!.score
+
+    expect(score44).toBe(795.7)
+    expect(score44).toBeLessThan(score45)
+  })
 })
 
 describe('calcTotals', () => {

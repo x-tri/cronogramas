@@ -29,7 +29,7 @@ import { answersMapToArray } from './submit-simulado.ts'
 
 const TOTAL_ITEMS = 180
 const TRI_METHOD = 'xtri_reference_anchored'
-const TRI_VERSION = '1.1'
+const TRI_VERSION = '1.2'
 
 interface SimuladoItemRow {
   readonly numero: number

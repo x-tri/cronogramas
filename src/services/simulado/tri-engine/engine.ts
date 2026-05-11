@@ -56,6 +56,7 @@ export type ExamConfig = {
 const TOTAL_ITEMS = 180
 const TOTAL_ITEMS_PER_AREA = 45
 const DEFAULT_DIFFICULTY = 3
+const LC_PERFECT_SCORE = REF_TABLES.LC.at(-1)?.mx ?? 795.8
 
 /**
  * Valida precondicao de tamanho de arrays. Lanca se qualquer array tiver menos
@@ -84,6 +85,25 @@ function normalizeAnswer(raw: string | undefined | null): string {
   const v = raw.toUpperCase().trim()
   if (v === '' || v === '-' || v === ' ') return ''
   return v
+}
+
+/**
+ * Recalibracao defensiva da cauda superior de LC.
+ *
+ * A tabela historica de LC v1.1 tem uma anomalia no topo: algumas faixas
+ * abaixo de 45 acertos podem ultrapassar o score de 45/45. Para uma TRI
+ * estimada operacional isso nao e defensavel, entao comprimimos somente a
+ * cauda que excede o teto perfeito, preservando a ordem por numero de acertos.
+ */
+function calibrateEstimatedScore(
+  area: AreaConfig,
+  nCorrect: number,
+  score: number,
+): number {
+  if (area.key !== 'LC' || nCorrect >= TOTAL_ITEMS_PER_AREA) return score
+
+  const maxBelowPerfect = LC_PERFECT_SCORE - (TOTAL_ITEMS_PER_AREA - nCorrect) * 0.1
+  return Math.round(Math.min(score, maxBelowPerfect) * 10) / 10
 }
 
 /**
@@ -175,7 +195,8 @@ function calcAreaTRI(
   const position = bestUp === worstUp ? 0.5 : (scoreUp - worstUp) / (bestUp - worstUp)
 
   const amplitude = entry.mx - entry.mn
-  const score = Math.round((entry.mn + position * amplitude) * 10) / 10
+  const rawScore = Math.round((entry.mn + position * amplitude) * 10) / 10
+  const score = calibrateEstimatedScore(area, nCorrect, rawScore)
 
   return {
     score,
