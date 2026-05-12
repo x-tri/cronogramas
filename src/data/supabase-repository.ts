@@ -22,6 +22,28 @@ import {
 } from '../lib/project-user'
 import { supabase } from '../lib/supabase'
 
+export const DEFAULT_SCHOOL_YEAR = 2026
+
+export function normalizeTurmaLabel(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export function buildTurmaCandidates(turma: string): string[] {
+  const trimmed = turma.trim()
+  if (!trimmed) return []
+
+  const candidates = new Set<string>([trimmed])
+  const normalized = normalizeTurmaLabel(trimmed)
+
+  if (normalized.startsWith('turma ')) {
+    candidates.add(trimmed.replace(/^turma\s+/i, '').trim())
+  } else if (/^\d/.test(trimmed)) {
+    candidates.add(`Turma ${trimmed}`)
+  }
+
+  return [...candidates].filter(Boolean)
+}
+
 // Garante sessão válida antes de writes — verifica com o servidor (evita clock skew)
 async function assertSession(): Promise<void> {
   // getUser() faz requisição real ao servidor — detecta tokens expirados mesmo com
@@ -181,22 +203,69 @@ export function createSupabaseRepository(): DataRepository {
           logRepository('[getOfficialSchedule] schoolId vazio -> fallback mock', { turma })
           return getHorariosPorTurma(turma)
         }
-        const ano = anoLetivo ?? 2026
-        const { data, error } = await supabase
-          .from('school_schedules')
-          .select('id, school_id, turma, dia_semana, horario_inicio, horario_fim, turno, disciplina, professor')
-          .eq('school_id', schoolId)
-          .eq('turma', turma)
-          .eq('ano_letivo', ano)
-          .order('dia_semana')
-          .order('horario_inicio')
+        const ano = anoLetivo ?? DEFAULT_SCHOOL_YEAR
+        const turmaCandidates = buildTurmaCandidates(turma)
+
+        const fetchSchedules = async (
+          turmaCandidata: string,
+          options: { allowNullYear?: boolean } = {},
+        ) => {
+          let query = supabase
+            .from('school_schedules')
+            .select('id, school_id, turma, dia_semana, horario_inicio, horario_fim, turno, disciplina, professor')
+            .eq('school_id', schoolId)
+            .eq('turma', turmaCandidata)
+            .order('dia_semana')
+            .order('horario_inicio')
+
+          query = options.allowNullYear
+            ? query.is('ano_letivo', null)
+            : query.eq('ano_letivo', ano)
+
+          return query
+        }
+
+        let data: Awaited<ReturnType<typeof fetchSchedules>>['data'] | null = null
+        let error: Awaited<ReturnType<typeof fetchSchedules>>['error'] | null = null
+
+        for (const turmaCandidata of turmaCandidates) {
+          const result = await fetchSchedules(turmaCandidata)
+          if (result.error) {
+            error = result.error
+            break
+          }
+          if (result.data && result.data.length > 0) {
+            data = result.data
+            break
+          }
+        }
+
+        if (!data || data.length === 0) {
+          for (const turmaCandidata of turmaCandidates) {
+            const legacyResult = await fetchSchedules(turmaCandidata, { allowNullYear: true })
+            if (legacyResult.error) {
+              error = legacyResult.error
+              break
+            }
+            if (legacyResult.data && legacyResult.data.length > 0) {
+              data = legacyResult.data
+              logRepository('[getOfficialSchedule] usando fallback legado sem ano_letivo', {
+                schoolId,
+                turma,
+                turmaCandidata,
+              })
+              break
+            }
+          }
+        }
+
         if (error) {
           console.warn('[supabase-repository] school_schedules falhou, fallback mock:', error.message)
           return getHorariosPorTurma(turma)
         }
         if (!data || data.length === 0) {
           logRepository('[getOfficialSchedule] school_schedules vazio (RLS bloqueou ou turma sem cadastro) -> fallback mock', {
-            schoolId, turma, ano,
+            schoolId, turma, ano, turmaCandidates,
           })
           return getHorariosPorTurma(turma)
         }

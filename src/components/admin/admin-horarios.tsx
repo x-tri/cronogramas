@@ -24,6 +24,7 @@ interface AdminHorariosProps {
   embedded?: boolean;
 }
 
+const DEFAULT_SCHOOL_YEAR = 2026;
 const DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado"] as const;
 const DIA_LABELS: Record<string, string> = {
   segunda: "Seg",
@@ -40,6 +41,7 @@ export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
   const [turmas, setTurmas] = useState<string[]>([]);
   const [selectedTurma, setSelectedTurma] = useState("");
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
+  const [selectedAnoLetivo, setSelectedAnoLetivo] = useState(DEFAULT_SCHOOL_YEAR);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<ScheduleEntry | null>(null);
@@ -56,16 +58,30 @@ export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
   // Load turmas when school changes
   useEffect(() => {
     if (!selectedSchool) return;
-    supabase
-      .from("school_schedules")
-      .select("turma")
-      .eq("school_id", selectedSchool)
-      .then(({ data }) => {
-        const unique = [...new Set((data ?? []).map((d) => d.turma))].sort();
-        setTurmas(unique);
-        setSelectedTurma(unique[0] ?? "");
-      });
-  }, [selectedSchool]);
+    const loadTurmas = async () => {
+      const currentYearResult = await supabase
+        .from("school_schedules")
+        .select("turma")
+        .eq("school_id", selectedSchool)
+        .eq("ano_letivo", selectedAnoLetivo);
+
+      let data = currentYearResult.data ?? [];
+      if (data.length === 0) {
+        const legacyResult = await supabase
+          .from("school_schedules")
+          .select("turma")
+          .eq("school_id", selectedSchool)
+          .is("ano_letivo", null);
+        data = legacyResult.data ?? [];
+      }
+
+      const unique = [...new Set(data.map((d) => d.turma))].sort();
+      setTurmas(unique);
+      setSelectedTurma((current) => (current && unique.includes(current) ? current : unique[0] ?? ""));
+    };
+
+    void loadTurmas();
+  }, [selectedAnoLetivo, selectedSchool]);
 
   // Load entries when turma changes
   const loadEntries = useCallback(async () => {
@@ -78,10 +94,25 @@ export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
       .select("*")
       .eq("school_id", selectedSchool)
       .eq("turma", selectedTurma)
+      .eq("ano_letivo", selectedAnoLetivo)
       .order("dia_semana")
       .order("horario_inicio");
-    setEntries(data ?? []);
-  }, [selectedSchool, selectedTurma]);
+
+    if (data && data.length > 0) {
+      setEntries(data);
+      return;
+    }
+
+    const legacyResult = await supabase
+      .from("school_schedules")
+      .select("*")
+      .eq("school_id", selectedSchool)
+      .eq("turma", selectedTurma)
+      .is("ano_letivo", null)
+      .order("dia_semana")
+      .order("horario_inicio");
+    setEntries(legacyResult.data ?? []);
+  }, [selectedAnoLetivo, selectedSchool, selectedTurma]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -197,6 +228,17 @@ export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
             </select>
           </div>
           <div className="flex items-center gap-2">
+            <label className="text-xs text-[#64748b]">Ano:</label>
+            <input
+              type="number"
+              min={2024}
+              max={2035}
+              value={selectedAnoLetivo}
+              onChange={(e) => setSelectedAnoLetivo(Number(e.target.value) || DEFAULT_SCHOOL_YEAR)}
+              className="w-24 rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs text-[#1d1d1f]"
+            />
+          </div>
+          <div className="flex items-center gap-2">
             <label className="text-xs text-[#64748b]">Turma:</label>
             <div className="flex gap-1">
               {turmas.length === 0 ? (
@@ -299,6 +341,7 @@ export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
           entry={editingEntry}
           schoolId={selectedSchool}
           turma={selectedTurma}
+          anoLetivo={selectedAnoLetivo}
           onClose={() => { setShowAddModal(false); setEditingEntry(null); }}
           onSaved={() => { setShowAddModal(false); setEditingEntry(null); loadEntries(); }}
         />
@@ -313,12 +356,14 @@ function ScheduleFormModal({
   entry,
   schoolId,
   turma,
+  anoLetivo,
   onClose,
   onSaved,
 }: {
   entry: ScheduleEntry | null;
   schoolId: string;
   turma: string;
+  anoLetivo: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -331,11 +376,12 @@ function ScheduleFormModal({
     turno: entry?.turno ?? "manha",
     disciplina: entry?.disciplina ?? "",
     professor: entry?.professor ?? "",
+    ano_letivo: entry?.ano_letivo ?? anoLetivo,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  function update(field: string, value: string) {
+  function update<K extends keyof typeof form>(field: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -357,6 +403,7 @@ function ScheduleFormModal({
       turno: form.turno,
       disciplina: form.disciplina.trim(),
       professor: form.professor.trim() || null,
+      ano_letivo: Number(form.ano_letivo) || DEFAULT_SCHOOL_YEAR,
     };
 
     if (isEdit && entry) {
@@ -390,6 +437,12 @@ function ScheduleFormModal({
             <Field label="Turma">
               <input value={form.turma} onChange={(e) => update("turma", e.target.value)} required className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:border-[#93c5fd] focus:ring-2 focus:ring-[#bfdbfe]" />
             </Field>
+            <Field label="Ano letivo">
+              <input type="number" value={form.ano_letivo} onChange={(e) => update("ano_letivo", Number(e.target.value) || DEFAULT_SCHOOL_YEAR)} required className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:border-[#93c5fd] focus:ring-2 focus:ring-[#bfdbfe]" />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Dia">
               <select value={form.dia_semana} onChange={(e) => update("dia_semana", e.target.value)} className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:border-[#93c5fd] focus:ring-2 focus:ring-[#bfdbfe]">
                 {DIAS.map((d) => <option key={d} value={d}>{DIA_LABELS[d]}</option>)}
