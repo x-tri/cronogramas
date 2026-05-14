@@ -137,6 +137,7 @@ describe('SimuladoAnalyzer', () => {
       selectedSimuladoHistoryItem: null as SimuladoHistoryItem | null,
       selectedSimuladoResult: null as SimuladoResult | null,
       addBlock: vi.fn().mockResolvedValue({ id: 'block-1' }),
+      removeBlock: vi.fn().mockResolvedValue(undefined),
       createCronograma: vi.fn().mockResolvedValue(mockCronograma),
       loadCronogramaVersions: vi.fn().mockResolvedValue(undefined),
       setSimuladoHistory: vi.fn((history: SimuladoHistoryItem[]) => {
@@ -168,6 +169,7 @@ describe('SimuladoAnalyzer', () => {
     blocos: {
       getBlocos: ReturnType<typeof vi.fn>
       createBloco: ReturnType<typeof vi.fn>
+      deleteBloco: ReturnType<typeof vi.fn>
     }
   }
 
@@ -200,6 +202,7 @@ describe('SimuladoAnalyzer', () => {
             createdAt: new Date(),
           }
         }),
+        deleteBloco: vi.fn().mockResolvedValue(undefined),
       },
     }
     vi.mocked(getRepository).mockReturnValue(repositoryState as never)
@@ -426,7 +429,7 @@ describe('SimuladoAnalyzer', () => {
     expect(futureBlockData.horarioFim).toBe('15:45')
   })
 
-  it('nao redistribui questoes que ja estao em cronogramas do aluno', async () => {
+  it('substitui questoes ja distribuidas antes de recriar a sequencia', async () => {
     storeState.blocks = [
       {
         id: 'existing-q1',
@@ -457,23 +460,24 @@ describe('SimuladoAnalyzer', () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          'Será distribuída 1 questão em 1 semana, começando pela semana atual. 1 já está no cronograma.',
+          'Serão distribuídas 2 questões em 1 semana, começando pela semana atual.',
         ),
       ).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /Distribuir \(1\)/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Distribuir \(2\)/i }))
 
     await waitFor(() => {
-      expect(storeState.addBlock).toHaveBeenCalledTimes(1)
+      expect(storeState.removeBlock).toHaveBeenCalledWith('existing-q1')
+      expect(storeState.addBlock).toHaveBeenCalledTimes(2)
     })
 
     const blockData = storeState.addBlock.mock.calls[0][0] as Omit<
       BlocoCronograma,
       'id' | 'createdAt'
     >
-    expect(blockData.descricao).toBe('Questão 136 - Revisão de erro')
-    expect(blockData.titulo).toBe('Álgebra')
+    expect(blockData.descricao).toBe('Questão 1 - Revisão de erro')
+    expect(blockData.titulo).toBe('Interpretação de Texto')
   })
 
   it('ignora clique duplicado enquanto a distribuição está em andamento', async () => {

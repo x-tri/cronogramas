@@ -142,6 +142,7 @@ export function SimuladoAnalyzer({
   const officialSchedule = useCronogramaStore((state) => state.officialSchedule)
   const slotsOverride = useCronogramaStore((state) => state.slotsOverride)
   const addBlock = useCronogramaStore((state) => state.addBlock)
+  const removeBlock = useCronogramaStore((state) => state.removeBlock)
   const cronograma = useCronogramaStore((state) => state.cronograma)
   const currentStudent = useCronogramaStore((state) => state.currentStudent)
   const createCronograma = useCronogramaStore((state) => state.createCronograma)
@@ -416,11 +417,8 @@ export function SimuladoAnalyzer({
   }, [selectedSimuladoResult, selectedQuestions])
 
   const selectedQuestionsToDistribute = useMemo(
-    () =>
-      selectedQuestionsList.filter(
-        (question) => !scheduledQuestionNumbers.has(question.questionNumber),
-      ),
-    [scheduledQuestionNumbers, selectedQuestionsList],
+    () => selectedQuestionsList,
+    [selectedQuestionsList],
   )
 
   const buildAvailableSlotsForBlocks = useCallback((weekBlocks: BlocoCronograma[]) => {
@@ -577,17 +575,6 @@ export function SimuladoAnalyzer({
     setError(null)
 
     try {
-      const latestScheduledQuestionNumbers = await getScheduledQuestionNumbers()
-      const questionsToSchedule = selectedQuestionsList.filter(
-        (question) => !latestScheduledQuestionNumbers.has(question.questionNumber),
-      )
-
-      if (questionsToSchedule.length === 0) {
-        setScheduledQuestionNumbers(latestScheduledQuestionNumbers)
-        setError('As questões selecionadas já estão distribuídas nos cronogramas deste aluno.')
-        return
-      }
-
       const repo = getRepository()
       const { weekStart: selectedWeekStart } = getWeekRange(selectedWeek)
       const selectedWeekKey = getDateKey(selectedWeekStart)
@@ -598,9 +585,57 @@ export function SimuladoAnalyzer({
         return
       }
 
+      const questionsToSchedule = selectedQuestionsList
+      const selectedQuestionNumbers = new Set(
+        questionsToSchedule.map((question) => question.questionNumber),
+      )
+      const versions = await repo.cronogramas.getAllCronogramas(currentStudent.id)
+      const versionBlocksEntries = await Promise.all(
+        versions.map(async (version) => {
+          const versionBlocks = version.id === cronograma?.id
+            ? blocks
+            : await repo.blocos.getBlocos(version.id)
+          return [version.id, versionBlocks] as const
+        }),
+      )
+      const blocksByCronograma = new Map<string, BlocoCronograma[]>(
+        versionBlocksEntries.map(([cronogramaId, versionBlocks]) => [
+          cronogramaId,
+          [...versionBlocks],
+        ]),
+      )
+      if (cronograma?.id && !blocksByCronograma.has(cronograma.id)) {
+        blocksByCronograma.set(cronograma.id, [...blocks])
+      }
+      const blocksToReplace = [...blocksByCronograma.entries()].flatMap(
+        ([cronogramaId, versionBlocks]) =>
+          versionBlocks
+          .filter((block) => {
+            const questionNumber = getQuestionNumberFromBlock(block)
+            return block.tipo === 'revisao' &&
+              questionNumber !== null &&
+              selectedQuestionNumbers.has(questionNumber)
+          })
+          .map((block) => ({ cronogramaId, block })),
+      )
+
+      for (const { cronogramaId, block } of blocksToReplace) {
+        if (cronogramaId === cronograma?.id) {
+          await removeBlock(block.id)
+        } else {
+          await repo.blocos.deleteBloco(block.id)
+        }
+
+        blocksByCronograma.set(
+          cronogramaId,
+          (blocksByCronograma.get(cronogramaId) ?? []).filter((item) => item.id !== block.id),
+        )
+      }
+
       let activeCronograma = cronograma
       let nextQuestionIndex = 0
       let distributedCount = 0
+      const latestScheduledQuestionNumbers = new Set<number>()
 
       for (
         let weekOffset = 0;
@@ -613,7 +648,9 @@ export function SimuladoAnalyzer({
         const isSelectedWeek = getDateKey(normalizedWeekStart) === selectedWeekKey
 
         let targetCronograma = isSelectedWeek ? activeCronograma : null
-        let weekBlocks = isSelectedWeek ? blocks : []
+        let weekBlocks = isSelectedWeek
+          ? blocksByCronograma.get(activeCronograma?.id ?? '') ?? []
+          : []
 
         if (!isSelectedWeek) {
           targetCronograma = await repo.cronogramas.getCronograma(
@@ -622,7 +659,9 @@ export function SimuladoAnalyzer({
           )
 
           if (targetCronograma) {
-            weekBlocks = await repo.blocos.getBlocos(targetCronograma.id)
+            weekBlocks =
+              blocksByCronograma.get(targetCronograma.id) ??
+              await repo.blocos.getBlocos(targetCronograma.id)
           }
         }
 
@@ -653,6 +692,7 @@ export function SimuladoAnalyzer({
 
           if (isSelectedWeek) {
             activeCronograma = targetCronograma
+            blocksByCronograma.set(targetCronograma.id, [])
           }
         }
 
@@ -672,6 +712,14 @@ export function SimuladoAnalyzer({
           }
 
           latestScheduledQuestionNumbers.add(question.questionNumber)
+          blocksByCronograma.set(targetCronograma.id, [
+            ...(blocksByCronograma.get(targetCronograma.id) ?? []),
+            {
+              ...blockData,
+              id: `pending-${targetCronograma.id}-${question.questionNumber}`,
+              createdAt: new Date(),
+            },
+          ])
           nextQuestionIndex++
           distributedCount++
         }
