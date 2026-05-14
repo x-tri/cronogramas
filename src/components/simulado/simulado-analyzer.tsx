@@ -9,7 +9,7 @@ import type {
 import type { BlocoCronograma, DiaSemana, Turno } from '../../types/domain'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, TURNOS } from '../../types/domain'
-import { TURNOS_CONFIG } from '../../constants/time-slots'
+import { TURNOS_CONFIG, isPlaceholderHorario } from '../../constants/time-slots'
 import { getColorFromQuestionNumber } from '../../constants/colors'
 import type { CursoEscolhido, ReportData, ReportProgress } from '../../types/report'
 import { saveStudentReport } from '../../services/student-report-storage'
@@ -72,6 +72,7 @@ export function SimuladoAnalyzer({
 
   const blocks = useCronogramaStore((state) => state.blocks)
   const officialSchedule = useCronogramaStore((state) => state.officialSchedule)
+  const slotsOverride = useCronogramaStore((state) => state.slotsOverride)
   const addBlock = useCronogramaStore((state) => state.addBlock)
   const cronograma = useCronogramaStore((state) => state.cronograma)
   const currentStudent = useCronogramaStore((state) => state.currentStudent)
@@ -357,9 +358,21 @@ export function SimuladoAnalyzer({
       fim: string
     }> = []
 
-    for (const dia of DIAS_SEMANA) {
+    const weekdays = DIAS_SEMANA.filter((dia) => dia !== 'sabado' && dia !== 'domingo')
+    const hasSchoolSchedule = officialSchedule.length > 0
+
+    for (const dia of weekdays) {
       for (const turno of TURNOS) {
-        const slots = TURNOS_CONFIG[turno].slots
+        const baseSlots = slotsOverride?.[turno] ?? TURNOS_CONFIG[turno].slots
+        const slots = hasSchoolSchedule
+          ? baseSlots.filter((slot) =>
+              officialSchedule.some(
+                (horario) =>
+                  horario.turno === turno &&
+                  horario.horarioInicio === slot.inicio,
+              ),
+            )
+          : baseSlots
 
         for (let i = 0; i < slots.length; i++) {
           const slot = slots[i]
@@ -368,7 +381,8 @@ export function SimuladoAnalyzer({
             (horario) =>
               horario.diaSemana === dia &&
               horario.turno === turno &&
-              horario.horarioInicio === slot.inicio,
+              horario.horarioInicio === slot.inicio &&
+              !isPlaceholderHorario(horario),
           )
 
           const hasBlock = blocks.some(
@@ -392,7 +406,7 @@ export function SimuladoAnalyzer({
     }
 
     return available
-  }, [blocks, officialSchedule])
+  }, [blocks, officialSchedule, slotsOverride])
 
   const createCronogramaForStudent = async () => {
     const today = new Date()

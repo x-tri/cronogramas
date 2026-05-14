@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { SimuladoAnalyzer } from './simulado-analyzer'
 import { useCronogramaStore } from '../../stores/cronograma-store'
+import type { TimeSlotsByTurno } from '../../stores/cronograma-store'
 import * as simuladoService from '../../services/simulado-analyzer'
 import type {
   SimuladoHistoryItem,
   SimuladoResult,
 } from '../../types/supabase'
-import type { Aluno, BlocoCronograma, Cronograma } from '../../types/domain'
+import type { Aluno, BlocoCronograma, Cronograma, HorarioOficial } from '../../types/domain'
 
 vi.mock('../../services/simulado-analyzer')
 vi.mock('../../stores/cronograma-store')
@@ -123,7 +124,8 @@ describe('SimuladoAnalyzer', () => {
   const createStoreState = () => {
     const state = {
       blocks: [] as BlocoCronograma[],
-      officialSchedule: [],
+      officialSchedule: [] as HorarioOficial[],
+      slotsOverride: null as TimeSlotsByTurno | null,
       cronograma: mockCronograma,
       currentStudent: mockStudent,
       simuladoHistory: [] as SimuladoHistoryItem[],
@@ -276,6 +278,89 @@ describe('SimuladoAnalyzer', () => {
     >
     expect(blockData.tipo).toBe('revisao')
     expect(blockData.titulo).toBe('Interpretação de Texto')
+  })
+
+  it('usa a grade real da escola e nao distribui em turno sem horario oficial', async () => {
+    storeState.officialSchedule = [
+      {
+        id: 'db-1',
+        turma: 'Turma 300',
+        diaSemana: 'segunda',
+        turno: 'tarde',
+        horarioInicio: '15:00',
+        horarioFim: '15:45',
+        disciplina: '—',
+        professor: null,
+      },
+      {
+        id: 'db-2',
+        turma: 'Turma 300',
+        diaSemana: 'segunda',
+        turno: 'tarde',
+        horarioInicio: '15:45',
+        horarioFim: '16:30',
+        disciplina: '—',
+        professor: null,
+      },
+    ]
+    storeState.slotsOverride = {
+      manha: [
+        { inicio: '07:20', fim: '08:05' },
+        { inicio: '08:05', fim: '08:50' },
+      ],
+      tarde: [
+        { inicio: '15:00', fim: '15:45' },
+        { inicio: '15:45', fim: '16:30' },
+      ],
+      noite: [
+        { inicio: '19:30', fim: '20:30' },
+        { inicio: '20:30', fim: '21:30' },
+      ],
+    }
+    storeState.blocks = [
+      {
+        id: 'blocked-1',
+        cronogramaId: mockCronograma.id,
+        diaSemana: 'segunda',
+        turno: 'tarde',
+        horarioInicio: '15:00',
+        horarioFim: '15:45',
+        tipo: 'rotina',
+        titulo: 'Bloqueado',
+        descricao: null,
+        disciplinaCodigo: null,
+        cor: null,
+        prioridade: 0,
+        concluido: false,
+        createdAt: new Date(),
+      },
+    ]
+
+    render(<SimuladoAnalyzer matricula={mockMatricula} />)
+
+    await waitFor(() => {
+      expect(storeState.selectedSimuladoHistoryItem?.id).toBe(latestHistoryItem.id)
+    })
+
+    fireEvent.click(screen.getByText('Simulado'))
+
+    await waitFor(() => {
+      expect(screen.getByText('2 de 2 selecionadas')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Distribuir/i }))
+
+    await waitFor(() => {
+      expect(storeState.addBlock).toHaveBeenCalledTimes(1)
+    })
+
+    const blockData = storeState.addBlock.mock.calls[0][0] as Omit<
+      BlocoCronograma,
+      'id' | 'createdAt'
+    >
+    expect(blockData.turno).toBe('tarde')
+    expect(blockData.horarioInicio).toBe('15:45')
+    expect(blockData.horarioFim).toBe('16:30')
   })
 
   it('exibe erro quando não encontra histórico de simulados', async () => {
