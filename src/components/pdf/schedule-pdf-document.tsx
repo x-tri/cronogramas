@@ -7,6 +7,40 @@ import { PdfHeader } from './pdf-header'
 import { PdfBlockCell } from './pdf-block-cell'
 import { PdfLegend } from './pdf-legend'
 
+export function getSchedulePdfSlotsByTurno(
+  officialSchedule: readonly HorarioOficial[],
+): Record<Turno, ReadonlyArray<{ inicio: string; fim: string }>> {
+  if (officialSchedule.length === 0) {
+    return {
+      manha: TURNOS_CONFIG.manha.slots,
+      tarde: TURNOS_CONFIG.tarde.slots,
+      noite: TURNOS_CONFIG.noite.slots,
+    }
+  }
+
+  const byTurno: Record<Turno, Map<string, string>> = {
+    manha: new Map(),
+    tarde: new Map(),
+    noite: new Map(),
+  }
+
+  for (const horario of officialSchedule) {
+    byTurno[horario.turno].set(horario.horarioInicio, horario.horarioFim)
+  }
+
+  return {
+    manha: [...byTurno.manha.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([inicio, fim]) => ({ inicio, fim })),
+    tarde: [...byTurno.tarde.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([inicio, fim]) => ({ inicio, fim })),
+    noite: [...byTurno.noite.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([inicio, fim]) => ({ inicio, fim })),
+  }
+}
+
 type SchedulePdfDocumentProps = {
   student: Aluno
   weekStart: Date
@@ -31,6 +65,8 @@ export function SchedulePdfDocument({
   examTitle,
   triScores,
 }: SchedulePdfDocumentProps) {
+  const slotsByTurno = getSchedulePdfSlotsByTurno(officialSchedule)
+
   const getContent = (dia: DiaSemana, turno: Turno, slotInicio: string) => {
     const official = officialSchedule.find(
       (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slotInicio
@@ -64,7 +100,7 @@ export function SchedulePdfDocument({
               {TURNOS.map((turno) => (
                 <View key={turno} style={styles.turnoSection}>
                   <Text style={styles.turnoLabel}>{TURNO_LABELS[turno]}</Text>
-                  {TURNOS_CONFIG[turno].slots.map((slot) => {
+                  {slotsByTurno[turno].map((slot) => {
                     const { official, block } = getContent(dia, turno, slot.inicio)
                     return (
                       <View key={slot.inicio} style={styles.slot}>
