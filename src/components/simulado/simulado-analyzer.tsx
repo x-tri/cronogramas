@@ -9,7 +9,11 @@ import type {
 import type { BlocoCronograma, DiaSemana, Turno } from '../../types/domain'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, TURNOS } from '../../types/domain'
-import { TURNOS_CONFIG, isPlaceholderHorario } from '../../constants/time-slots'
+import {
+  TURNOS_CONFIG,
+  isPlaceholderHorario,
+  timeRangesOverlap,
+} from '../../constants/time-slots'
 import { getColorFromQuestionNumber } from '../../constants/colors'
 import type { CursoEscolhido, ReportData, ReportProgress } from '../../types/report'
 import { saveStudentReport } from '../../services/student-report-storage'
@@ -406,8 +410,13 @@ export function SimuladoAnalyzer({
             (horario) =>
               horario.diaSemana === dia &&
               horario.turno === turno &&
-              horario.horarioInicio === slot.inicio &&
-              !isPlaceholderHorario(horario),
+              !isPlaceholderHorario(horario) &&
+              timeRangesOverlap(
+                slot.inicio,
+                slot.fim,
+                horario.horarioInicio,
+                horario.horarioFim,
+              ),
           )
 
           const hasBlock = weekBlocks.some(

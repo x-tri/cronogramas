@@ -12,6 +12,21 @@ export function isPlaceholderHorario(h: { disciplina: string }): boolean {
   return h.disciplina === PLACEHOLDER_DISCIPLINA
 }
 
+export function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number)
+  return hours * 60 + minutes
+}
+
+export function timeRangesOverlap(
+  startA: string,
+  endA: string,
+  startB: string,
+  endB: string,
+): boolean {
+  return timeToMinutes(startA) < timeToMinutes(endB) &&
+    timeToMinutes(startB) < timeToMinutes(endA)
+}
+
 export const TURNOS_CONFIG: Record<Turno, TurnoConfig> = {
   manha: {
     label: 'Manhã',

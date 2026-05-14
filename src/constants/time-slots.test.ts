@@ -5,6 +5,7 @@ import {
   getSlotIndex,
   getSlotByIndex,
   getTurnoFromTime,
+  timeRangesOverlap,
   formatTimeRange,
 } from './time-slots'
 
@@ -110,6 +111,13 @@ describe('time-slots', () => {
   describe('formatTimeRange', () => {
     it('should format time range correctly', () => {
       expect(formatTimeRange('07:15', '08:05')).toBe('07:15 - 08:05')
+    })
+  })
+
+  describe('timeRangesOverlap', () => {
+    it('detecta sobreposicao parcial entre aula oficial e pomodoro', () => {
+      expect(timeRangesOverlap('17:30', '18:20', '17:15', '18:00')).toBe(true)
+      expect(timeRangesOverlap('18:00', '18:50', '17:15', '18:00')).toBe(false)
     })
   })
 })

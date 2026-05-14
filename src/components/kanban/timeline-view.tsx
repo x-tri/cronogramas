@@ -1,7 +1,11 @@
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, DIAS_SEMANA_LABELS, TURNOS, TURNO_LABELS } from '../../types/domain'
 import type { BlocoCronograma, DiaSemana, Turno } from '../../types/domain'
-import { TURNOS_CONFIG, isPlaceholderHorario } from '../../constants/time-slots'
+import {
+  TURNOS_CONFIG,
+  isPlaceholderHorario,
+  timeRangesOverlap,
+} from '../../constants/time-slots'
 import { detectAreaFromTitle } from '../../constants/colors'
 import { BloquearTurnoButtons } from '../cronograma/bloquear-turno-buttons'
 
@@ -33,14 +37,15 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
 
   const isToday = (date: Date) => new Date().toDateString() === date.toDateString()
 
-  function getOfficial(dia: DiaSemana, turno: Turno, slotInicio: string) {
+  function getOfficial(dia: DiaSemana, turno: Turno, slotInicio: string, slotFim: string) {
     const found = officialSchedule.find(
-      (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slotInicio
+      (h) =>
+        h.diaSemana === dia &&
+        h.turno === turno &&
+        !isPlaceholderHorario(h) &&
+        timeRangesOverlap(slotInicio, slotFim, h.horarioInicio, h.horarioFim),
     )
-    // Placeholder ('—'): slot existe na grade mas sem aula real (ex: Dom Bosco
-    // tarde sem atividade definida). Devolve undefined para UI renderizar
-    // celula vazia clicavel.
-    return found && !isPlaceholderHorario(found) ? found : undefined
+    return found
   }
 
   function getBlock(dia: DiaSemana, turno: Turno, slotInicio: string) {
@@ -147,7 +152,7 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
 
                   {/* Day cells */}
                   {DIAS_SEMANA.map((dia) => {
-                    const official = getOfficial(dia, turno, slot.inicio)
+                    const official = getOfficial(dia, turno, slot.inicio, slot.fim)
                     const block = getBlock(dia, turno, slot.inicio)
                     const isWeekend = dia === 'sabado' || dia === 'domingo'
                     const today = isToday(dayDates[dia])

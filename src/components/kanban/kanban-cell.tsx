@@ -1,5 +1,9 @@
 import type { BlocoCronograma, DiaSemana, HorarioOficial, Turno } from '../../types/domain'
-import { TURNOS_CONFIG, isPlaceholderHorario } from '../../constants/time-slots'
+import {
+  TURNOS_CONFIG,
+  isPlaceholderHorario,
+  timeRangesOverlap,
+} from '../../constants/time-slots'
 import { TimeSlot } from './time-slot'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 
@@ -37,13 +41,15 @@ export function KanbanCell({
   // o store popula slotsOverride a partir do officialSchedule do aluno.
   const slots = slotsOverride?.[turno] ?? turnoConfig.slots
 
-  const getOfficialForSlot = (slotInicio: string): HorarioOficial | undefined => {
+  const getOfficialForSlot = (slotInicio: string, slotFim: string): HorarioOficial | undefined => {
     const found = officialSchedule.find(
-      (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slotInicio
+      (h) =>
+        h.diaSemana === dia &&
+        h.turno === turno &&
+        !isPlaceholderHorario(h) &&
+        timeRangesOverlap(slotInicio, slotFim, h.horarioInicio, h.horarioFim),
     )
-    // Placeholder (disciplina='—') indica slot existe mas sem aula real;
-    // devolve undefined pra UI mostrar slot vazio editavel.
-    return found && !isPlaceholderHorario(found) ? found : undefined
+    return found
   }
 
   const getBlockForSlot = (slotInicio: string): BlocoCronograma | undefined => {
@@ -55,7 +61,7 @@ export function KanbanCell({
   return (
     <div className="bg-white rounded border border-[#f1f1ef] p-1 space-y-0.5">
       {slots.map((slot, index) => {
-        const officialClass = getOfficialForSlot(slot.inicio)
+        const officialClass = getOfficialForSlot(slot.inicio, slot.fim)
         const customBlock = getBlockForSlot(slot.inicio)
 
         const isTargetSlot = isDropTarget && dropSlotIndex === index
