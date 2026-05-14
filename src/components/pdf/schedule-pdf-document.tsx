@@ -1,45 +1,11 @@
 import { Document, Page, View, Text } from '@react-pdf/renderer'
 import type { Aluno, BlocoCronograma, HorarioOficial, DiaSemana, Turno } from '../../types/domain'
 import { DIAS_SEMANA, DIAS_SEMANA_LABELS, TURNOS, TURNO_LABELS } from '../../types/domain'
-import { TURNOS_CONFIG } from '../../constants/time-slots'
 import { styles } from './pdf-styles'
 import { PdfHeader } from './pdf-header'
 import { PdfBlockCell } from './pdf-block-cell'
 import { PdfLegend } from './pdf-legend'
-
-export function getSchedulePdfSlotsByTurno(
-  officialSchedule: readonly HorarioOficial[],
-): Record<Turno, ReadonlyArray<{ inicio: string; fim: string }>> {
-  if (officialSchedule.length === 0) {
-    return {
-      manha: TURNOS_CONFIG.manha.slots,
-      tarde: TURNOS_CONFIG.tarde.slots,
-      noite: TURNOS_CONFIG.noite.slots,
-    }
-  }
-
-  const byTurno: Record<Turno, Map<string, string>> = {
-    manha: new Map(),
-    tarde: new Map(),
-    noite: new Map(),
-  }
-
-  for (const horario of officialSchedule) {
-    byTurno[horario.turno].set(horario.horarioInicio, horario.horarioFim)
-  }
-
-  return {
-    manha: [...byTurno.manha.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([inicio, fim]) => ({ inicio, fim })),
-    tarde: [...byTurno.tarde.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([inicio, fim]) => ({ inicio, fim })),
-    noite: [...byTurno.noite.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([inicio, fim]) => ({ inicio, fim })),
-  }
-}
+import { getSchedulePdfSlotsByTurno } from './schedule-pdf-slots'
 
 type SchedulePdfDocumentProps = {
   student: Aluno

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HorarioOficial } from '../../types/domain'
-import { getSchedulePdfSlotsByTurno } from './schedule-pdf-document'
+import { getSchedulePdfSlotsByTurno } from './schedule-pdf-slots'
 
 describe('getSchedulePdfSlotsByTurno', () => {
   it('usa a grade real da escola e nao inventa turno sem horario', () => {
