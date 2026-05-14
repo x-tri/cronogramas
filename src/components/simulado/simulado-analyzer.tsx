@@ -12,7 +12,6 @@ import { DIAS_SEMANA, TURNOS } from '../../types/domain'
 import { TURNOS_CONFIG } from '../../constants/time-slots'
 import { getColorFromQuestionNumber } from '../../constants/colors'
 import type { CursoEscolhido, ReportData, ReportProgress } from '../../types/report'
-import { buildSimuladoAudit } from '../../services/simulado/audit'
 import { saveStudentReport } from '../../services/student-report-storage'
 import { CursoSelector } from './curso-selector'
 import { RelatorioCirurgico } from './relatorio-cirurgico'
@@ -498,7 +497,6 @@ export function SimuladoAnalyzer({
     const totalQuestions = result.wrongQuestions.length
     const selectedCount = selectedQuestions.size
     const canDistribute = selectedCount > 0
-    const audit = buildSimuladoAudit(result)
 
     return createPortal(
       <div
@@ -518,33 +516,6 @@ export function SimuladoAnalyzer({
                   {result.studentAnswer.wrong_answers} erros •{' '}
                   {result.studentAnswer.blank_answers} em branco
                 </p>
-                {audit.hasDiscrepancy && (
-                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    <p className="font-medium">
-                      Auditoria: {audit.accountedTotal}
-                      {audit.expectedTotal != null ? ` de ${audit.expectedTotal}` : ''}{' '}
-                      questoes contabilizadas.
-                      {audit.uncategorizedCount > 0 &&
-                        ` ${audit.uncategorizedCount} sem classificacao.`}
-                      {audit.overflowCount > 0 &&
-                        ` ${audit.overflowCount} acima do total esperado.`}
-                    </p>
-                    {audit.explanation && (
-                      <p className="mt-1 text-[11px] text-amber-800">
-                        {audit.explanation}
-                      </p>
-                    )}
-                    <p className="mt-1 text-[11px] text-amber-800">
-                      Base do front: {result.studentAnswer.correct_answers} acertos +{' '}
-                      {result.studentAnswer.wrong_answers} erros +{' '}
-                      {result.studentAnswer.blank_answers} brancos
-                      {audit.answersCount > 0 &&
-                        ` • respostas carregadas: ${audit.answersCount}`}
-                      {audit.wrongAnswersMismatch > 0 &&
-                        ` • erros detalhados: ${audit.wrongQuestionsCount}`}
-                    </p>
-                  </div>
-                )}
                 <div className="mt-2 flex items-center gap-3 text-xs">
                   {result.studentAnswer.tri_lc != null && (
                     <span className="flex items-center gap-1">
