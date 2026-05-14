@@ -16,6 +16,7 @@
 import type { DiaSemana } from '../../types/domain'
 
 export type BulkShift = 'manha' | 'tarde'
+export type ShiftSlot = { readonly inicio: string; readonly fim: string }
 
 export const WEEKDAYS: readonly DiaSemana[] = [
   'segunda',
@@ -25,7 +26,7 @@ export const WEEKDAYS: readonly DiaSemana[] = [
   'sexta',
 ] as const
 
-export const SHIFT_BLOCK_SLOTS: Record<BulkShift, readonly { inicio: string; fim: string }[]> = {
+export const SHIFT_BLOCK_SLOTS: Record<BulkShift, readonly ShiftSlot[]> = {
   manha: [
     { inicio: '07:15', fim: '08:05' },
     { inicio: '08:05', fim: '09:05' },
@@ -61,15 +62,15 @@ export type ShiftStatus = 'none' | 'partial' | 'full'
 export function computeShiftBlockStatus(
   blocks: readonly BlockLike[],
   turno: BulkShift,
+  slots: readonly ShiftSlot[] = SHIFT_BLOCK_SLOTS[turno],
 ): {
   readonly blocked: number
   readonly total: number
   readonly status: ShiftStatus
 } {
-  const targetSlots = SHIFT_BLOCK_SLOTS[turno]
-  const total = WEEKDAYS.length * targetSlots.length
+  const total = WEEKDAYS.length * slots.length
   const weekdaySet = new Set<DiaSemana>(WEEKDAYS)
-  const slotStarts = new Set(targetSlots.map((s) => s.inicio))
+  const slotStarts = new Set(slots.map((s) => s.inicio))
 
   const blocked = blocks.filter(
     (b) =>
@@ -89,8 +90,8 @@ export function computeShiftBlockStatus(
 export function missingSlotsToBlock(
   blocks: readonly BlockLike[],
   turno: BulkShift,
+  slots: readonly ShiftSlot[] = SHIFT_BLOCK_SLOTS[turno],
 ): ReadonlyArray<{ dia: DiaSemana; inicio: string; fim: string }> {
-  const targetSlots = SHIFT_BLOCK_SLOTS[turno]
   const existing = new Set(
     blocks
       .filter((b) => b.turno === turno)
@@ -98,7 +99,7 @@ export function missingSlotsToBlock(
   )
   const result: Array<{ dia: DiaSemana; inicio: string; fim: string }> = []
   for (const dia of WEEKDAYS) {
-    for (const slot of targetSlots) {
+    for (const slot of slots) {
       const key = `${dia}::${slot.inicio}`
       if (!existing.has(key)) {
         result.push({ dia, inicio: slot.inicio, fim: slot.fim })
@@ -115,9 +116,9 @@ export function missingSlotsToBlock(
 export function blockIdsToUnblock(
   blocks: readonly BlockLike[],
   turno: BulkShift,
+  slots: readonly ShiftSlot[] = SHIFT_BLOCK_SLOTS[turno],
 ): readonly string[] {
-  const targetSlots = SHIFT_BLOCK_SLOTS[turno]
-  const slotStarts = new Set(targetSlots.map((s) => s.inicio))
+  const slotStarts = new Set(slots.map((s) => s.inicio))
   const weekdaySet = new Set<DiaSemana>(WEEKDAYS)
   return blocks
     .filter(

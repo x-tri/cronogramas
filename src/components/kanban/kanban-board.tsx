@@ -23,6 +23,7 @@ const TURNO_BANNER: Record<Turno, { bg: string; icon: string }> = {
 export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
   const officialSchedule = useCronogramaStore((state) => state.officialSchedule)
   const isLoadingSchedule = useCronogramaStore((state) => state.isLoadingSchedule)
+  const slotsOverride = useCronogramaStore((state) => state.slotsOverride)
   const blocks = useCronogramaStore((state) => state.blocks)
   const selectedWeek = useCronogramaStore((state) => state.selectedWeek)
   const removeBlock = useCronogramaStore((state) => state.removeBlock)
@@ -81,7 +82,7 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
     const dropData = over.data.current as { dia: DiaSemana; turno: Turno; slotIndex: number } | undefined
     if (!dropData) { setDropTarget(null); return }
     const { dia, turno, slotIndex } = dropData
-    const slot = getSlotByIndex(turno, slotIndex)
+    const slot = slotsOverride?.[turno]?.[slotIndex] ?? getSlotByIndex(turno, slotIndex)
     if (!slot) { setDropTarget(null); return }
     // Slot eh "ocupado por aula oficial" so se for aula real (nao placeholder).
     // Placeholders (disciplina='—') sao slots disponiveis pra coord cadastrar atividades.
@@ -95,7 +96,7 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
     )
     setDropTarget({ dia, turno, slotIndex })
     setDropMode(occupyingBlock && occupyingBlock.id !== activeBlock?.id ? 'swap' : 'move')
-  }, [blocks, officialSchedule, activeBlock])
+  }, [blocks, officialSchedule, activeBlock, slotsOverride])
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveBlock(null)
@@ -106,7 +107,7 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
     const dropData = over.data.current as { dia: DiaSemana; turno: Turno; slotIndex: number } | undefined
     if (!dropData) return
     const { dia, turno, slotIndex } = dropData
-    const slot = getSlotByIndex(turno, slotIndex)
+    const slot = slotsOverride?.[turno]?.[slotIndex] ?? getSlotByIndex(turno, slotIndex)
     if (!slot) return
     // Slot eh "ocupado por aula oficial" so se for aula real (nao placeholder).
     // Placeholders (disciplina='—') sao slots disponiveis pra coord cadastrar atividades.
@@ -122,7 +123,7 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
       if (targetBlock) await swapBlocks(blockId, targetBlock.id)
       else await moveBlock(blockId, dia, turno, slotIndex)
     } catch (err) { console.error('Failed to move/swap block:', err) }
-  }, [blocks, officialSchedule, moveBlock, swapBlocks])
+  }, [blocks, officialSchedule, moveBlock, swapBlocks, slotsOverride])
 
   const dropAnimation: DropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }),
@@ -182,6 +183,7 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
 
           {TURNOS.map((turno) => {
             const config = TURNOS_CONFIG[turno]
+            const slots = slotsOverride?.[turno] ?? config.slots
             const banner = TURNO_BANNER[turno]
 
             return (
@@ -214,7 +216,7 @@ export function KanbanBoard({ onSlotClick, onBlockEdit }: KanbanBoardProps) {
                 </div>
 
                 {/* Slot rows */}
-                {config.slots.map((slot, slotIndex) => (
+                {slots.map((slot, slotIndex) => (
                   <div key={slot.inicio} className="timetable-grid timetable-row">
                     <div className="timetable-time-cell">{slot.inicio}</div>
 

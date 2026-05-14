@@ -15,6 +15,7 @@ import {
   blockIdsToUnblock,
   computeShiftBlockStatus,
   missingSlotsToBlock,
+  SHIFT_BLOCK_SLOTS,
   type BulkShift,
 } from '../services/shift-block/shift-block-slots'
 
@@ -22,13 +23,15 @@ export function useToggleShiftBlock(turno: BulkShift) {
   const blocks = useCronogramaStore((s) => s.blocks)
   const cronograma = useCronogramaStore((s) => s.cronograma)
   const currentStudent = useCronogramaStore((s) => s.currentStudent)
+  const slotsOverride = useCronogramaStore((s) => s.slotsOverride)
   const addBlock = useCronogramaStore((s) => s.addBlock)
   const removeBlock = useCronogramaStore((s) => s.removeBlock)
   const createCronograma = useCronogramaStore((s) => s.createCronograma)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { blocked, total, status } = computeShiftBlockStatus(blocks, turno)
+  const targetSlots = slotsOverride?.[turno] ?? SHIFT_BLOCK_SLOTS[turno]
+  const { blocked, total, status } = computeShiftBlockStatus(blocks, turno, targetSlots)
   const isBlocked = status === 'full'
 
   /**
@@ -58,14 +61,14 @@ export function useToggleShiftBlock(turno: BulkShift) {
       const cronogramaId = await ensureCronogramaId()
       if (status === 'full') {
         // Desbloquear: remove TODOS os bloqueios do turno (preserva estudos)
-        const ids = blockIdsToUnblock(blocks, turno)
+        const ids = blockIdsToUnblock(blocks, turno, targetSlots)
         // Sequential para evitar race conditions no set() do store
         for (const id of ids) {
           await removeBlock(id)
         }
       } else {
         // Bloquear: INSERT nos slots livres (não sobrescreve estudos)
-        const missing = missingSlotsToBlock(blocks, turno)
+        const missing = missingSlotsToBlock(blocks, turno, targetSlots)
         for (const slot of missing) {
           await addBlock({
             cronogramaId,
@@ -95,6 +98,7 @@ export function useToggleShiftBlock(turno: BulkShift) {
     isBlocked,
     blocked,
     total,
+    targetSlots,
     toggle,
     loading,
     error,

@@ -102,6 +102,20 @@ describe('computeShiftBlockStatus', () => {
     const r = computeShiftBlockStatus(blocks, 'manha')
     expect(r.blocked).toBe(0)
   })
+
+  it('aceita slots customizados de escola (ex: Dom Bosco)', () => {
+    const domBoscoSlots = [
+      { inicio: '07:20', fim: '08:05' },
+      { inicio: '08:05', fim: '08:50' },
+    ] as const
+    const blocks: BlockLike[] = [
+      mk({ diaSemana: 'segunda', turno: 'manha', horarioInicio: '07:20' }),
+      mk({ diaSemana: 'terca', turno: 'manha', horarioInicio: '08:05' }),
+      mk({ diaSemana: 'quarta', turno: 'manha', horarioInicio: '07:15' }),
+    ]
+    const r = computeShiftBlockStatus(blocks, 'manha', domBoscoSlots)
+    expect(r).toEqual({ blocked: 2, total: 10, status: 'partial' })
+  })
 })
 
 describe('missingSlotsToBlock', () => {
@@ -126,6 +140,19 @@ describe('missingSlotsToBlock', () => {
     expect(
       r.find((s) => s.dia === 'segunda' && s.inicio === '07:15'),
     ).toBeUndefined()
+  })
+
+  it('retorna slots faltantes usando a grade customizada informada', () => {
+    const domBoscoSlots = [
+      { inicio: '07:20', fim: '08:05' },
+      { inicio: '08:05', fim: '08:50' },
+    ] as const
+    const blocks: BlockLike[] = [
+      mk({ diaSemana: 'segunda', turno: 'manha', horarioInicio: '07:20' }),
+    ]
+    const r = missingSlotsToBlock(blocks, 'manha', domBoscoSlots)
+    expect(r).toHaveLength(9)
+    expect(r[0]).toEqual({ dia: 'segunda', inicio: '08:05', fim: '08:50' })
   })
 })
 

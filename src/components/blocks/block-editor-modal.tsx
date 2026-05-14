@@ -39,6 +39,7 @@ export function BlockEditorModal({
   const removeBlock = useCronogramaStore((state) => state.removeBlock)
   const cronograma = useCronogramaStore((state) => state.cronograma)
   const currentStudent = useCronogramaStore((state) => state.currentStudent)
+  const slotsOverride = useCronogramaStore((state) => state.slotsOverride)
   const createCronograma = useCronogramaStore((state) => state.createCronograma)
   const isSaving = useCronogramaStore((state) => state.isSaving)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -90,7 +91,7 @@ export function BlockEditorModal({
   }
 
   const handleBlock = async () => {
-    if (!slot || !currentStudent) {
+    if (!resolvedSlot || !currentStudent) {
       setError('Selecione um aluno primeiro')
       return
     }
@@ -101,8 +102,8 @@ export function BlockEditorModal({
         cronogramaId,
         diaSemana: dia,
         turno,
-        horarioInicio: slot.inicio,
-        horarioFim: slot.fim,
+        horarioInicio: resolvedSlot.inicio,
+        horarioFim: resolvedSlot.fim,
         tipo: 'rotina',       // Uses 'rotina' in DB (constraint-safe), detected as blocked by title
         titulo: 'Bloqueado',
         descricao: null,
@@ -132,7 +133,7 @@ export function BlockEditorModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!slot) return
+    if (!resolvedSlot) return
     if (!currentStudent) {
       setError('Selecione um aluno primeiro')
       return
@@ -147,8 +148,8 @@ export function BlockEditorModal({
         cronogramaId,
         diaSemana: dia,
         turno,
-        horarioInicio: slot.inicio,
-        horarioFim: slot.fim,
+        horarioInicio: resolvedSlot.inicio,
+        horarioFim: resolvedSlot.fim,
         tipo,
         titulo: generateTitle(),
         descricao: descricao.trim() || null,
@@ -171,7 +172,9 @@ export function BlockEditorModal({
     }
   }
 
-  if (!slot) return null
+  const resolvedSlot = slotsOverride?.[turno]?.[slotIndex] ?? slot
+
+  if (!resolvedSlot) return null
 
   return (
     <Modal
@@ -238,7 +241,7 @@ export function BlockEditorModal({
             {DIAS_SEMANA_LABELS[dia]} - {TURNO_LABELS[turno]}
           </div>
           <div className="text-gray-500">
-            {slot.inicio} - {slot.fim}
+            {resolvedSlot.inicio} - {resolvedSlot.fim}
           </div>
         </div>
 

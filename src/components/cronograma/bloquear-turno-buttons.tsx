@@ -13,7 +13,9 @@ import { useToggleShiftBlock } from '../../hooks/useToggleShiftBlock'
 import type { BulkShift } from '../../services/shift-block/shift-block-slots'
 
 function ShiftButton({ turno, label }: { turno: BulkShift; label: string }) {
-  const { status, blocked, total, toggle, loading, error } = useToggleShiftBlock(turno)
+  const { status, blocked, total, targetSlots, toggle, loading, error } = useToggleShiftBlock(turno)
+  const firstSlot = targetSlots[0]
+  const lastSlot = targetSlots[targetSlots.length - 1]
 
   const styles = {
     none: {
@@ -54,6 +56,11 @@ function ShiftButton({ turno, label }: { turno: BulkShift; label: string }) {
           {styles.text}
         </>
       )}
+      {firstSlot && lastSlot && (
+        <span className="font-mono text-[10px] opacity-75">
+          {firstSlot.inicio}-{lastSlot.fim}
+        </span>
+      )}
     </button>
   )
 }
@@ -72,9 +79,7 @@ export function BloquearTurnoButtons() {
       <ShiftButton turno="manha" label="MANHÃ" />
       <ShiftButton turno="tarde" label="TARDE" />
       <span className="ml-1 text-[10px] text-[#94a3b8]">
-        seg–sex · {' '}
-        <span className="font-mono">07:15–13:35</span> / {' '}
-        <span className="font-mono">14:35–19:05</span>
+        seg–sex · usa a grade da escola carregada
       </span>
     </div>
   )

@@ -281,7 +281,7 @@ export const useCronogramaStore = create<CronogramaState>()(
         const block = get().blocks.find((b) => b.id === id)
         if (!block) return
 
-        const targetSlot = getSlotByIndex(turno, slotIndex)
+        const targetSlot = get().slotsOverride?.[turno]?.[slotIndex] ?? getSlotByIndex(turno, slotIndex)
         if (!targetSlot) return
 
         const updates = {
@@ -503,4 +503,3 @@ export function selectBlocksForCell(
 ): BlocoCronograma[] {
   return state.blocks.filter((b) => b.diaSemana === dia && b.turno === turno)
 }
-
