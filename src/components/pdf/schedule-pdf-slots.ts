@@ -1,5 +1,5 @@
 import type { HorarioOficial, Turno } from '../../types/domain'
-import { TURNOS_CONFIG } from '../../constants/time-slots'
+import { TURNOS_CONFIG, isPlaceholderHorario } from '../../constants/time-slots'
 
 export function getSchedulePdfSlotsByTurno(
   officialSchedule: readonly HorarioOficial[],
@@ -18,8 +18,15 @@ export function getSchedulePdfSlotsByTurno(
     noite: new Map(),
   }
 
-  for (const horario of officialSchedule) {
-    byTurno[horario.turno].set(horario.horarioInicio, horario.horarioFim)
+  for (const turno of ['manha', 'tarde', 'noite'] as const) {
+    const turnoSchedules = officialSchedule.filter((h) => h.turno === turno)
+    const source = turnoSchedules.some(isPlaceholderHorario)
+      ? turnoSchedules.filter(isPlaceholderHorario)
+      : turnoSchedules
+
+    for (const horario of source) {
+      byTurno[turno].set(horario.horarioInicio, horario.horarioFim)
+    }
   }
 
   return {

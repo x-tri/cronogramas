@@ -46,4 +46,44 @@ describe('getSchedulePdfSlotsByTurno', () => {
     ])
     expect(slots.noite).toEqual([])
   })
+
+  it('prioriza placeholders Pomodoro e nao adiciona linha da aula real sobreposta', () => {
+    const schedule: HorarioOficial[] = [
+      {
+        id: 'db-1',
+        turma: 'Turma 301',
+        diaSemana: 'quarta',
+        turno: 'tarde',
+        horarioInicio: '16:30',
+        horarioFim: '17:20',
+        disciplina: '—',
+        professor: null,
+      },
+      {
+        id: 'db-2',
+        turma: 'Turma 301',
+        diaSemana: 'quarta',
+        turno: 'tarde',
+        horarioInicio: '17:30',
+        horarioFim: '18:20',
+        disciplina: '—',
+        professor: null,
+      },
+      {
+        id: 'db-3',
+        turma: 'Turma 301',
+        diaSemana: 'quarta',
+        turno: 'tarde',
+        horarioInicio: '17:15',
+        horarioFim: '18:00',
+        disciplina: 'EDUCAÇÃO FÍSICA',
+        professor: 'BÁRBARA',
+      },
+    ]
+
+    expect(getSchedulePdfSlotsByTurno(schedule).tarde).toEqual([
+      { inicio: '16:30', fim: '17:20' },
+      { inicio: '17:30', fim: '18:20' },
+    ])
+  })
 })

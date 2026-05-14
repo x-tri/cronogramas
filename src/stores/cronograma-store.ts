@@ -12,7 +12,11 @@ import type {
   SimuladoHistoryItem,
   SimuladoResult,
 } from '../types/supabase'
-import { getSlotByIndex, TURNOS_CONFIG } from '../constants/time-slots'
+import {
+  getSlotByIndex,
+  TURNOS_CONFIG,
+  isPlaceholderHorario,
+} from '../constants/time-slots'
 import { getRepository } from '../data/factory'
 
 /**
@@ -150,13 +154,23 @@ export const useCronogramaStore = create<CronogramaState>()(
           return
         }
         // Deriva slots distintos por turno, ordenados por horario_inicio.
+        // Quando ha placeholders ('—') em um turno, eles sao a grade editavel
+        // daquele turno. Aulas reais que sobrepoem estes slots bloqueiam a
+        // celula, mas nao devem criar linhas extras fora do grid Pomodoro.
         const byTurno: Record<Turno, Map<string, string>> = {
           manha: new Map(),
           tarde: new Map(),
           noite: new Map(),
         }
-        for (const h of schedule) {
-          byTurno[h.turno].set(h.horarioInicio, h.horarioFim)
+        for (const turno of ['manha', 'tarde', 'noite'] as const) {
+          const turnoSchedules = schedule.filter((h) => h.turno === turno)
+          const source = turnoSchedules.some(isPlaceholderHorario)
+            ? turnoSchedules.filter(isPlaceholderHorario)
+            : turnoSchedules
+
+          for (const h of source) {
+            byTurno[turno].set(h.horarioInicio, h.horarioFim)
+          }
         }
         const toSlots = (m: Map<string, string>) =>
           [...m.entries()]

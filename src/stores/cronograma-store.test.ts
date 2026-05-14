@@ -115,6 +115,22 @@ describe('useCronogramaStore', () => {
       expect(ov!.tarde[0]).toEqual({ inicio: '17:15', fim: '18:00' })
     })
 
+    it('quando turno tem placeholders Pomodoro, nao cria linha extra por aula real sobreposta', () => {
+      const store = useCronogramaStore.getState()
+      store.applySlotsOverrideFromSchedule([
+        { id: '1', turma: 'Turma 301', diaSemana: 'quarta', horarioInicio: '16:30', horarioFim: '17:20', turno: 'tarde', disciplina: '—', professor: null },
+        { id: '2', turma: 'Turma 301', diaSemana: 'quarta', horarioInicio: '17:30', horarioFim: '18:20', turno: 'tarde', disciplina: '—', professor: null },
+        { id: '3', turma: 'Turma 301', diaSemana: 'quarta', horarioInicio: '17:15', horarioFim: '18:00', turno: 'tarde', disciplina: 'EDUCAÇÃO FÍSICA', professor: 'BÁRBARA' },
+      ])
+
+      const ov = useCronogramaStore.getState().slotsOverride
+      expect(ov).not.toBeNull()
+      expect(ov!.tarde).toEqual([
+        { inicio: '16:30', fim: '17:20' },
+        { inicio: '17:30', fim: '18:20' },
+      ])
+    })
+
     it('turnos sem schedule mantem default (ex: noite vazio -> default Marista)', () => {
       const store = useCronogramaStore.getState()
       store.applySlotsOverrideFromSchedule([
