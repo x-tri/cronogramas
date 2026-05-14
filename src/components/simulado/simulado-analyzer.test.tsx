@@ -353,7 +353,7 @@ describe('SimuladoAnalyzer', () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          'Nesta semana cabem 1 de 2 questões. 1 ficará pendente por falta de horários livres.',
+          'Serão distribuídas 2 questões nesta semana.',
         ),
       ).toBeInTheDocument()
     })
@@ -361,7 +361,7 @@ describe('SimuladoAnalyzer', () => {
     fireEvent.click(screen.getByRole('button', { name: /Distribuir/i }))
 
     await waitFor(() => {
-      expect(storeState.addBlock).toHaveBeenCalledTimes(1)
+      expect(storeState.addBlock).toHaveBeenCalledTimes(2)
     })
 
     const blockData = storeState.addBlock.mock.calls[0][0] as Omit<
@@ -372,9 +372,13 @@ describe('SimuladoAnalyzer', () => {
     expect(blockData.horarioInicio).toBe('15:45')
     expect(blockData.horarioFim).toBe('16:30')
 
-    expect(screen.getByText(
-      'Distribuí 1 de 2 questões nesta semana. 1 ficou pendente por falta de horários livres.',
-    )).toBeInTheDocument()
+    const weekendBlockData = storeState.addBlock.mock.calls[1][0] as Omit<
+      BlocoCronograma,
+      'id' | 'createdAt'
+    >
+    expect(weekendBlockData.diaSemana).toBe('sabado')
+    expect(weekendBlockData.turno).toBe('manha')
+    expect(weekendBlockData.horarioInicio).toBe('07:20')
   })
 
   it('substitui questoes ja distribuidas antes de recriar a sequencia', async () => {

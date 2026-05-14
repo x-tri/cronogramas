@@ -386,13 +386,14 @@ export function SimuladoAnalyzer({
   const buildAvailableSlotsForBlocks = useCallback((weekBlocks: BlocoCronograma[]) => {
     const available: AvailableSlot[] = []
 
-    const weekdays = DIAS_SEMANA.filter((dia) => dia !== 'sabado' && dia !== 'domingo')
     const hasSchoolSchedule = officialSchedule.length > 0
 
-    for (const dia of weekdays) {
+    for (const dia of DIAS_SEMANA) {
+      const isWeekend = dia === 'sabado' || dia === 'domingo'
+
       for (const turno of TURNOS) {
         const baseSlots = slotsOverride?.[turno] ?? TURNOS_CONFIG[turno].slots
-        const slots = hasSchoolSchedule
+        const slots = hasSchoolSchedule && !isWeekend
           ? baseSlots.filter((slot) =>
               officialSchedule.some(
                 (horario) =>
