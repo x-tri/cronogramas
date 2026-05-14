@@ -11,6 +11,7 @@ import { useCronogramaStore } from '../../stores/cronograma-store'
 import { DIAS_SEMANA, TURNOS } from '../../types/domain'
 import { TURNOS_CONFIG, isPlaceholderHorario } from '../../constants/time-slots'
 import { getColorFromQuestionNumber } from '../../constants/colors'
+import { getRepository } from '../../data/factory'
 import type { CursoEscolhido, ReportData, ReportProgress } from '../../types/report'
 import { saveStudentReport } from '../../services/student-report-storage'
 import { CursoSelector } from './curso-selector'
@@ -30,6 +31,65 @@ const REPORT_SLOW_WARNING_MS = 12000
 
 const getScheduleCellKey = (dia: DiaSemana, turno: Turno, inicio: string) =>
   `${dia}|${turno}|${inicio}`
+
+const MAX_AUTOMATIC_DISTRIBUTION_WEEKS = 52
+
+type AvailableSlot = {
+  dia: DiaSemana
+  turno: Turno
+  slotIndex: number
+  inicio: string
+  fim: string
+}
+
+function getWeekRange(date: Date) {
+  const weekStart = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  const day = weekStart.getUTCDay()
+  const diffToMonday = day === 0 ? -6 : 1 - day
+  weekStart.setUTCDate(weekStart.getUTCDate() + diffToMonday)
+
+  const weekEnd = new Date(weekStart)
+  weekEnd.setUTCDate(weekStart.getUTCDate() + 6)
+
+  return { weekStart, weekEnd }
+}
+
+function addWeeks(date: Date, weeks: number) {
+  const next = new Date(date)
+  next.setUTCDate(next.getUTCDate() + weeks * 7)
+  return next
+}
+
+function getDateKey(date: Date) {
+  return date.toISOString().split('T')[0]
+}
+
+function getQuestionNumberFromBlock(block: BlocoCronograma): number | null {
+  const match = block.descricao?.match(/Quest(?:ã|a)o\s+(\d+)/i)
+  if (!match) return null
+
+  const questionNumber = Number(match[1])
+  return Number.isInteger(questionNumber) && questionNumber >= 1 && questionNumber <= 180
+    ? questionNumber
+    : null
+}
+
+function getDistributionWeeksLabel(count: number) {
+  return `${count} semana${count === 1 ? '' : 's'}`
+}
+
+function estimateDistributionWeeks(
+  questionCount: number,
+  currentWeekAvailableSlots: number,
+  weeklyCapacity: number,
+) {
+  if (questionCount <= 0 || weeklyCapacity <= 0) return 0
+  if (currentWeekAvailableSlots >= questionCount) return 1
+
+  const currentWeekUsed = currentWeekAvailableSlots > 0 ? 1 : 0
+  const remainingQuestions = questionCount - Math.max(currentWeekAvailableSlots, 0)
+  return currentWeekUsed + Math.ceil(remainingQuestions / weeklyCapacity)
+}
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -65,6 +125,7 @@ export function SimuladoAnalyzer({
   const [isLoadingResult, setIsLoadingResult] = useState(false)
   const [isLoadingReport, setIsLoadingReport] = useState(false)
   const [isDistributing, setIsDistributing] = useState(false)
+  const [isLoadingScheduledQuestions, setIsLoadingScheduledQuestions] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isResultOpen, setIsResultOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,6 +134,9 @@ export function SimuladoAnalyzer({
     'Preparando o relatório com dados reais do Supabase...',
   )
   const [selectedQuestions, setSelectedQuestions] = useState<Set<number>>(new Set())
+  const [scheduledQuestionNumbers, setScheduledQuestionNumbers] = useState<Set<number>>(
+    new Set(),
+  )
 
   const blocks = useCronogramaStore((state) => state.blocks)
   const officialSchedule = useCronogramaStore((state) => state.officialSchedule)
@@ -81,6 +145,7 @@ export function SimuladoAnalyzer({
   const cronograma = useCronogramaStore((state) => state.cronograma)
   const currentStudent = useCronogramaStore((state) => state.currentStudent)
   const createCronograma = useCronogramaStore((state) => state.createCronograma)
+  const selectedWeek = useCronogramaStore((state) => state.selectedWeek)
   const simuladoHistory = useCronogramaStore((state) => state.simuladoHistory)
   const selectedSimuladoHistoryItem = useCronogramaStore(
     (state) => state.selectedSimuladoHistoryItem,
@@ -94,6 +159,9 @@ export function SimuladoAnalyzer({
   )
   const setSelectedSimuladoResult = useCronogramaStore(
     (state) => state.setSelectedSimuladoResult,
+  )
+  const loadCronogramaVersions = useCronogramaStore(
+    (state) => state.loadCronogramaVersions,
   )
   const resetSimuladoState = useCronogramaStore((state) => state.resetSimuladoState)
 
@@ -347,20 +415,16 @@ export function SimuladoAnalyzer({
     )
   }, [selectedSimuladoResult, selectedQuestions])
 
-  const getAvailableSlots = useCallback((): Array<{
-    dia: DiaSemana
-    turno: Turno
-    slotIndex: number
-    inicio: string
-    fim: string
-  }> => {
-    const available: Array<{
-      dia: DiaSemana
-      turno: Turno
-      slotIndex: number
-      inicio: string
-      fim: string
-    }> = []
+  const selectedQuestionsToDistribute = useMemo(
+    () =>
+      selectedQuestionsList.filter(
+        (question) => !scheduledQuestionNumbers.has(question.questionNumber),
+      ),
+    [scheduledQuestionNumbers, selectedQuestionsList],
+  )
+
+  const buildAvailableSlotsForBlocks = useCallback((weekBlocks: BlocoCronograma[]) => {
+    const available: AvailableSlot[] = []
 
     const weekdays = DIAS_SEMANA.filter((dia) => dia !== 'sabado' && dia !== 'domingo')
     const hasSchoolSchedule = officialSchedule.length > 0
@@ -390,7 +454,7 @@ export function SimuladoAnalyzer({
               !isPlaceholderHorario(horario),
           )
 
-          const hasBlock = blocks.some(
+          const hasBlock = weekBlocks.some(
             (block) =>
               getScheduleCellKey(block.diaSemana, block.turno, block.horarioInicio) ===
               getScheduleCellKey(dia, turno, slot.inicio),
@@ -410,27 +474,80 @@ export function SimuladoAnalyzer({
     }
 
     return available
-  }, [blocks, officialSchedule, slotsOverride])
+  }, [officialSchedule, slotsOverride])
+
+  const getAvailableSlots = useCallback(
+    () => buildAvailableSlotsForBlocks(blocks),
+    [blocks, buildAvailableSlotsForBlocks],
+  )
+
+  const getScheduledQuestionNumbers = useCallback(async () => {
+    if (!currentStudent) return new Set<number>()
+
+    const scheduled = new Set<number>()
+    const addBlockQuestion = (block: BlocoCronograma) => {
+      const questionNumber = getQuestionNumberFromBlock(block)
+      if (questionNumber) scheduled.add(questionNumber)
+    }
+
+    blocks.forEach(addBlockQuestion)
+
+    try {
+      const repo = getRepository()
+      const versions = await repo.cronogramas.getAllCronogramas(currentStudent.id)
+      const versionBlocks = await Promise.all(
+        versions.map(async (version) => {
+          if (version.id === cronograma?.id) return blocks
+          return repo.blocos.getBlocos(version.id)
+        }),
+      )
+
+      versionBlocks.flat().forEach(addBlockQuestion)
+    } catch (err) {
+      console.warn('Failed to load scheduled questions:', err)
+    }
+
+    return scheduled
+  }, [blocks, cronograma?.id, currentStudent])
+
+  const refreshScheduledQuestionNumbers = useCallback(async () => {
+    if (!currentStudent) {
+      setScheduledQuestionNumbers(new Set())
+      return
+    }
+
+    setIsLoadingScheduledQuestions(true)
+    try {
+      setScheduledQuestionNumbers(await getScheduledQuestionNumbers())
+    } finally {
+      setIsLoadingScheduledQuestions(false)
+    }
+  }, [currentStudent, getScheduledQuestionNumbers])
+
+  useEffect(() => {
+    if (!isResultOpen) {
+      setScheduledQuestionNumbers(new Set())
+      return
+    }
+
+    void refreshScheduledQuestionNumbers()
+  }, [isResultOpen, refreshScheduledQuestionNumbers])
 
   const createCronogramaForStudent = async () => {
-    const today = new Date()
-    const weekStart = new Date(today)
-    weekStart.setDate(today.getDate() - today.getDay() + 1)
-    const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekStart.getDate() + 6)
+    const { weekStart, weekEnd } = getWeekRange(selectedWeek)
 
     if (!currentStudent) throw new Error('Nenhum aluno selecionado')
     return createCronograma(currentStudent.id, weekStart, weekEnd)
   }
 
-  const createBlock = async (
+  const buildBlockData = (
     cronogramaId: string,
     question: WrongQuestion,
     slot: { dia: DiaSemana; turno: Turno; inicio: string; fim: string },
-  ) => {
+  ): Omit<BlocoCronograma, 'id' | 'createdAt'> => {
     const areaColor = getColorFromQuestionNumber(question.questionNumber)
 
-    const blockData: Omit<BlocoCronograma, 'id' | 'createdAt'> = {
+    return {
       cronogramaId,
       diaSemana: slot.dia,
       turno: slot.turno,
@@ -444,8 +561,6 @@ export function SimuladoAnalyzer({
       prioridade: 1,
       concluido: false,
     }
-
-    await addBlock(blockData)
   }
 
   const handleDistribute = async () => {
@@ -453,7 +568,7 @@ export function SimuladoAnalyzer({
       isDistributing ||
       !selectedSimuladoResult ||
       !currentStudent ||
-      selectedQuestionsList.length === 0
+      selectedQuestionsToDistribute.length === 0
     ) {
       return
     }
@@ -462,32 +577,120 @@ export function SimuladoAnalyzer({
     setError(null)
 
     try {
-      const activeCronograma = cronograma ?? (await createCronogramaForStudent())
-      const occupiedCells = new Set(
-        blocks.map((block) =>
-          getScheduleCellKey(block.diaSemana, block.turno, block.horarioInicio),
-        ),
+      const latestScheduledQuestionNumbers = await getScheduledQuestionNumbers()
+      const questionsToSchedule = selectedQuestionsList.filter(
+        (question) => !latestScheduledQuestionNumbers.has(question.questionNumber),
       )
-      const availableSlots = getAvailableSlots().filter((slot) => {
-        const key = getScheduleCellKey(slot.dia, slot.turno, slot.inicio)
-        if (occupiedCells.has(key)) return false
-        occupiedCells.add(key)
-        return true
-      })
 
-      if (availableSlots.length === 0) {
-        setError('Não há horários livres nesta semana para distribuir questões.')
+      if (questionsToSchedule.length === 0) {
+        setScheduledQuestionNumbers(latestScheduledQuestionNumbers)
+        setError('As questões selecionadas já estão distribuídas nos cronogramas deste aluno.')
         return
       }
 
-      const questionsToDistribute = selectedQuestionsList.slice(0, availableSlots.length)
+      const repo = getRepository()
+      const { weekStart: selectedWeekStart } = getWeekRange(selectedWeek)
+      const selectedWeekKey = getDateKey(selectedWeekStart)
+      const weeklyCapacity = buildAvailableSlotsForBlocks([]).length
 
-      for (let index = 0; index < questionsToDistribute.length; index++) {
-        const question = questionsToDistribute[index]
-        const slot = availableSlots[index]
-        if (!slot) continue
+      if (weeklyCapacity === 0) {
+        setError('Não há horários livres cadastrados na grade desta turma.')
+        return
+      }
 
-        await createBlock(activeCronograma.id, question, slot)
+      let activeCronograma = cronograma
+      let nextQuestionIndex = 0
+      let distributedCount = 0
+
+      for (
+        let weekOffset = 0;
+        nextQuestionIndex < questionsToSchedule.length &&
+        weekOffset < MAX_AUTOMATIC_DISTRIBUTION_WEEKS;
+        weekOffset++
+      ) {
+        const weekStart = addWeeks(selectedWeekStart, weekOffset)
+        const { weekStart: normalizedWeekStart, weekEnd } = getWeekRange(weekStart)
+        const isSelectedWeek = getDateKey(normalizedWeekStart) === selectedWeekKey
+
+        let targetCronograma = isSelectedWeek ? activeCronograma : null
+        let weekBlocks = isSelectedWeek ? blocks : []
+
+        if (!isSelectedWeek) {
+          targetCronograma = await repo.cronogramas.getCronograma(
+            currentStudent.id,
+            normalizedWeekStart,
+          )
+
+          if (targetCronograma) {
+            weekBlocks = await repo.blocos.getBlocos(targetCronograma.id)
+          }
+        }
+
+        const occupiedCells = new Set(
+          weekBlocks.map((block) =>
+            getScheduleCellKey(block.diaSemana, block.turno, block.horarioInicio),
+          ),
+        )
+        const availableSlots = buildAvailableSlotsForBlocks(weekBlocks).filter((slot) => {
+          const key = getScheduleCellKey(slot.dia, slot.turno, slot.inicio)
+          if (occupiedCells.has(key)) return false
+          occupiedCells.add(key)
+          return true
+        })
+
+        if (availableSlots.length === 0) continue
+
+        if (!targetCronograma) {
+          targetCronograma = isSelectedWeek
+            ? await createCronogramaForStudent()
+            : await repo.cronogramas.saveCronograma({
+                alunoId: currentStudent.id,
+                semanaInicio: normalizedWeekStart,
+                semanaFim: weekEnd,
+                observacoes: null,
+                status: 'ativo',
+              })
+
+          if (isSelectedWeek) {
+            activeCronograma = targetCronograma
+          }
+        }
+
+        for (
+          let slotIndex = 0;
+          slotIndex < availableSlots.length && nextQuestionIndex < questionsToSchedule.length;
+          slotIndex++
+        ) {
+          const question = questionsToSchedule[nextQuestionIndex]
+          const slot = availableSlots[slotIndex]
+          const blockData = buildBlockData(targetCronograma.id, question, slot)
+
+          if (isSelectedWeek) {
+            await addBlock(blockData)
+          } else {
+            await repo.blocos.createBloco(blockData)
+          }
+
+          latestScheduledQuestionNumbers.add(question.questionNumber)
+          nextQuestionIndex++
+          distributedCount++
+        }
+      }
+
+      setScheduledQuestionNumbers(new Set(latestScheduledQuestionNumbers))
+      await loadCronogramaVersions(currentStudent.id)
+
+      if (distributedCount === 0) {
+        setError('Não há horários livres nas próximas semanas para distribuir questões.')
+        return
+      }
+
+      const pendingCount = questionsToSchedule.length - distributedCount
+      if (pendingCount > 0) {
+        setError(
+          `Distribuí ${distributedCount} questão${distributedCount === 1 ? '' : 'ões'}, mas ${pendingCount} ficaram pendentes porque as próximas ${MAX_AUTOMATIC_DISTRIBUTION_WEEKS} semanas estão sem horários livres.`,
+        )
+        return
       }
 
       handleCloseResult()
@@ -540,17 +743,32 @@ export function SimuladoAnalyzer({
 
     const totalQuestions = result.wrongQuestions.length
     const selectedCount = selectedQuestions.size
-    const availableSlotsCount = getAvailableSlots().length
-    const distributionCount = Math.min(selectedCount, availableSlotsCount)
-    const pendingQuestionCount = Math.max(selectedCount - availableSlotsCount, 0)
+    const selectedToDistributeCount = selectedQuestionsToDistribute.length
+    const alreadyScheduledCount = selectedQuestionsList.length - selectedToDistributeCount
+    const currentWeekAvailableSlotsCount = getAvailableSlots().length
+    const weeklyCapacity = buildAvailableSlotsForBlocks([]).length
+    const distributionWeeksCount = estimateDistributionWeeks(
+      selectedToDistributeCount,
+      currentWeekAvailableSlotsCount,
+      weeklyCapacity,
+    )
     const distributionVerb =
-      distributionCount === 1 ? 'Será distribuída' : 'Serão distribuídas'
-    const pendingQuestionLabel =
-      pendingQuestionCount === 1
-        ? '1 ficará pendente'
-        : `${pendingQuestionCount} ficarão pendentes`
+      selectedToDistributeCount === 1 ? 'Será distribuída' : 'Serão distribuídas'
+    const questionLabel =
+      selectedToDistributeCount === 1 ? 'questão' : 'questões'
+    const distributionStartLabel =
+      currentWeekAvailableSlotsCount > 0
+        ? 'começando pela semana atual'
+        : 'a partir da próxima semana livre'
+    const alreadyScheduledLabel =
+      alreadyScheduledCount > 0
+        ? ` ${alreadyScheduledCount} já ${alreadyScheduledCount === 1 ? 'está' : 'estão'} no cronograma.`
+        : ''
     const canDistribute =
-      selectedCount > 0 && availableSlotsCount > 0 && !isDistributing
+      selectedToDistributeCount > 0 &&
+      weeklyCapacity > 0 &&
+      !isDistributing &&
+      !isLoadingScheduledQuestions
 
     return createPortal(
       <div
@@ -716,20 +934,20 @@ export function SimuladoAnalyzer({
             <div className="flex items-center justify-between gap-4 border-t border-gray-100 pt-2">
               <span
                 className={`text-sm ${
-                  selectedCount === 0 || availableSlotsCount === 0
+                  selectedCount === 0 || weeklyCapacity === 0 || selectedToDistributeCount === 0
                     ? 'text-red-500'
-                    : pendingQuestionCount > 0
-                      ? 'text-amber-700'
-                      : 'text-gray-600'
+                    : 'text-gray-600'
                 }`}
               >
                 {selectedCount === 0
                   ? 'Selecione pelo menos uma questão'
-                  : availableSlotsCount === 0
-                    ? 'Não há horários livres nesta semana'
-                    : pendingQuestionCount > 0
-                      ? `${distributionVerb} ${distributionCount} de ${selectedCount} questões. ${pendingQuestionLabel} por falta de horários livres.`
-                      : `${selectedCount} questão${selectedCount > 1 ? 's' : ''} serão adicionadas`}
+                  : isLoadingScheduledQuestions
+                    ? 'Conferindo questões já distribuídas...'
+                    : selectedToDistributeCount === 0
+                      ? 'As questões selecionadas já estão distribuídas nos cronogramas deste aluno.'
+                      : weeklyCapacity === 0
+                        ? 'Não há horários livres cadastrados na grade desta turma'
+                        : `${distributionVerb} ${selectedToDistributeCount} ${questionLabel} em ${getDistributionWeeksLabel(distributionWeeksCount)}, ${distributionStartLabel}.${alreadyScheduledLabel}`}
               </span>
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={handleCloseResult}>
@@ -738,7 +956,7 @@ export function SimuladoAnalyzer({
                 <Button onClick={handleDistribute} disabled={!canDistribute}>
                   {isDistributing
                     ? 'Distribuindo...'
-                    : `Distribuir ${selectedCount > 0 ? `(${distributionCount})` : ''}`}
+                    : `Distribuir ${selectedToDistributeCount > 0 ? `(${selectedToDistributeCount})` : ''}`}
                 </Button>
               </div>
             </div>

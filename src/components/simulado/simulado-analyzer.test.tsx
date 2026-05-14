@@ -4,6 +4,7 @@ import { SimuladoAnalyzer } from './simulado-analyzer'
 import { useCronogramaStore } from '../../stores/cronograma-store'
 import type { TimeSlotsByTurno } from '../../stores/cronograma-store'
 import * as simuladoService from '../../services/simulado-analyzer'
+import { getRepository } from '../../data/factory'
 import type {
   SimuladoHistoryItem,
   SimuladoResult,
@@ -12,6 +13,9 @@ import type { Aluno, BlocoCronograma, Cronograma, HorarioOficial } from '../../t
 
 vi.mock('../../services/simulado-analyzer')
 vi.mock('../../stores/cronograma-store')
+vi.mock('../../data/factory', () => ({
+  getRepository: vi.fn(),
+}))
 
 describe('SimuladoAnalyzer', () => {
   const mockMatricula = '214140291'
@@ -128,11 +132,13 @@ describe('SimuladoAnalyzer', () => {
       slotsOverride: null as TimeSlotsByTurno | null,
       cronograma: mockCronograma,
       currentStudent: mockStudent,
+      selectedWeek: new Date('2026-05-11T12:00:00Z'),
       simuladoHistory: [] as SimuladoHistoryItem[],
       selectedSimuladoHistoryItem: null as SimuladoHistoryItem | null,
       selectedSimuladoResult: null as SimuladoResult | null,
       addBlock: vi.fn().mockResolvedValue({ id: 'block-1' }),
       createCronograma: vi.fn().mockResolvedValue(mockCronograma),
+      loadCronogramaVersions: vi.fn().mockResolvedValue(undefined),
       setSimuladoHistory: vi.fn((history: SimuladoHistoryItem[]) => {
         state.simuladoHistory = history
       }),
@@ -153,10 +159,50 @@ describe('SimuladoAnalyzer', () => {
   }
 
   let storeState = createStoreState()
+  let repositoryState: {
+    cronogramas: {
+      getCronograma: ReturnType<typeof vi.fn>
+      getAllCronogramas: ReturnType<typeof vi.fn>
+      saveCronograma: ReturnType<typeof vi.fn>
+    }
+    blocos: {
+      getBlocos: ReturnType<typeof vi.fn>
+      createBloco: ReturnType<typeof vi.fn>
+    }
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
     storeState = createStoreState()
+    let createdCronogramas = 0
+    let createdBlocks = 0
+    repositoryState = {
+      cronogramas: {
+        getCronograma: vi.fn().mockResolvedValue(null),
+        getAllCronogramas: vi.fn().mockResolvedValue([]),
+        saveCronograma: vi.fn().mockImplementation(async (data) => {
+          createdCronogramas += 1
+          return {
+            id: `future-cronograma-${createdCronogramas}`,
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }
+        }),
+      },
+      blocos: {
+        getBlocos: vi.fn().mockResolvedValue([]),
+        createBloco: vi.fn().mockImplementation(async (data) => {
+          createdBlocks += 1
+          return {
+            id: `future-block-${createdBlocks}`,
+            ...data,
+            createdAt: new Date(),
+          }
+        }),
+      },
+    }
+    vi.mocked(getRepository).mockReturnValue(repositoryState as never)
 
     vi.mocked(useCronogramaStore).mockImplementation((selector) =>
       selector(storeState as never),
@@ -348,16 +394,19 @@ describe('SimuladoAnalyzer', () => {
       expect(screen.getByText('2 de 2 selecionadas')).toBeInTheDocument()
     })
 
-    expect(
-      screen.getByText(
-        'Será distribuída 1 de 2 questões. 1 ficará pendente por falta de horários livres.',
-      ),
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Serão distribuídas 2 questões em 2 semanas, começando pela semana atual.',
+        ),
+      ).toBeInTheDocument()
+    })
 
     fireEvent.click(screen.getByRole('button', { name: /Distribuir/i }))
 
     await waitFor(() => {
       expect(storeState.addBlock).toHaveBeenCalledTimes(1)
+      expect(repositoryState.blocos.createBloco).toHaveBeenCalledTimes(1)
     })
 
     const blockData = storeState.addBlock.mock.calls[0][0] as Omit<
@@ -367,6 +416,64 @@ describe('SimuladoAnalyzer', () => {
     expect(blockData.turno).toBe('tarde')
     expect(blockData.horarioInicio).toBe('15:45')
     expect(blockData.horarioFim).toBe('16:30')
+
+    const futureBlockData = repositoryState.blocos.createBloco.mock.calls[0][0] as Omit<
+      BlocoCronograma,
+      'id' | 'createdAt'
+    >
+    expect(futureBlockData.turno).toBe('tarde')
+    expect(futureBlockData.horarioInicio).toBe('15:00')
+    expect(futureBlockData.horarioFim).toBe('15:45')
+  })
+
+  it('nao redistribui questoes que ja estao em cronogramas do aluno', async () => {
+    storeState.blocks = [
+      {
+        id: 'existing-q1',
+        cronogramaId: mockCronograma.id,
+        diaSemana: 'segunda',
+        turno: 'manha',
+        horarioInicio: '07:15',
+        horarioFim: '08:05',
+        tipo: 'revisao',
+        titulo: 'Interpretação de Texto',
+        descricao: 'Questão 1 - Revisão de erro',
+        disciplinaCodigo: null,
+        cor: '#3B82F6',
+        prioridade: 1,
+        concluido: false,
+        createdAt: new Date(),
+      },
+    ]
+
+    render(<SimuladoAnalyzer matricula={mockMatricula} />)
+
+    await waitFor(() => {
+      expect(storeState.selectedSimuladoHistoryItem?.id).toBe(latestHistoryItem.id)
+    })
+
+    fireEvent.click(screen.getByText('Simulado'))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Será distribuída 1 questão em 1 semana, começando pela semana atual. 1 já está no cronograma.',
+        ),
+      ).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Distribuir \(1\)/i }))
+
+    await waitFor(() => {
+      expect(storeState.addBlock).toHaveBeenCalledTimes(1)
+    })
+
+    const blockData = storeState.addBlock.mock.calls[0][0] as Omit<
+      BlocoCronograma,
+      'id' | 'createdAt'
+    >
+    expect(blockData.descricao).toBe('Questão 136 - Revisão de erro')
+    expect(blockData.titulo).toBe('Álgebra')
   })
 
   it('ignora clique duplicado enquanto a distribuição está em andamento', async () => {
