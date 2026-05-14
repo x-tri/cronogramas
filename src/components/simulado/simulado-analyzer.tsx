@@ -28,6 +28,9 @@ type LoadResultOptions = {
 const REPORT_TIMEOUT_MS = 45000
 const REPORT_SLOW_WARNING_MS = 12000
 
+const getScheduleCellKey = (dia: DiaSemana, turno: Turno, inicio: string) =>
+  `${dia}|${turno}|${inicio}`
+
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeoutId = window.setTimeout(() => {
@@ -61,6 +64,7 @@ export function SimuladoAnalyzer({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isLoadingResult, setIsLoadingResult] = useState(false)
   const [isLoadingReport, setIsLoadingReport] = useState(false)
+  const [isDistributing, setIsDistributing] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isResultOpen, setIsResultOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -368,6 +372,7 @@ export function SimuladoAnalyzer({
           ? baseSlots.filter((slot) =>
               officialSchedule.some(
                 (horario) =>
+                  horario.diaSemana === dia &&
                   horario.turno === turno &&
                   horario.horarioInicio === slot.inicio,
               ),
@@ -387,9 +392,8 @@ export function SimuladoAnalyzer({
 
           const hasBlock = blocks.some(
             (block) =>
-              block.diaSemana === dia &&
-              block.turno === turno &&
-              block.horarioInicio === slot.inicio,
+              getScheduleCellKey(block.diaSemana, block.turno, block.horarioInicio) ===
+              getScheduleCellKey(dia, turno, slot.inicio),
           )
 
           if (!isOfficial && !hasBlock) {
@@ -445,13 +449,37 @@ export function SimuladoAnalyzer({
   }
 
   const handleDistribute = async () => {
-    if (!selectedSimuladoResult || !currentStudent || selectedQuestionsList.length === 0) {
+    if (
+      isDistributing ||
+      !selectedSimuladoResult ||
+      !currentStudent ||
+      selectedQuestionsList.length === 0
+    ) {
       return
     }
 
+    setIsDistributing(true)
+    setError(null)
+
     try {
       const activeCronograma = cronograma ?? (await createCronogramaForStudent())
-      const availableSlots = getAvailableSlots()
+      const occupiedCells = new Set(
+        blocks.map((block) =>
+          getScheduleCellKey(block.diaSemana, block.turno, block.horarioInicio),
+        ),
+      )
+      const availableSlots = getAvailableSlots().filter((slot) => {
+        const key = getScheduleCellKey(slot.dia, slot.turno, slot.inicio)
+        if (occupiedCells.has(key)) return false
+        occupiedCells.add(key)
+        return true
+      })
+
+      if (availableSlots.length === 0) {
+        setError('Não há horários livres nesta semana para distribuir questões.')
+        return
+      }
+
       const questionsToDistribute = selectedQuestionsList.slice(0, availableSlots.length)
 
       for (let index = 0; index < questionsToDistribute.length; index++) {
@@ -466,6 +494,8 @@ export function SimuladoAnalyzer({
     } catch (err) {
       console.error('Failed to distribute blocks:', err)
       setError('Erro ao distribuir blocos')
+    } finally {
+      setIsDistributing(false)
     }
   }
 
@@ -510,7 +540,17 @@ export function SimuladoAnalyzer({
 
     const totalQuestions = result.wrongQuestions.length
     const selectedCount = selectedQuestions.size
-    const canDistribute = selectedCount > 0
+    const availableSlotsCount = getAvailableSlots().length
+    const distributionCount = Math.min(selectedCount, availableSlotsCount)
+    const pendingQuestionCount = Math.max(selectedCount - availableSlotsCount, 0)
+    const distributionVerb =
+      distributionCount === 1 ? 'Será distribuída' : 'Serão distribuídas'
+    const pendingQuestionLabel =
+      pendingQuestionCount === 1
+        ? '1 ficará pendente'
+        : `${pendingQuestionCount} ficarão pendentes`
+    const canDistribute =
+      selectedCount > 0 && availableSlotsCount > 0 && !isDistributing
 
     return createPortal(
       <div
@@ -673,18 +713,32 @@ export function SimuladoAnalyzer({
               />
             </div>
 
-            <div className="flex items-center justify-between border-t border-gray-100 pt-2">
-              <span className={`text-sm ${canDistribute ? 'text-gray-600' : 'text-red-500'}`}>
-                {canDistribute
-                  ? `${selectedCount} questão${selectedCount > 1 ? 's' : ''} serão adicionadas`
-                  : 'Selecione pelo menos uma questão'}
+            <div className="flex items-center justify-between gap-4 border-t border-gray-100 pt-2">
+              <span
+                className={`text-sm ${
+                  selectedCount === 0 || availableSlotsCount === 0
+                    ? 'text-red-500'
+                    : pendingQuestionCount > 0
+                      ? 'text-amber-700'
+                      : 'text-gray-600'
+                }`}
+              >
+                {selectedCount === 0
+                  ? 'Selecione pelo menos uma questão'
+                  : availableSlotsCount === 0
+                    ? 'Não há horários livres nesta semana'
+                    : pendingQuestionCount > 0
+                      ? `${distributionVerb} ${distributionCount} de ${selectedCount} questões. ${pendingQuestionLabel} por falta de horários livres.`
+                      : `${selectedCount} questão${selectedCount > 1 ? 's' : ''} serão adicionadas`}
               </span>
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={handleCloseResult}>
                   Cancelar
                 </Button>
                 <Button onClick={handleDistribute} disabled={!canDistribute}>
-                  Distribuir {selectedCount > 0 ? `(${selectedCount})` : ''}
+                  {isDistributing
+                    ? 'Distribuindo...'
+                    : `Distribuir ${selectedCount > 0 ? `(${distributionCount})` : ''}`}
                 </Button>
               </div>
             </div>

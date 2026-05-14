@@ -348,6 +348,12 @@ describe('SimuladoAnalyzer', () => {
       expect(screen.getByText('2 de 2 selecionadas')).toBeInTheDocument()
     })
 
+    expect(
+      screen.getByText(
+        'Será distribuída 1 de 2 questões. 1 ficará pendente por falta de horários livres.',
+      ),
+    ).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: /Distribuir/i }))
 
     await waitFor(() => {
@@ -361,6 +367,52 @@ describe('SimuladoAnalyzer', () => {
     expect(blockData.turno).toBe('tarde')
     expect(blockData.horarioInicio).toBe('15:45')
     expect(blockData.horarioFim).toBe('16:30')
+  })
+
+  it('ignora clique duplicado enquanto a distribuição está em andamento', async () => {
+    const pendingResolutions: Array<() => void> = []
+    storeState.addBlock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pendingResolutions.push(() => resolve({ id: 'block-delayed' }))
+        }),
+    )
+
+    render(<SimuladoAnalyzer matricula={mockMatricula} />)
+
+    await waitFor(() => {
+      expect(storeState.selectedSimuladoHistoryItem?.id).toBe(latestHistoryItem.id)
+    })
+
+    fireEvent.click(screen.getByText('Simulado'))
+
+    await waitFor(() => {
+      expect(screen.getByText('2 de 2 selecionadas')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Distribuir/i }))
+
+    await waitFor(() => {
+      expect(storeState.addBlock).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: /Distribuindo/i })).toBeDisabled()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Distribuindo/i }))
+    expect(storeState.addBlock).toHaveBeenCalledTimes(1)
+
+    pendingResolutions.shift()?.()
+
+    await waitFor(() => {
+      expect(storeState.addBlock).toHaveBeenCalledTimes(2)
+    })
+
+    pendingResolutions.shift()?.()
+
+    await waitFor(() => {
+      expect(screen.queryByText('Simulado ENEM 2024')).not.toBeInTheDocument()
+    })
+
+    expect(storeState.addBlock).toHaveBeenCalledTimes(2)
   })
 
   it('exibe erro quando não encontra histórico de simulados', async () => {
