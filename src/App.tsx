@@ -262,121 +262,112 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f7]">
-      <header className="sticky top-0 z-50 border-b border-[#e0e4ea] bg-white/92 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-2 px-3 py-1.5 sm:flex-nowrap">
-          {/* Logo — compact */}
-          <img src="/logo-xtri.png" alt="XTRI" className="h-7 w-7 shrink-0" />
+      <header className="sticky top-0 z-50 border-b border-[#e0e4ea] bg-white/94 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-2 px-3 py-2 sm:px-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <img src="/logo-xtri.png" alt="XTRI" className="h-8 w-8 shrink-0" />
 
-          {/* Toggle Mentoria | Simulados */}
-          <div
-            role="group"
-            aria-label="Alternar entre Mentoria e Simulados"
-            className="order-2 flex w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-[#e5e7eb] bg-[#f8fafc] p-0.5 sm:order-none sm:w-auto"
-          >
-            <button
-              type="button"
-              onClick={() => setCoordView("mentor")}
-              aria-pressed={coordView === "mentor"}
-              className={`flex-1 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-bold transition-all sm:flex-none ${
-                coordView === "mentor"
-                  ? "bg-[#2563eb] text-white shadow-sm"
-                  : "text-[#64748b] hover:text-[#0f172a]"
-              }`}
+            <div
+              role="group"
+              aria-label="Alternar entre Mentoria e Simulados"
+              className="grid w-full shrink-0 grid-cols-3 gap-1 rounded-xl border border-[#dbe5f3] bg-[#f8fafc] p-1 shadow-sm sm:w-auto"
             >
-              Mentoria
-            </button>
-            <button
-              type="button"
-              onClick={() => setCoordView("simulados")}
-              aria-pressed={coordView === "simulados"}
-              className={`flex-1 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-bold transition-all sm:flex-none ${
-                coordView === "simulados"
-                  ? "bg-[#2563eb] text-white shadow-sm"
-                  : "text-[#64748b] hover:text-[#0f172a]"
-              }`}
-            >
-              Simulados ENEM
-            </button>
-            <button
-              type="button"
-              onClick={() => setCoordView("materiais")}
-              aria-pressed={coordView === "materiais"}
-              className={`flex-1 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-bold transition-all sm:flex-none ${
-                coordView === "materiais"
-                  ? "bg-[#2563eb] text-white shadow-sm"
-                  : "text-[#64748b] hover:text-[#0f172a]"
-              }`}
-            >
-              Listas e Planos
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => setCoordView("mentor")}
+                aria-pressed={coordView === "mentor"}
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                  coordView === "mentor"
+                    ? "bg-[#2563eb] text-white shadow-sm"
+                    : "text-[#64748b] hover:bg-white hover:text-[#0f172a]"
+                }`}
+              >
+                Mentoria
+              </button>
+              <button
+                type="button"
+                onClick={() => setCoordView("simulados")}
+                aria-pressed={coordView === "simulados"}
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                  coordView === "simulados"
+                    ? "bg-[#2563eb] text-white shadow-sm"
+                    : "text-[#64748b] hover:bg-white hover:text-[#0f172a]"
+                }`}
+              >
+                Simulados ENEM
+              </button>
+              <button
+                type="button"
+                onClick={() => setCoordView("materiais")}
+                aria-pressed={coordView === "materiais"}
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                  coordView === "materiais"
+                    ? "bg-[#2563eb] text-white shadow-sm"
+                    : "text-[#64748b] hover:bg-white hover:text-[#0f172a]"
+                }`}
+              >
+                Listas e Planos
+              </button>
+            </div>
 
-          {/* Divider */}
-          <div className="h-5 w-px bg-[#e2e8f0]" />
-
-          {/* Student info + search (only in mentor view with student) */}
-          {coordView === "mentor" && currentStudent && (
-            <>
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-bold text-[#111827] leading-tight">
-                    {currentStudent.nome}
-                  </p>
-                  <p className="text-[10px] text-[#94a3b8] leading-tight">
-                    Turma {currentStudent.turma} · {currentStudent.matricula}
-                  </p>
+            {coordView === "mentor" && currentStudent && (
+              <>
+                <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-xl border border-[#e8eef7] bg-[#f8fbff] px-3 py-2 sm:max-w-[460px]">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold leading-tight text-[#111827]">
+                      {currentStudent.nome}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-tight text-[#94a3b8]">
+                      Turma {currentStudent.turma} · {currentStudent.matricula}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowSearch(true)}
+                    className="ml-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#dbe5f3] bg-white text-[#2563eb] transition-colors hover:bg-[#eef6ff]"
+                    title="Trocar aluno"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowSearch(true)}
-                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#dbe5f3] bg-[#f8fbff] text-[#2563eb] transition-colors hover:bg-white"
-                  title="Trocar aluno"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
-              </div>
 
-              <div className="h-5 w-px bg-[#e2e8f0]" />
+                <div className="shrink-0">
+                  <WeekSelector variant="compact" />
+                </div>
+              </>
+            )}
 
-              {/* Week selector — inline */}
-              <div className="shrink-0">
-                <WeekSelector variant="compact" />
-              </div>
-
-              <div className="h-5 w-px bg-[#e2e8f0]" />
-
-              {/* Action buttons — inline */}
-              <div className="flex items-center gap-1.5">
-                <Suspense fallback={null}>
-                  <SimuladoAnalyzer
-                    matricula={currentStudent.matricula}
-                    variant="compact"
-                  />
-                </Suspense>
-                <ResetButton />
-                <Suspense fallback={null}>
-                  <ShareDropdown />
-                </Suspense>
-              </div>
-            </>
-          )}
-
-          {/* Right side — coordinator + logout */}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="hidden text-[11px] font-medium text-[#94a3b8] sm:block">
-              <span className="font-bold text-[#475569]">{user.name}</span>
-            </span>
-            <button
-              onClick={handleLogout}
-              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-[#e5e7eb] bg-white px-2.5 text-[11px] font-semibold text-[#64748b] transition-colors hover:bg-[#f8fafc] hover:text-[#0f172a]"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1" />
-              </svg>
-              <span className="hidden sm:inline">Sair</span>
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="hidden max-w-[180px] text-xs font-semibold leading-tight text-[#475569] lg:block">
+                {user.name}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#64748b] transition-colors hover:bg-[#f8fafc] hover:text-[#0f172a]"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1" />
+                </svg>
+                <span className="hidden sm:inline">Sair</span>
+              </button>
+            </div>
           </div>
+
+          {coordView === "mentor" && currentStudent && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#e8eef7] bg-[#f8fafc]/80 p-2">
+              <Suspense fallback={null}>
+                <SimuladoAnalyzer
+                  matricula={currentStudent.matricula}
+                  variant="compact"
+                />
+              </Suspense>
+              <ResetButton />
+              <Suspense fallback={null}>
+                <ShareDropdown />
+              </Suspense>
+            </div>
+          )}
         </div>
       </header>
 
