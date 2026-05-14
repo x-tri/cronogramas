@@ -160,7 +160,7 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
                           key={dia}
                           className="timetable-cell blocked"
                           onClick={(e) => handleUnblock(block, e)}
-                          title="Clique para desbloquear"
+                          aria-label="Clique para desbloquear"
                         >
                           <svg className="blocked-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="10" />
@@ -176,7 +176,7 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
                         <div
                           key={dia}
                           className="timetable-cell official"
-                          title={`${official.disciplina}${official.professor ? ` — ${official.professor}` : ''}`}
+                          aria-label={`${official.disciplina}${official.professor ? ` — ${official.professor}` : ''}`}
                         >
                           <span className="official-title">{official.disciplina}</span>
                           {official.professor && (
@@ -199,7 +199,7 @@ export function TimelineView({ dayDates, onSlotClick, onBlockEdit }: TimelineVie
                             borderLeftColor: style.border,
                           }}
                           onClick={() => onBlockEdit?.(block)}
-                          title={block.titulo}
+                          aria-label={block.titulo}
                         >
                           <span className="block-title" style={{ color: style.text }}>
                             {block.titulo}

@@ -34,6 +34,7 @@ export function ResetButton({ variant = 'default' }: { variant?: 'default' | 'ic
           <button
             onClick={() => setIsModalOpen(true)}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#fecaca] bg-[#fff1f2] text-[#be123c] transition-colors hover:bg-[#ffe4e6]"
+            aria-label="Refazer semana"
           >
             {refreshIcon}
           </button>
@@ -46,7 +47,7 @@ export function ResetButton({ variant = 'default' }: { variant?: 'default' | 'ic
           <button
             onClick={() => setIsModalOpen(true)}
             className="inline-flex h-12 w-full items-center gap-2.5 rounded-2xl border border-[#fecaca] bg-[#fff1f2] px-4 text-left text-sm font-semibold text-[#be123c] transition-colors hover:bg-[#ffe4e6]"
-            title="Apagar os blocos atuais da semana e recomeçar o planejamento"
+            aria-label="Apagar os blocos atuais da semana e recomeçar o planejamento"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white/80">
               {refreshIcon}

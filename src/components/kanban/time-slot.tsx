@@ -104,7 +104,7 @@ export function TimeSlot({
       {officialClass && (
         <div
           className="mt-1.5 px-2 py-1.5 bg-[#6b7280] text-white text-xs font-medium rounded"
-          title={`${officialClass.disciplina}${officialClass.professor ? ` - ${officialClass.professor}` : ''}`}
+          aria-label={`${officialClass.disciplina}${officialClass.professor ? ` - ${officialClass.professor}` : ''}`}
         >
           <div className="line-clamp-1">{officialClass.disciplina}</div>
         </div>

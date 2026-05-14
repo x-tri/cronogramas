@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ResetConfirmModalProps {
   isOpen: boolean
@@ -17,6 +18,22 @@ export function ResetConfirmModal({
 }: ResetConfirmModalProps) {
   const [isResetting, setIsResetting] = useState(false)
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isResetting) onClose()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [isOpen, isResetting, onClose])
+
   if (!isOpen) return null
 
   const handleConfirm = async () => {
@@ -31,8 +48,8 @@ export function ResetConfirmModal({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -40,11 +57,16 @@ export function ResetConfirmModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div
+        className="relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reset-confirm-title"
+      >
         {/* Header with warning icon */}
-        <div className="bg-red-50 px-6 py-4 border-b border-red-100">
+        <div className="shrink-0 border-b border-red-100 bg-red-50 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-full">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
               <svg
                 className="w-5 h-5 text-red-600"
                 fill="none"
@@ -59,8 +81,8 @@ export function ResetConfirmModal({
                 />
               </svg>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-red-900">
+            <div className="min-w-0">
+              <h3 id="reset-confirm-title" className="text-lg font-semibold text-red-900">
                 Refazer Cronograma
               </h3>
               <p className="text-sm text-red-700">
@@ -71,10 +93,10 @@ export function ResetConfirmModal({
         </div>
 
         {/* Content */}
-        <div className="px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
           <p className="text-[#37352f] mb-4">
             Você tem certeza que deseja <strong>refazer</strong> o cronograma de{' '}
-            <span className="font-semibold text-[#2eaadc]">{studentName}</span>?
+            <span className="break-words font-semibold text-[#2eaadc]">{studentName}</span>?
           </p>
 
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
@@ -94,7 +116,7 @@ export function ResetConfirmModal({
               </svg>
               <div className="text-sm text-amber-800">
                 <p className="font-medium mb-1">O que será apagado:</p>
-                <ul className="list-disc list-inside space-y-1 text-amber-700">
+                <ul className="list-disc space-y-1 pl-5 text-amber-700">
                   <li>
                     <strong>{blockCount}</strong> bloco{blockCount !== 1 ? 's' : ''} de estudo
                   </li>
@@ -111,7 +133,7 @@ export function ResetConfirmModal({
         </div>
 
         {/* Actions */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 justify-end">
+        <div className="flex shrink-0 justify-end gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:px-6">
           <button
             onClick={onClose}
             disabled={isResetting}
@@ -168,6 +190,7 @@ export function ResetConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

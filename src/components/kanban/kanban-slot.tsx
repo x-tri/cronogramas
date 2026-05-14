@@ -50,7 +50,7 @@ function DraggableStudyBlock({ block, slot, onBlockEdit }: {
         touchAction: 'none',
       }}
       onClick={() => onBlockEdit?.(block)}
-      title={`${block.titulo} (arraste para trocar)`}
+      aria-label={`${block.titulo} (arraste para trocar)`}
       {...listeners}
       {...attributes}
     >
@@ -96,7 +96,7 @@ export function KanbanSlot({
         ref={setNodeRef}
         className="timetable-cell blocked"
         onClick={(e) => onUnblock(block, e)}
-        title="Clique para desbloquear"
+        aria-label="Clique para desbloquear"
       >
         <svg className="blocked-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" />
@@ -112,7 +112,7 @@ export function KanbanSlot({
       <div
         ref={setNodeRef}
         className="timetable-cell official"
-        title={`${official.disciplina}${official.professor ? ` — ${official.professor}` : ''}`}
+        aria-label={`${official.disciplina}${official.professor ? ` — ${official.professor}` : ''}`}
       >
         <span className="official-title">{official.disciplina}</span>
         {official.professor && <span className="official-sub">{official.professor}</span>}
