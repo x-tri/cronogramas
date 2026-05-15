@@ -1,10 +1,11 @@
 import { Document, Page, View, Text } from '@react-pdf/renderer'
-import type { Aluno, BlocoCronograma, HorarioOficial, DiaSemana, Turno } from '../../types/domain'
+import type { Aluno, BlocoCronograma, HorarioOficial, DiaSemana } from '../../types/domain'
 import { DIAS_SEMANA, DIAS_SEMANA_LABELS, TURNOS, TURNO_LABELS } from '../../types/domain'
 import { styles } from './pdf-styles'
 import { PdfHeader } from './pdf-header'
 import { PdfBlockCell } from './pdf-block-cell'
 import { PdfLegend } from './pdf-legend'
+import { getSchedulePdfContent } from './schedule-pdf-content'
 import { getSchedulePdfSlotsByTurno } from './schedule-pdf-slots'
 
 type SchedulePdfDocumentProps = {
@@ -33,16 +34,6 @@ export function SchedulePdfDocument({
 }: SchedulePdfDocumentProps) {
   const slotsByTurno = getSchedulePdfSlotsByTurno(officialSchedule)
 
-  const getContent = (dia: DiaSemana, turno: Turno, slotInicio: string) => {
-    const official = officialSchedule.find(
-      (h) => h.diaSemana === dia && h.turno === turno && h.horarioInicio === slotInicio
-    )
-    const block = blocks.find(
-      (b) => b.diaSemana === dia && b.turno === turno && b.horarioInicio === slotInicio
-    )
-    return { official, block }
-  }
-
   const isWeekend = (dia: DiaSemana) => dia === 'sabado' || dia === 'domingo'
 
   return (
@@ -67,7 +58,13 @@ export function SchedulePdfDocument({
                 <View key={turno} style={styles.turnoSection}>
                   <Text style={styles.turnoLabel}>{TURNO_LABELS[turno]}</Text>
                   {slotsByTurno[turno].map((slot) => {
-                    const { official, block } = getContent(dia, turno, slot.inicio)
+                    const { official, block } = getSchedulePdfContent({
+                      officialSchedule,
+                      blocks,
+                      dia,
+                      turno,
+                      slot,
+                    })
                     return (
                       <View key={slot.inicio} style={styles.slot}>
                         <Text style={styles.slotTime}>
