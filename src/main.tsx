@@ -14,6 +14,39 @@ import { initializeRepository, RepositoryProvider } from './data/factory'
 import { queryClient } from './lib/query-client'
 import { clearLegacyAuxiliarySupabaseSessions } from './lib/supabase-session-hygiene'
 
+const CHUNK_RELOAD_STORAGE_KEY = 'xtri:chunk-reload-attempted'
+
+function isChunkLoadError(reason: unknown): boolean {
+  const message = reason instanceof Error
+    ? reason.message
+    : typeof reason === 'string'
+      ? reason
+      : ''
+
+  return /importing a module script failed|failed to fetch dynamically imported module|loading chunk/i.test(
+    message,
+  )
+}
+
+function reloadOnceAfterChunkFailure(reason: unknown) {
+  if (!isChunkLoadError(reason)) return
+
+  if (window.sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) === '1') {
+    return
+  }
+
+  window.sessionStorage.setItem(CHUNK_RELOAD_STORAGE_KEY, '1')
+  window.location.reload()
+}
+
+window.addEventListener('unhandledrejection', (event) => {
+  reloadOnceAfterChunkFailure(event.reason)
+})
+
+window.addEventListener('error', (event) => {
+  reloadOnceAfterChunkFailure(event.error ?? event.message)
+})
+
 // Inicializa o repository uma vez na startup
 const { repository, mode, error } = initializeRepository()
 

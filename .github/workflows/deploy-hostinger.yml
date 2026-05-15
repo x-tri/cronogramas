@@ -165,7 +165,10 @@ jobs:
           ls -1dt public_html.bak-* 2>/dev/null || echo "  (nenhum)"
           EOF
 
-      # Rsync admin (exclui aluno/ pra não apagar subpasta)
+      # Rsync admin (exclui aluno/ pra não apagar subpasta).
+      # Nao usamos --delete nos assets hashados do Vite: usuarios com a tela
+      # aberta podem clicar em uma aba lazy-loaded depois do deploy e ainda
+      # precisar de chunks antigos.
       - name: Deploy admin (rsync)
         env:
           HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
@@ -173,11 +176,11 @@ jobs:
           USER: ${{ secrets.HOSTINGER_SSH_USER }}
           REMOTE_ADMIN: ${{ secrets.HOSTINGER_REMOTE_ADMIN }}
         run: |
-          rsync -avz --delete --delete-after --exclude=aluno/ \
+          rsync -avz --exclude=aluno/ \
             -e "ssh -p $PORT" \
             dist/ "$USER@$HOST:$REMOTE_ADMIN/"
 
-      # Rsync aluno
+      # Rsync aluno (mantem chunks antigos pelo mesmo motivo do admin).
       - name: Deploy aluno (rsync)
         env:
           HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
@@ -185,7 +188,7 @@ jobs:
           USER: ${{ secrets.HOSTINGER_SSH_USER }}
           REMOTE_ALUNO: ${{ secrets.HOSTINGER_REMOTE_ALUNO }}
         run: |
-          rsync -avz --delete --delete-after \
+          rsync -avz \
             -e "ssh -p $PORT" \
             aluno/dist/ "$USER@$HOST:$REMOTE_ALUNO/"
 
