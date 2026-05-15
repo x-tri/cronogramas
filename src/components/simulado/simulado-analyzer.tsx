@@ -524,9 +524,7 @@ export function SimuladoAnalyzer({
 
       const pendingCount = selectedQuestionsList.length - distributedCount
       if (pendingCount > 0) {
-        setError(
-          `Distribuí ${distributedCount} de ${selectedQuestionsList.length} questões nesta semana. ${pendingCount} ${pendingCount === 1 ? 'ficou pendente' : 'ficaram pendentes'} por falta de horários livres.`,
-        )
+        handleCloseResult()
         return
       }
 

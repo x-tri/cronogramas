@@ -381,6 +381,83 @@ describe('SimuladoAnalyzer', () => {
     expect(weekendBlockData.horarioInicio).toBe('07:20')
   })
 
+  it('fecha o modal mesmo quando sobram questoes pendentes por falta de horario', async () => {
+    storeState.officialSchedule = [
+      {
+        id: 'db-1',
+        turma: 'Turma 300',
+        diaSemana: 'segunda',
+        turno: 'tarde',
+        horarioInicio: '15:00',
+        horarioFim: '15:50',
+        disciplina: '—',
+        professor: null,
+      },
+    ]
+    storeState.slotsOverride = {
+      manha: [],
+      tarde: [{ inicio: '15:00', fim: '15:50' }],
+      noite: [],
+    }
+    storeState.blocks = [
+      {
+        id: 'blocked-saturday',
+        cronogramaId: mockCronograma.id,
+        diaSemana: 'sabado',
+        turno: 'tarde',
+        horarioInicio: '15:00',
+        horarioFim: '15:50',
+        tipo: 'rotina',
+        titulo: 'Bloqueado',
+        descricao: null,
+        disciplinaCodigo: null,
+        cor: null,
+        prioridade: 0,
+        concluido: false,
+        createdAt: new Date(),
+      },
+      {
+        id: 'blocked-sunday',
+        cronogramaId: mockCronograma.id,
+        diaSemana: 'domingo',
+        turno: 'tarde',
+        horarioInicio: '15:00',
+        horarioFim: '15:50',
+        tipo: 'rotina',
+        titulo: 'Bloqueado',
+        descricao: null,
+        disciplinaCodigo: null,
+        cor: null,
+        prioridade: 0,
+        concluido: false,
+        createdAt: new Date(),
+      },
+    ]
+
+    render(<SimuladoAnalyzer matricula={mockMatricula} />)
+
+    await waitFor(() => {
+      expect(storeState.selectedSimuladoHistoryItem?.id).toBe(latestHistoryItem.id)
+    })
+
+    fireEvent.click(screen.getByText('Simulado'))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Nesta semana cabem 1 de 2 questões. 1 ficará pendente por falta de horários livres.',
+        ),
+      ).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Distribuir/i }))
+
+    await waitFor(() => {
+      expect(storeState.addBlock).toHaveBeenCalledTimes(1)
+      expect(screen.queryByText('Simulado ENEM 2024')).not.toBeInTheDocument()
+    })
+  })
+
   it('substitui questoes ja distribuidas antes de recriar a sequencia', async () => {
     storeState.blocks = [
       {
