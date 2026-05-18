@@ -3,6 +3,7 @@ import type { ReportData, HabilidadeCritica, QuestaoRecomendada, AreaSigla } fro
 import { shouldRenderQuestionImage } from '../../services/question-delivery'
 import {
   buildQuestionImageLayoutKey,
+  DEFAULT_QUESTION_IMAGE_LAYOUT,
   type QuestionImageLayout,
 } from '../../services/question-image-layout'
 import {
@@ -160,10 +161,12 @@ interface QuestionRenderItem {
   readonly area: AreaSigla
 }
 
-const MAX_COLUMN_VISUAL_WIDTH_PT = 360
-const MAX_COLUMN_VISUAL_HEIGHT_PT = 320
+const MAX_COLUMN_VISUAL_WIDTH_PT = 340
+const MAX_COLUMN_VISUAL_HEIGHT_PT = 280
+const FULL_IMAGE_WIDTH_PT = 440
+const FULL_IMAGE_HEIGHT_PT = 260
 const COLUMN_IMAGE_WIDTH_PT = 210
-const COLUMN_IMAGE_HEIGHT_PT = 190
+const COLUMN_IMAGE_HEIGHT_PT = 220
 
 type AreaQuestionRow =
   | {
@@ -195,10 +198,9 @@ function shouldUseFullWidthQuestion(
     return false
   }
 
-  const layout = imageLayoutByQuestionKey[buildQuestionImageLayoutKey(question)]
-  if (!layout) {
-    return true
-  }
+  const layout =
+    imageLayoutByQuestionKey[buildQuestionImageLayoutKey(question)] ??
+    DEFAULT_QUESTION_IMAGE_LAYOUT
 
   return (
     layout.width > MAX_COLUMN_VISUAL_WIDTH_PT ||
@@ -427,13 +429,13 @@ function QuestionCard({
   const textoApoioLimpo = stripMarkdownImages(questao.textoApoio)
   const enunciadoLimpo = stripMarkdownImages(questao.enunciado)
   const imagemValida = shouldRenderVisualImage(questao)
-  const imageLayout = imageLayoutByQuestionKey[buildQuestionImageLayoutKey(questao)]
-  const imageWidth = compactVisualImage
-    ? Math.min(imageLayout?.width ?? COLUMN_IMAGE_WIDTH_PT, COLUMN_IMAGE_WIDTH_PT)
-    : (imageLayout?.width ?? 260)
-  const imageHeight = compactVisualImage
-    ? Math.min(imageLayout?.height ?? COLUMN_IMAGE_HEIGHT_PT, COLUMN_IMAGE_HEIGHT_PT)
-    : (imageLayout?.height ?? 160)
+  const imageLayout =
+    imageLayoutByQuestionKey[buildQuestionImageLayoutKey(questao)] ??
+    DEFAULT_QUESTION_IMAGE_LAYOUT
+  const maxImageWidth = compactVisualImage ? COLUMN_IMAGE_WIDTH_PT : FULL_IMAGE_WIDTH_PT
+  const maxImageHeight = compactVisualImage ? COLUMN_IMAGE_HEIGHT_PT : FULL_IMAGE_HEIGHT_PT
+  const imageWidth = Math.min(imageLayout.width, maxImageWidth)
+  const imageHeight = Math.min(imageLayout.height, maxImageHeight)
 
   return (
     <View style={[s.questaoBox, { borderTopWidth: 2, borderTopColor: areaColor }]}>

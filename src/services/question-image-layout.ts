@@ -11,9 +11,9 @@ interface QuestionImageDimensions {
 }
 
 const PX_TO_PT = 0.75
-const MAX_IMAGE_WIDTH_PT = 500
-const MAX_IMAGE_HEIGHT_PT = 300
-const FALLBACK_IMAGE_LAYOUT: QuestionImageLayout = {
+const MAX_IMAGE_WIDTH_PT = 440
+const MAX_IMAGE_HEIGHT_PT = 260
+export const DEFAULT_QUESTION_IMAGE_LAYOUT: QuestionImageLayout = {
   width: 260,
   height: 160,
 }
@@ -38,7 +38,7 @@ export function calculateQuestionImageLayout(
     dimensions.naturalWidthPx <= 0 ||
     dimensions.naturalHeightPx <= 0
   ) {
-    return FALLBACK_IMAGE_LAYOUT
+    return DEFAULT_QUESTION_IMAGE_LAYOUT
   }
 
   const naturalWidthPt = dimensions.naturalWidthPx * PX_TO_PT
@@ -84,7 +84,6 @@ export async function loadQuestionImageLayouts(
     .flatMap((habilidade) => habilidade.questoesRecomendadas)
     .filter(
       (question) =>
-        question.requiresVisualContext &&
         typeof question.imagemUrl === 'string' &&
         question.imagemUrl.trim().length > 0,
     )
@@ -101,4 +100,3 @@ export async function loadQuestionImageLayouts(
 
   return Object.fromEntries(layoutEntries)
 }
-
