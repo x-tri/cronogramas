@@ -161,7 +161,7 @@ describe('report-recommendations', () => {
     )
   })
 
-  it('mantém alternativas-imagem mesmo com texto vazio', () => {
+  it('bloqueia alternativas-imagem remotas enquanto o PDF não embute imagens da API', () => {
     const safe = filterPdfSafeRecommendations([
       {
         ano: 2020,
@@ -180,7 +180,7 @@ describe('report-recommendations', () => {
       },
     ])
 
-    expect(safe).toHaveLength(1)
+    expect(safe).toHaveLength(0)
   })
 
   it('remove alternativa vazia sem imagem do conjunto seguro para PDF', () => {
@@ -221,7 +221,7 @@ describe('report-recommendations', () => {
     expect(safe).toHaveLength(0)
   })
 
-  it('aceita ENEM 2020 Q170 quando alternativas vêm como imagens da API', () => {
+  it('bloqueia ENEM 2020 Q170 enquanto alternativas-imagem remotas não são embutidas', () => {
     const safe = filterPdfSafeRecommendations([
       {
         ano: 2020,
@@ -238,6 +238,28 @@ describe('report-recommendations', () => {
       },
     ])
 
-    expect(safe).toHaveLength(1)
+    expect(safe).toHaveLength(0)
+  })
+
+  it('bloqueia item que menciona imagem mesmo sem flag requiresVisualContext', () => {
+    const findings = auditPdfRecommendationQuality({
+      ano: 2019,
+      dificuldade: -0.25,
+      posicaoCaderno: 59,
+      coItem: 59,
+      enunciado: 'A divisão política do mundo como apresentada na imagem seria',
+      requiresVisualContext: false,
+      alternativas: [
+        { letra: 'A', texto: 'opção a', imagemUrl: null },
+        { letra: 'B', texto: 'opção b', imagemUrl: null },
+        { letra: 'C', texto: 'opção c', imagemUrl: null },
+        { letra: 'D', texto: 'opção d', imagemUrl: null },
+        { letra: 'E', texto: 'opção e', imagemUrl: null },
+      ],
+    })
+
+    expect(findings.map((finding) => finding.issue)).toContain(
+      'remote_image_not_embeddable',
+    )
   })
 })

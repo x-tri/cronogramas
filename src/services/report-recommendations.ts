@@ -25,6 +25,7 @@ export type RecommendationQualityIssue =
   | 'visual_context_without_image'
   | 'empty_statement'
   | 'empty_option_without_image'
+  | 'remote_image_not_embeddable'
 
 export interface RecommendationQualityFinding {
   readonly key: string
@@ -109,6 +110,37 @@ function hasTrustedImageUrl(url: string | null | undefined): boolean {
   }
 }
 
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function textMentionsVisualContext(item: PdfRecommendationLike): boolean {
+  const text = normalizeText([item.enunciado, item.textoApoio].filter(Boolean).join(' '))
+  return [
+    'figura',
+    'imagem',
+    'grafico',
+    'tabela',
+    'mapa',
+    'charge',
+    'cartaz',
+    'esquema',
+    'diagrama',
+    'infografico',
+  ].some((keyword) => text.includes(keyword))
+}
+
+function hasRemoteImage(item: PdfRecommendationLike): boolean {
+  return Boolean(
+    hasTrustedImageUrl(item.imagemUrl) ||
+    hasTrustedImageUrl(item.linkImagem) ||
+    item.alternativas?.some((alternativa) => hasTrustedImageUrl(alternativa.imagemUrl)),
+  )
+}
+
 export function auditPdfRecommendationQuality(
   item: PdfRecommendationLike,
 ): RecommendationQualityFinding[] {
@@ -119,6 +151,7 @@ export function auditPdfRecommendationQuality(
   const hasOptionImage = Boolean(
     item.alternativas?.some((alternativa) => hasTrustedImageUrl(alternativa.imagemUrl)),
   )
+  const requiresVisualContext = Boolean(item.requiresVisualContext || textMentionsVisualContext(item))
 
   if (!hasStatement) {
     findings.push({
@@ -128,11 +161,19 @@ export function auditPdfRecommendationQuality(
     })
   }
 
-  if (item.requiresVisualContext && !hasVisualImage && !hasOptionImage) {
+  if (requiresVisualContext && !hasVisualImage && !hasOptionImage) {
     findings.push({
       key,
       issue: 'visual_context_without_image',
       message: 'Questão depende de contexto visual, mas não possui imagem confiável.',
+    })
+  }
+
+  if (requiresVisualContext || hasRemoteImage(item)) {
+    findings.push({
+      key,
+      issue: 'remote_image_not_embeddable',
+      message: 'Questão depende de imagem remota que o PDF do navegador não embute com segurança.',
     })
   }
 
