@@ -217,6 +217,7 @@ export interface QuestaoRecomendada {
   readonly alternativas: ReadonlyArray<{
     readonly letra: string // A, B, C, D, E
     readonly texto: string // texto da alternativa
+    readonly imagemUrl?: string | null // imagem da alternativa quando o ENEM usa formulas/figuras
   }> | null
   readonly imagemUrl: string | null // image_url da questão (se tiver imagem incorporada)
   readonly requiresVisualContext: boolean

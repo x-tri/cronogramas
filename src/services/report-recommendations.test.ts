@@ -48,6 +48,45 @@ describe('report-recommendations', () => {
     expect(highTri.map((item) => item.coItem)).toEqual([3, 2, 1])
   })
 
+  it('prioriza questoes com imagem quando estao na faixa adequada do aluno', () => {
+    const picked = pickRecommendationsForStudent(
+      [
+        { ano: 2024, dificuldade: 0.1, posicaoCaderno: 10, coItem: 10 },
+        {
+          ano: 2024,
+          dificuldade: 0.2,
+          posicaoCaderno: 11,
+          coItem: 11,
+          imagemUrl: 'https://api.questoes.xtri.online/media/enem/2024/questions/136/question-136.png',
+        },
+        { ano: 2024, dificuldade: 0.3, posicaoCaderno: 12, coItem: 12 },
+      ],
+      520,
+      3,
+    )
+
+    expect(picked.map((item) => item.coItem)).toEqual([11, 10, 12])
+  })
+
+  it('prioriza questoes com imagem nas alternativas', () => {
+    const picked = pickRecommendationsForStudent(
+      [
+        { ano: 2024, dificuldade: 0.1, posicaoCaderno: 10, coItem: 10 },
+        {
+          ano: 2020,
+          dificuldade: 0.2,
+          posicaoCaderno: 157,
+          coItem: 157,
+          alternativas: [{ imagemUrl: 'https://api.questoes.xtri.online/media/enem/2020/questions/157/a.png' }],
+        },
+      ],
+      520,
+      2,
+    )
+
+    expect(picked.map((item) => item.coItem)).toEqual([157, 10])
+  })
+
   it('completa com fallback sem perder a selecao personalizada', () => {
     const merged = mergeRecommendationsForStudent(
       [

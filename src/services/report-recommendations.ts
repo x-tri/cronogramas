@@ -3,6 +3,11 @@ export interface RecommendationLike {
   readonly dificuldade: number
   readonly posicaoCaderno: number | null
   readonly coItem: number
+  readonly imagemUrl?: string | null
+  readonly linkImagem?: string | null
+  readonly alternativas?: ReadonlyArray<{
+    readonly imagemUrl?: string | null
+  }> | null
 }
 
 export interface DifficultyWindow {
@@ -64,6 +69,14 @@ function getDifficultyBias(
   return 'balanced'
 }
 
+function hasQuestionImage(item: RecommendationLike): boolean {
+  return Boolean(
+    item.imagemUrl ??
+    item.linkImagem ??
+    item.alternativas?.some((alternativa) => alternativa.imagemUrl),
+  )
+}
+
 export function sortRecommendationsByStudentLevel<T extends RecommendationLike>(
   items: ReadonlyArray<T>,
   tri: number | null | undefined,
@@ -87,6 +100,12 @@ export function sortRecommendationsByStudentLevel<T extends RecommendationLike>(
 
     if (leftSide !== rightSide) {
       return leftSide - rightSide
+    }
+
+    const leftHasImage = hasQuestionImage(left) ? 0 : 1
+    const rightHasImage = hasQuestionImage(right) ? 0 : 1
+    if (leftHasImage !== rightHasImage) {
+      return leftHasImage - rightHasImage
     }
 
     const leftDistance = Math.abs(left.dificuldade - target)

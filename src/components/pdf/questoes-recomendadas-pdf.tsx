@@ -116,9 +116,10 @@ const s = StyleSheet.create({
   enunciado: { fontSize: 8, color: '#1d1d1f', lineHeight: 1.5 },
   // Alternativas
   alternativasBox: { marginHorizontal: 8, marginBottom: 6 },
-  alternativaRow: { flexDirection: 'row', marginBottom: 2 },
+  alternativaRow: { flexDirection: 'row', marginBottom: 2, alignItems: 'flex-start' },
   alternativaLetra: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#1d1d1f', width: 16 },
   alternativaTexto: { fontSize: 8, color: '#1d1d1f', flex: 1, lineHeight: 1.4 },
+  alternativaImagem: { width: 128, height: 28, objectFit: 'contain' },
   // Sem conteudo
   semConteudoBox: { paddingHorizontal: 8, paddingVertical: 10, alignItems: 'center' },
   semConteudoText: { fontSize: 7.5, color: '#9ca3af', fontStyle: 'italic' },
@@ -175,7 +176,6 @@ function shouldRenderVisualImage(
   question: QuestaoRecomendada,
 ): boolean {
   return (
-    question.requiresVisualContext &&
     isValidImageUrl(question.imagemUrl) &&
     shouldRenderQuestionImage(question)
   )
@@ -489,7 +489,11 @@ function QuestionCard({
           {questao.alternativas.map((alt) => (
             <View key={alt.letra} style={s.alternativaRow}>
               <Text style={s.alternativaLetra}>{alt.letra})</Text>
-              <Text style={s.alternativaTexto}>{alt.texto}</Text>
+              {isValidImageUrl(alt.imagemUrl) ? (
+                <Image src={alt.imagemUrl as string} style={s.alternativaImagem} />
+              ) : (
+                <Text style={s.alternativaTexto}>{alt.texto}</Text>
+              )}
             </View>
           ))}
         </View>

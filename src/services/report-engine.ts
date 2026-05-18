@@ -1236,7 +1236,11 @@ async function fetchTopicMatchedRecommendations(params: {
           enunciado: (candidate.stem as string) ?? null,
           textoApoio: (candidate.support_text as string) ?? null,
           alternativas: options.length > 0
-            ? options.map((option) => ({ letra: option.letter, texto: option.text }))
+            ? options.map((option) => ({
+                letra: option.letter,
+                texto: option.text,
+                imagemUrl: option.image_url ?? null,
+              }))
             : null,
           imagemUrl: resolvedImageUrl,
           requiresVisualContext: questionRequiresVisualContext(candidate),
@@ -1503,7 +1507,13 @@ async function computeQuestoesRecomendadas(
                       posicaoCaderno: q.source_question as number | null,
                       enunciado: (q.stem as string) ?? null,
                       textoApoio: (q.support_text as string) ?? null,
-                      alternativas: opts.length > 0 ? opts.map(o => ({ letra: o.letter, texto: o.text })) : null,
+                      alternativas: opts.length > 0
+                        ? opts.map(o => ({
+                            letra: o.letter,
+                            texto: o.text,
+                            imagemUrl: o.image_url ?? null,
+                          }))
+                        : null,
                       imagemUrl: resolvedImageUrl,
                       requiresVisualContext,
                       resolutionStatus: 'resolved' as const,
@@ -1576,7 +1586,13 @@ async function computeQuestoesRecomendadas(
                 posicaoCaderno: q.source_question as number | null,
                 enunciado: (q.stem as string) ?? null,
                 textoApoio: (q.support_text as string) ?? null,
-                alternativas: opts.length > 0 ? opts.map(o => ({ letra: o.letter, texto: o.text })) : null,
+                alternativas: opts.length > 0
+                  ? opts.map(o => ({
+                      letra: o.letter,
+                      texto: o.text,
+                      imagemUrl: o.image_url ?? null,
+                    }))
+                  : null,
                 imagemUrl: resolvedImageUrl,
                 requiresVisualContext,
                 resolutionStatus: 'resolved' as const,

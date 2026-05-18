@@ -24,6 +24,7 @@ export interface QuestionOptionRow {
   readonly letter: string
   readonly text: string
   readonly is_correct: boolean
+  readonly image_url?: string | null
 }
 
 export type ItemValidationFailure =
@@ -119,8 +120,14 @@ export function isTrustedQuestionImageUrl(
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
 
     return (
-      url.hostname === 'uhqdkaftqjxenobdfqkd.supabase.co' &&
-      url.pathname.includes('/storage/v1/object/public/enem-images/')
+      (
+        url.hostname === 'uhqdkaftqjxenobdfqkd.supabase.co' &&
+        url.pathname.includes('/storage/v1/object/public/enem-images/')
+      ) ||
+      (
+        url.hostname === 'api.questoes.xtri.online' &&
+        url.pathname.startsWith('/media/enem/')
+      )
     )
   } catch {
     return false
@@ -129,6 +136,10 @@ export function isTrustedQuestionImageUrl(
 
 function isPlaceholderOptionText(text: string): boolean {
   return /^[A-E]$/.test(text.trim().toUpperCase())
+}
+
+function hasOptionVisualAsset(option: QuestionOptionRow): boolean {
+  return isTrustedQuestionImageUrl(option.image_url)
 }
 
 export function hasUsableOptions(
@@ -140,7 +151,12 @@ export function hasUsableOptions(
   const letters = sorted.map((option) => option.letter.toUpperCase())
   if (letters.join(',') !== LETTER_ORDER.join(',')) return false
 
-  return sorted.every((option) => !isPlaceholderOptionText(option.text))
+  return sorted.every((option) => {
+    const text = option.text.trim()
+    if (hasOptionVisualAsset(option)) return true
+    if (text.length === 0) return false
+    return !isPlaceholderOptionText(text)
+  })
 }
 
 function scoreQuestionCandidate(
@@ -245,10 +261,6 @@ function validateQuestionCandidate(params: {
 
   if (params.candidate.image_url && !isTrustedQuestionImageUrl(params.candidate.image_url)) {
     return 'broken_image_host'
-  }
-
-  if (!requiresVisual && params.resolvedImageUrl && isTrustedQuestionImageUrl(params.resolvedImageUrl)) {
-    return 'text_image_mismatch'
   }
 
   const hasConflictingVariant = params.candidates.some((candidate) => {
@@ -419,5 +431,5 @@ export async function resolveItem(
 export function shouldRenderQuestionImage(
   question: Pick<QuestaoRecomendada, 'imagemUrl' | 'requiresVisualContext'>,
 ): boolean {
-  return Boolean(question.requiresVisualContext && isTrustedQuestionImageUrl(question.imagemUrl))
+  return isTrustedQuestionImageUrl(question.imagemUrl)
 }

@@ -253,6 +253,7 @@ export function mapApiToOptions(q: ApiQuestion): QuestionOptionRow[] {
     letter: a.letter,
     text: a.text,
     is_correct: a.isCorrect,
+    image_url: a.image ?? a.file ?? a.localFile ?? null,
   }))
 }
 

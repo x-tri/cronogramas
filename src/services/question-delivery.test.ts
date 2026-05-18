@@ -44,6 +44,23 @@ describe('question-delivery', () => {
     ).toBe(false)
   })
 
+  it('aceita alternativas com imagem mesmo quando o texto vem vazio', () => {
+    expect(
+      hasUsableOptions(
+        buildOptions([
+          ['A', '', false],
+          ['B', '', false],
+          ['C', '', false],
+          ['D', '', false],
+          ['E', '', true],
+        ]).map((option) => ({
+          ...option,
+          image_url: `https://api.questoes.xtri.online/media/enem/2020/questions/157/${option.letter}.png`,
+        })),
+      ),
+    ).toBe(true)
+  })
+
   it('detecta quando a questão depende de figura', () => {
     expect(
       questionRequiresVisualContext({
@@ -105,6 +122,34 @@ describe('question-delivery', () => {
     expect(pickBestQuestionCandidate([ppl, enem], optionsById)?.id).toBe('enem')
   })
 
+  it('aceita imagem oficial da API de questões XTRI', () => {
+    const candidate: QuestionCandidateRow = {
+      id: 'api-xtri-com-imagem',
+      source_year: 2024,
+      source_question: 136,
+      source_exam: 'ENEM 2024',
+      stem: 'Com base na figura apresentada, determine a resposta.',
+      support_text: 'Observe a figura.',
+      image_url: 'https://api.questoes.xtri.online/media/enem/2024/questions/136/question-136.png',
+      image_alt: null,
+    }
+
+    const optionsById = new Map<string, ReadonlyArray<QuestionOptionRow>>([
+      [
+        candidate.id,
+        buildOptions([
+          ['A', 'opção a', true],
+          ['B', 'opção b', false],
+          ['C', 'opção c', false],
+          ['D', 'opção d', false],
+          ['E', 'opção e', false],
+        ]),
+      ],
+    ])
+
+    expect(pickBestQuestionCandidate([candidate], optionsById)?.id).toBe(candidate.id)
+  })
+
   it('descarta item visual sem imagem confiável', () => {
     const candidate: QuestionCandidateRow = {
       id: 'visual-sem-imagem',
@@ -158,22 +203,21 @@ describe('question-delivery', () => {
     expect(grouped.get('2022:141')?.map((candidate) => candidate.id)).toEqual(['1', '2'])
   })
 
-  it('só renderiza imagem quando ela é parte da resolução', () => {
+  it('renderiza imagem confiável do banco antigo ou da API nova', () => {
     expect(
       shouldRenderQuestionImage({
         imagemUrl:
           'https://uhqdkaftqjxenobdfqkd.supabase.co/storage/v1/object/public/enem-images/2021/156/correta.png',
-        requiresVisualContext: true,
+        requiresVisualContext: false,
       }),
     ).toBe(true)
 
     expect(
       shouldRenderQuestionImage({
-        imagemUrl:
-          'https://uhqdkaftqjxenobdfqkd.supabase.co/storage/v1/object/public/enem-images/2020/119/alguma.png',
+        imagemUrl: 'https://api.questoes.xtri.online/media/enem/2024/questions/136/question-136.png',
         requiresVisualContext: false,
       }),
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('recompõe a imagem pela candidata mais nova com a mesma assinatura textual', () => {

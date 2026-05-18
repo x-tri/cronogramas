@@ -105,6 +105,25 @@ describe('mapApiToOptions', () => {
     expect(opts.find((o) => o.is_correct)?.letter).toBe('E')
   })
 
+  it('preserva imagem de alternativa quando a API devolve formula/figura', () => {
+    const opts = mapApiToOptions(makeApiQuestion({
+      alternatives: [
+        {
+          letter: 'A',
+          text: '',
+          image: 'https://api.questoes.xtri.online/media/enem/2020/questions/157/a.png',
+          file: null,
+          localFile: null,
+          isCorrect: true,
+        },
+      ],
+    }))
+
+    expect(opts[0]?.image_url).toBe(
+      'https://api.questoes.xtri.online/media/enem/2020/questions/157/a.png',
+    )
+  })
+
   it('retorna [] quando alternatives ausentes (caso listing endpoint)', () => {
     const q = { ...makeApiQuestion(), alternatives: undefined }
     expect(mapApiToOptions(q)).toEqual([])
