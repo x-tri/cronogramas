@@ -291,10 +291,12 @@ export function RelatorioCirurgico({
           computeReportData(simulado, cursoSelecionado),
         )
         : report
+      const { embedQuestionPdfImages } = await import('../../services/pdf-image-assets')
+      const pdfReadyReport = await embedQuestionPdfImages(effectiveReport)
       const { loadQuestionImageLayouts } = await import('../../services/question-image-layout')
-      const imageLayoutByQuestionKey = await loadQuestionImageLayouts(effectiveReport)
+      const imageLayoutByQuestionKey = await loadQuestionImageLayouts(pdfReadyReport)
       const doc = createElement(QuestoesRecomendadasPDF, {
-        report: effectiveReport,
+        report: pdfReadyReport,
         nomeAluno,
         imageLayoutByQuestionKey,
       })

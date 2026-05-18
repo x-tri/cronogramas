@@ -35,6 +35,9 @@ function isValidImageUrl(url: string | null | undefined): url is string {
   if (!url || typeof url !== 'string') return false
   const trimmed = url.trim()
   if (trimmed.length === 0) return false
+  if (/^data:image\/(png|jpe?g|gif|bmp|webp);base64,/i.test(trimmed)) {
+    return true
+  }
   try {
     const u = new URL(trimmed)
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return false
@@ -177,7 +180,10 @@ function shouldRenderVisualImage(
 ): boolean {
   return (
     isValidImageUrl(question.imagemUrl) &&
-    shouldRenderQuestionImage(question)
+    (
+      question.imagemUrl.startsWith('data:image/') ||
+      shouldRenderQuestionImage(question)
+    )
   )
 }
 

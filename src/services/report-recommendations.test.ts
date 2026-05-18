@@ -161,7 +161,7 @@ describe('report-recommendations', () => {
     )
   })
 
-  it('bloqueia alternativas-imagem remotas enquanto o PDF não embute imagens da API', () => {
+  it('mantém alternativas-imagem quando a API fornece URL da imagem', () => {
     const safe = filterPdfSafeRecommendations([
       {
         ano: 2020,
@@ -180,7 +180,7 @@ describe('report-recommendations', () => {
       },
     ])
 
-    expect(safe).toHaveLength(0)
+    expect(safe).toHaveLength(1)
   })
 
   it('remove alternativa vazia sem imagem do conjunto seguro para PDF', () => {
@@ -221,7 +221,7 @@ describe('report-recommendations', () => {
     expect(safe).toHaveLength(0)
   })
 
-  it('bloqueia ENEM 2020 Q170 enquanto alternativas-imagem remotas não são embutidas', () => {
+  it('mantém ENEM 2020 Q170 quando alternativas vêm como imagens da API', () => {
     const safe = filterPdfSafeRecommendations([
       {
         ano: 2020,
@@ -238,10 +238,10 @@ describe('report-recommendations', () => {
       },
     ])
 
-    expect(safe).toHaveLength(0)
+    expect(safe).toHaveLength(1)
   })
 
-  it('bloqueia item que menciona imagem mesmo sem flag requiresVisualContext', () => {
+  it('bloqueia item que menciona imagem sem URL de imagem', () => {
     const findings = auditPdfRecommendationQuality({
       ano: 2019,
       dificuldade: -0.25,
@@ -259,7 +259,7 @@ describe('report-recommendations', () => {
     })
 
     expect(findings.map((finding) => finding.issue)).toContain(
-      'remote_image_not_embeddable',
+      'visual_context_without_image',
     )
   })
 })
