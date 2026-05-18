@@ -56,7 +56,7 @@ type RequestPayload = {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-internal-function-secret, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -70,8 +70,8 @@ function jsonResponse(status: number, payload: Record<string, unknown>) {
   })
 }
 
-function getEnv(name: string, fallback?: string): string {
-  const value = Deno.env.get(name) ?? (fallback ? Deno.env.get(fallback) : undefined)
+function getEnv(name: string): string {
+  const value = Deno.env.get(name)
   if (!value) {
     throw new Error(`Variável obrigatória ausente: ${name}`)
   }
@@ -79,30 +79,19 @@ function getEnv(name: string, fallback?: string): string {
 }
 
 function createPrimaryClient() {
-  const url = getEnv('SUPABASE_URL', 'VITE_SUPABASE_URL')
-  const key = getEnv('SUPABASE_SERVICE_ROLE_KEY', 'VITE_SUPABASE_KEY')
+  const url = getEnv('SUPABASE_URL')
+  const key = getEnv('SUPABASE_SERVICE_ROLE_KEY')
   return createClient(url, key, {
     auth: { persistSession: false },
   })
 }
 
 function createSimuladoClient() {
-  const primaryUrl = Deno.env.get('SUPABASE_URL') ?? Deno.env.get('VITE_SUPABASE_URL') ?? ''
-  const primaryKey =
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
-    Deno.env.get('SUPABASE_ANON_KEY') ??
-    Deno.env.get('VITE_SUPABASE_KEY') ??
-    ''
+  const primaryUrl = Deno.env.get('SUPABASE_URL') ?? ''
+  const primaryKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
-  const url =
-    Deno.env.get('SIMULADO_SUPABASE_URL') ??
-    Deno.env.get('VITE_SIMULADO_SUPABASE_URL') ??
-    primaryUrl
-  const key =
-    Deno.env.get('SIMULADO_SUPABASE_SERVICE_ROLE_KEY') ??
-    Deno.env.get('SIMULADO_SUPABASE_KEY') ??
-    Deno.env.get('VITE_SIMULADO_SUPABASE_KEY') ??
-    primaryKey
+  const url = Deno.env.get('SIMULADO_SUPABASE_URL') ?? primaryUrl
+  const key = Deno.env.get('SIMULADO_SUPABASE_SERVICE_ROLE_KEY') ?? primaryKey
 
   if (!url || !key) {
     throw new Error('Configuração do Supabase de simulados ausente.')
@@ -111,6 +100,51 @@ function createSimuladoClient() {
   return createClient(url, key, {
     auth: { persistSession: false },
   })
+}
+
+function isValidInternalRequest(request: Request): boolean {
+  const expectedSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET')
+  const receivedSecret = request.headers.get('x-internal-function-secret') ?? ''
+  return Boolean(expectedSecret && receivedSecret && receivedSecret === expectedSecret)
+}
+
+async function assertCanAnalyzePlan(
+  primary: ReturnType<typeof createPrimaryClient>,
+  request: Request,
+  plan: MentorPlanRow,
+): Promise<void> {
+  if (isValidInternalRequest(request)) return
+
+  const authHeader = request.headers.get('authorization') ?? ''
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+  if (!token) {
+    throw Object.assign(new Error('Missing Authorization'), { status: 401 })
+  }
+
+  const { data: userData, error: userError } = await primary.auth.getUser(token)
+  const userId = userData.user?.id
+  if (userError || !userId) {
+    throw Object.assign(new Error('Invalid token'), { status: 401 })
+  }
+
+  const { data: projectUser, error: projectUserError } = await primary
+    .from('project_users')
+    .select('role, school_id, is_active')
+    .eq('auth_uid', userId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (projectUserError) {
+    throw Object.assign(new Error('Falha ao validar permissões.'), { status: 500 })
+  }
+
+  if (projectUser?.role === 'super_admin') return
+
+  if (projectUser?.role === 'coordinator' && projectUser.school_id === plan.school_id) {
+    return
+  }
+
+  throw Object.assign(new Error('Forbidden: sem acesso ao plano informado.'), { status: 403 })
 }
 
 function parseQuestionContents(payload: unknown): QuestionContentLike[] {
@@ -183,15 +217,16 @@ function buildQuestionRecordsFromExam(params: {
 
 /**
  * Invoke get-student-performance edge function via direct fetch.
- * Forwards the incoming Authorization header (service_role for server-to-server,
- * or user JWT when called from the frontend) so identity check in the target fn
- * sees the correct principal.
+ * Forwards the incoming Authorization header and, for server-to-server calls,
+ * an internal shared secret. The target function must not trust decoded JWT role
+ * claims because its gateway JWT validation is disabled.
  *
  * Returns null on any failure (graceful degradation).
  * Types + buildTriContext live in src/services/mentor-tri-context.ts (unit-tested).
  */
 async function fetchStudentPerformance(
   authHeader: string,
+  internalSecret: string,
   studentKey: string,
   schoolId: string,
 ): Promise<{
@@ -201,7 +236,7 @@ async function fetchStudentPerformance(
   const parsed = parseStudentKey(studentKey)
   if (parsed.kind === 'avulso') return null
 
-  const url = Deno.env.get('SUPABASE_URL') ?? Deno.env.get('VITE_SUPABASE_URL') ?? ''
+  const url = Deno.env.get('SUPABASE_URL') ?? ''
   if (!url || !authHeader) return null
 
   try {
@@ -209,6 +244,7 @@ async function fetchStudentPerformance(
       method: 'POST',
       headers: {
         Authorization: authHeader,
+        'X-Internal-Function-Secret': internalSecret,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -646,7 +682,9 @@ serve(async (request) => {
 
     const primary = createPrimaryClient()
     const simulado = createSimuladoClient()
+    const internalSecret = getEnv('INTERNAL_FUNCTION_SECRET')
     const plan = await fetchPlan(primary, mentorPlanId)
+    await assertCanAnalyzePlan(primary, request, plan)
 
     if (!plan.student_key) {
       return jsonResponse(400, { error: 'O V1 exige plano individual com student_key.' })
@@ -675,7 +713,12 @@ serve(async (request) => {
     // Forwards caller's Authorization header so identity check in target fn
     // sees the right principal (service_role for server-to-server, user JWT otherwise).
     const incomingAuth = request.headers.get('authorization') ?? ''
-    const triFetchPromise = fetchStudentPerformance(incomingAuth, plan.student_key, plan.school_id)
+    const triFetchPromise = fetchStudentPerformance(
+      incomingAuth,
+      internalSecret,
+      plan.student_key,
+      plan.school_id,
+    )
 
     const audit = buildStudentPerformanceAudit({
       mentorPlanId: plan.id,
@@ -705,8 +748,14 @@ serve(async (request) => {
     return jsonResponse(200, { audit: persisted })
   } catch (error) {
     console.error('[mentor-gap-analysis]', error)
-    return jsonResponse(500, {
-      error: error instanceof Error ? error.message : 'Falha interna na análise do mentor.',
-    })
+    const status =
+      typeof (error as { status?: number }).status === 'number'
+        ? (error as { status: number }).status
+        : 500
+    const message =
+      status === 401 || status === 403 || status === 400
+        ? error instanceof Error ? error.message : 'Requisição inválida.'
+        : 'Falha interna na análise do mentor.'
+    return jsonResponse(status, { error: message })
   }
 })

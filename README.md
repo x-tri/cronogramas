@@ -36,6 +36,20 @@ brew install hudochenkov/sshpass/sshpass
 
 `.env.deploy` está no `.gitignore` — nunca commitar.
 
+### Supabase Edge Functions
+
+As funções `get-student-performance` e `mentor-gap-analysis` exigem secrets server-side reais:
+
+```bash
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+INTERNAL_FUNCTION_SECRET=... # mesmo valor nas duas funções
+SIMULADO_SUPABASE_URL=... # opcional, quando o banco de simulados for dedicado
+SIMULADO_SUPABASE_SERVICE_ROLE_KEY=... # opcional, exigido se SIMULADO_SUPABASE_URL existir
+```
+
+Não use `VITE_*` como fallback em Edge Function. Chave pública/anon é só frontend.
+
 ### ↩️ Rollback
 
 **Via Git** (lento, passa pelo CI de novo, ~3 min):

@@ -10,6 +10,28 @@ export interface RecommendationLike {
   }> | null
 }
 
+export interface PdfRecommendationLike extends RecommendationLike {
+  readonly enunciado?: string | null
+  readonly textoApoio?: string | null
+  readonly requiresVisualContext?: boolean
+  readonly alternativas?: ReadonlyArray<{
+    readonly letra?: string
+    readonly texto?: string | null
+    readonly imagemUrl?: string | null
+  }> | null
+}
+
+export type RecommendationQualityIssue =
+  | 'visual_context_without_image'
+  | 'empty_statement'
+  | 'empty_option_without_image'
+
+export interface RecommendationQualityFinding {
+  readonly key: string
+  readonly issue: RecommendationQualityIssue
+  readonly message: string
+}
+
 export interface DifficultyWindow {
   readonly target: number
   readonly min: number
@@ -75,6 +97,62 @@ function hasQuestionImage(item: RecommendationLike): boolean {
     item.linkImagem ??
     item.alternativas?.some((alternativa) => alternativa.imagemUrl),
   )
+}
+
+function hasTrustedImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' && parsed.hostname.length > 0
+  } catch {
+    return false
+  }
+}
+
+export function auditPdfRecommendationQuality(
+  item: PdfRecommendationLike,
+): RecommendationQualityFinding[] {
+  const key = buildRecommendationKey(item)
+  const findings: RecommendationQualityFinding[] = []
+  const hasStatement = Boolean(item.enunciado?.trim() || item.textoApoio?.trim())
+  const hasVisualImage = hasTrustedImageUrl(item.imagemUrl) || hasTrustedImageUrl(item.linkImagem)
+  const hasOptionImage = Boolean(
+    item.alternativas?.some((alternativa) => hasTrustedImageUrl(alternativa.imagemUrl)),
+  )
+
+  if (!hasStatement) {
+    findings.push({
+      key,
+      issue: 'empty_statement',
+      message: 'Questão recomendada sem enunciado/texto de apoio.',
+    })
+  }
+
+  if (item.requiresVisualContext && !hasVisualImage && !hasOptionImage) {
+    findings.push({
+      key,
+      issue: 'visual_context_without_image',
+      message: 'Questão depende de contexto visual, mas não possui imagem confiável.',
+    })
+  }
+
+  for (const alternativa of item.alternativas ?? []) {
+    if (!alternativa.texto?.trim() && !hasTrustedImageUrl(alternativa.imagemUrl)) {
+      findings.push({
+        key,
+        issue: 'empty_option_without_image',
+        message: `Alternativa ${alternativa.letra ?? '?'} sem texto e sem imagem.`,
+      })
+    }
+  }
+
+  return findings
+}
+
+export function filterPdfSafeRecommendations<T extends PdfRecommendationLike>(
+  items: ReadonlyArray<T>,
+): T[] {
+  return items.filter((item) => auditPdfRecommendationQuality(item).length === 0)
 }
 
 export function sortRecommendationsByStudentLevel<T extends RecommendationLike>(

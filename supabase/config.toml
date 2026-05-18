@@ -9,10 +9,10 @@
 verify_jwt = false
 
 # get-student-performance: verify_jwt=false pelo mesmo motivo do submit-simulado.
-# Server-to-server calls de mentor-gap-analysis com service_role JWT são
-# rejeitadas pelo gateway antes do handler. A função tem verificação interna
+# Server-to-server calls de mentor-gap-analysis com service_role JWT eram
+# rejeitadas pelo gateway antes do handler. A função tem verificação interna:
 # (assertCanReadStudent) que:
-#   - Aceita role=service_role (server-to-server trust)
+#   - Aceita X-Internal-Function-Secret para chamadas internas
 #   - Ou exige user JWT cujo sub == students.profile_id
 [functions.get-student-performance]
 verify_jwt = false

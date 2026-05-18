@@ -260,14 +260,15 @@ export function createSupabaseRepository(): DataRepository {
         }
 
         if (error) {
-          console.warn('[supabase-repository] school_schedules falhou, fallback mock:', error.message)
-          return getHorariosPorTurma(turma)
+          throw new Error(`Falha ao carregar horários oficiais: ${error.message}`)
         }
         if (!data || data.length === 0) {
-          logRepository('[getOfficialSchedule] school_schedules vazio (RLS bloqueou ou turma sem cadastro) -> fallback mock', {
+          logRepository('[getOfficialSchedule] school_schedules vazio (RLS bloqueou ou turma sem cadastro)', {
             schoolId, turma, ano, turmaCandidates,
           })
-          return getHorariosPorTurma(turma)
+          throw new Error(
+            `Nenhum horário oficial cadastrado para a turma ${turma} no ano ${ano}.`,
+          )
         }
         // Defesa client-side: mesmo o RLS+`.eq('school_id')` ja filtrando,
         // garantimos que NENHUMA row de outra escola escape (incidente
@@ -282,7 +283,9 @@ export function createSupabaseRepository(): DataRepository {
           )
         }
         if (valid.length === 0) {
-          return getHorariosPorTurma(turma)
+          throw new Error(
+            `Nenhum horário oficial válido para a escola solicitada (${schoolId}).`,
+          )
         }
         logRepository('[getOfficialSchedule] retornando do banco', { schoolId, turma, ano, qtd: valid.length })
         return valid.map((row): HorarioOficial => ({

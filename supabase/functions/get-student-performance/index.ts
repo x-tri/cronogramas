@@ -106,7 +106,7 @@ function findKeyForMatricula(
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-internal-function-secret, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 } as const
 
@@ -117,10 +117,8 @@ function jsonResponse(status: number, payload: Record<string, unknown>): Respons
   })
 }
 
-function getEnv(name: string, ...fallbacks: string[]): string {
-  const value =
-    Deno.env.get(name) ??
-    fallbacks.map((f) => Deno.env.get(f)).find((v) => v && v.length > 0)
+function getEnv(name: string): string {
+  const value = Deno.env.get(name)
   if (!value) {
     throw new Error(`Variável obrigatória ausente: ${name}`)
   }
@@ -128,22 +126,15 @@ function getEnv(name: string, ...fallbacks: string[]): string {
 }
 
 function createPrimaryClient(): SupabaseClient {
-  const url = getEnv('SUPABASE_URL', 'VITE_SUPABASE_URL')
-  const key = getEnv('SUPABASE_SERVICE_ROLE_KEY', 'VITE_SUPABASE_KEY')
+  const url = getEnv('SUPABASE_URL')
+  const key = getEnv('SUPABASE_SERVICE_ROLE_KEY')
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
 function tryCreateLegacyClient(): SupabaseClient | null {
-  const primaryUrl = Deno.env.get('SUPABASE_URL') ?? Deno.env.get('VITE_SUPABASE_URL') ?? ''
-  const legacyUrl =
-    Deno.env.get('SIMULADO_SUPABASE_URL') ??
-    Deno.env.get('VITE_SIMULADO_SUPABASE_URL') ??
-    ''
-  const legacyKey =
-    Deno.env.get('SIMULADO_SUPABASE_SERVICE_ROLE_KEY') ??
-    Deno.env.get('SIMULADO_SUPABASE_KEY') ??
-    Deno.env.get('VITE_SIMULADO_SUPABASE_KEY') ??
-    ''
+  const primaryUrl = Deno.env.get('SUPABASE_URL') ?? ''
+  const legacyUrl = Deno.env.get('SIMULADO_SUPABASE_URL') ?? ''
+  const legacyKey = Deno.env.get('SIMULADO_SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
   if (!legacyUrl || !legacyKey || legacyUrl === primaryUrl) {
     return null
@@ -430,23 +421,16 @@ async function resolveStudent(
  * H1 identity check (Phase 4 complete).
  *
  * Called in 3 scenarios:
- *   A) Server-to-server (role=service_role in JWT) → trust, skip check.
+ *   A) Server-to-server (X-Internal-Function-Secret) → trust, skip check.
  *   B) Admin/coordinator (project_users.role = super_admin | coordinator):
  *        - super_admin: read any student
  *        - coordinator: read students of their own school
  *   C) Student (user JWT with sub matching students.profile_id): self only.
  */
-function parseJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split('.')
-  if (parts.length !== 3) return null
-  try {
-    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = payload + '==='.slice((payload.length + 3) % 4)
-    const decoded = atob(padded)
-    return JSON.parse(decoded)
-  } catch {
-    return null
-  }
+function isValidInternalRequest(req: Request): boolean {
+  const expectedSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET')
+  const receivedSecret = req.headers.get('x-internal-function-secret') ?? ''
+  return Boolean(expectedSecret && receivedSecret && receivedSecret === expectedSecret)
 }
 
 async function assertCanReadStudent(
@@ -455,20 +439,18 @@ async function assertCanReadStudent(
   studentId: string,
   studentSchoolId: string,
 ): Promise<void> {
+  if (isValidInternalRequest(req)) return
+
   const authHeader = req.headers.get('authorization') ?? ''
   const token = authHeader.replace(/^Bearer\s+/i, '').trim()
   if (!token) {
     throw Object.assign(new Error('Missing Authorization'), { status: 401 })
   }
-  const claims = parseJwtPayload(token)
-  const role = (claims?.role ?? '') as string
 
-  // A) Server-to-server — trust.
-  if (role === 'service_role') return
-
-  const sub = (claims?.sub ?? '') as string
-  if (!sub) {
-    throw Object.assign(new Error('Invalid token: missing sub'), { status: 401 })
+  const { data: userData, error: userError } = await primary.auth.getUser(token)
+  const sub = userData.user?.id
+  if (userError || !sub) {
+    throw Object.assign(new Error('Invalid token'), { status: 401 })
   }
 
   // B) Admin/coordinator lookup in project_users (uses service_role client, so bypasses RLS).

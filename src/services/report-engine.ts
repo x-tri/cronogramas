@@ -49,6 +49,7 @@ import type {
 } from '../types/report'
 import { getConteudoDidatico } from '../constants/habilidade-conteudo'
 import {
+  filterPdfSafeRecommendations,
   getDifficultyWindowForTri,
   mergeRecommendationsForStudent,
   pickRecommendationsForStudent,
@@ -1538,6 +1539,7 @@ async function computeQuestoesRecomendadas(
         triArea,
         TARGET_QUESTOES_POR_AREA,
       )
+      recomendadas = filterPdfSafeRecommendations(recomendadas)
 
       // Completa com fallback por área sem sobrescrever o que já foi personalizado.
       if (recomendadas.length < TARGET_QUESTOES_POR_AREA) {
@@ -1607,6 +1609,7 @@ async function computeQuestoesRecomendadas(
               TARGET_QUESTOES_POR_AREA,
               MAX_QUESTOES_AREA_FALLBACK_POR_AREA,
             )
+            recomendadas = filterPdfSafeRecommendations(recomendadas)
           }
       }
 
