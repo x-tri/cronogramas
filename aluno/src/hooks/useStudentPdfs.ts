@@ -10,7 +10,7 @@ export interface StudentPdf {
   readonly tipo: string;
   readonly filename: string;
   readonly storage_path: string;
-  readonly url: string;
+  readonly url: string | null;
   readonly file_size: number | null;
   readonly created_at: string | null;
 }
@@ -50,7 +50,16 @@ export function useStudentPdfs(studentKey: string | undefined) {
             .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS);
 
           if (sErr || !signed?.signedUrl) {
-            return null;
+            console.warn("[student-pdfs] Falha ao assinar PDF:", row.id, sErr?.message);
+            return {
+              id: row.id,
+              tipo: row.tipo,
+              filename: row.filename,
+              storage_path: row.storage_path,
+              url: null,
+              file_size: row.file_size,
+              created_at: row.created_at,
+            };
           }
 
           return {
@@ -65,7 +74,7 @@ export function useStudentPdfs(studentKey: string | undefined) {
         }),
       );
 
-      return pdfs.filter((pdf): pdf is StudentPdf => pdf !== null);
+      return pdfs;
     },
     enabled: !!studentKey,
     staleTime: 5 * 60 * 1000,

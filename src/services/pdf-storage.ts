@@ -50,6 +50,27 @@ function isUuid(value: string | null | undefined): value is string {
   );
 }
 
+function sanitizeStorageSegment(value: string, fallback: string): string {
+  const sanitized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+
+  return sanitized || fallback;
+}
+
+export function buildPdfStoragePath(params: {
+  readonly schoolId: string | null;
+  readonly turma?: string | null;
+  readonly filename: string;
+}): string {
+  const turmaFolder = sanitizeStorageSegment(params.turma ?? "sem-turma", "sem-turma");
+  const storageFilename = sanitizeStorageSegment(params.filename, "arquivo.pdf");
+  return `${params.schoolId ?? "sem-escola"}/${turmaFolder}/${storageFilename}`;
+}
+
 async function resolveSchoolId(params: {
   schoolId?: string | null;
   schoolName?: string | null;
@@ -123,8 +144,11 @@ export async function uploadPdf({
     matricula,
     alunoId,
   });
-  const turmaFolder = turma ?? "sem-turma";
-  const storagePath = `${resolvedSchoolId ?? "sem-escola"}/${turmaFolder}/${filename}`;
+  const storagePath = buildPdfStoragePath({
+    schoolId: resolvedSchoolId,
+    turma,
+    filename,
+  });
 
   // Upload to storage (upsert to overwrite if same week)
   const { error: uploadError } = await supabase.storage
@@ -143,7 +167,8 @@ export async function uploadPdf({
   // Se falhar, segue com upload registrado, retornando URL vazia em último caso.
   const signedUrl = await getSignedPdfUrl(storagePath);
 
-  // Register in history (ignore errors - storage is the priority)
+  // Registra no historico. Sem isso o PDF existe no storage, mas nao aparece
+  // no portal do aluno nem na auditoria do coordenador.
   const { error: historyError } = await supabase.from("pdf_history").insert({
     school_id: resolvedSchoolId,
     aluno_id: alunoId,
@@ -157,13 +182,14 @@ export async function uploadPdf({
   });
 
   if (historyError) {
-    console.warn("[pdf-storage] Falha ao registrar pdf_history:", historyError.message, {
+    console.error("[pdf-storage] Falha ao registrar pdf_history:", historyError.message, {
       filename,
       resolvedSchoolId,
       alunoId,
       matricula,
       tipo,
     });
+    return null;
   }
 
   logAudit("generate_pdf", "pdf", filename, {

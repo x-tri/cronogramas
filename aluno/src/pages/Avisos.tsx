@@ -208,6 +208,34 @@ function PdfCard({ pdf, index, studentId, matricula, schoolId }: PdfCardProps) {
     }
   }
 
+  const content = (
+    <>
+      <span className="text-2xl flex-shrink-0">{typeInfo.emoji}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-black text-foreground leading-tight truncate">
+          {typeInfo.label}
+        </p>
+        <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">
+          {date || "Material gerado"}
+          {!pdf.url ? " · link indisponível" : ""}
+        </p>
+      </div>
+      <Download className={cn("h-5 w-5 flex-shrink-0", pdf.url ? "text-primary" : "text-muted-foreground")} />
+    </>
+  );
+
+  if (!pdf.url) {
+    return (
+      <div
+        className="flex items-center gap-3 rounded-2xl border-2 bg-card p-3.5 opacity-70 animate-fade-in"
+        style={{ animationDelay: `${index * 0.08}s`, animationFillMode: "both" }}
+        title="PDF registrado, mas o link temporário não pôde ser gerado."
+      >
+        {content}
+      </div>
+    );
+  }
+
   return (
     <a
       href={pdf.url}
@@ -217,16 +245,7 @@ function PdfCard({ pdf, index, studentId, matricula, schoolId }: PdfCardProps) {
       className="flex items-center gap-3 rounded-2xl border-2 bg-card p-3.5 transition-all active:scale-[0.98] hover:border-primary/30 animate-fade-in"
       style={{ animationDelay: `${index * 0.08}s`, animationFillMode: "both" }}
     >
-      <span className="text-2xl flex-shrink-0">{typeInfo.emoji}</span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-black text-foreground leading-tight truncate">
-          {typeInfo.label}
-        </p>
-        <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">
-          {date}
-        </p>
-      </div>
-      <Download className="h-5 w-5 text-primary flex-shrink-0" />
+      {content}
     </a>
   );
 }

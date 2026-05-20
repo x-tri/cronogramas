@@ -230,13 +230,13 @@ export function RelatorioCirurgico({
     blob: Blob
     filename: string
     tipo: 'relatorio' | 'caderno_questoes'
-  }) => {
+  }): Promise<boolean> => {
     if (!student?.id || !student?.matricula) {
-      return
+      return false
     }
 
     try {
-      await uploadPdf({
+      const result = await uploadPdf({
         blob: params.blob,
         filename: params.filename,
         schoolId: student.schoolId ?? null,
@@ -247,8 +247,10 @@ export function RelatorioCirurgico({
         matricula: student.matricula,
         tipo: params.tipo,
       })
+      return result !== null
     } catch (err) {
       console.warn('[relatorio-cirurgico] Falha ao registrar PDF:', err)
+      return false
     }
   }
 
@@ -271,7 +273,10 @@ export function RelatorioCirurgico({
       link.href = url
       link.download = filename
       link.click()
-      void saveGeneratedPdf({ blob, filename, tipo: 'relatorio' })
+      const saved = await saveGeneratedPdf({ blob, filename, tipo: 'relatorio' })
+      if (!saved) {
+        window.alert('O relatório foi baixado, mas não consegui registrar no portal do aluno. Gere novamente ou confira permissões do PDF.')
+      }
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Erro ao gerar PDF do relatorio:', err)
@@ -308,7 +313,10 @@ export function RelatorioCirurgico({
       link.href = url
       link.download = filename
       link.click()
-      void saveGeneratedPdf({ blob, filename, tipo: 'caderno_questoes' })
+      const saved = await saveGeneratedPdf({ blob, filename, tipo: 'caderno_questoes' })
+      if (!saved) {
+        window.alert('O caderno foi baixado, mas não consegui registrar no portal do aluno. Gere novamente ou confira permissões do PDF.')
+      }
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Erro ao gerar PDF de questoes:', err)
