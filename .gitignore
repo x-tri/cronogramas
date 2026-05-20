@@ -7,6 +7,10 @@ node_modules
 dist
 dist-ssr
 *.local
+macos/.build/
+macos/dist/
+macos/Resources/AppIcon.iconset/
+macos/Resources/source/
 
 # Environment
 .env
