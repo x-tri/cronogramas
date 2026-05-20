@@ -19,15 +19,15 @@ struct WebAppView: NSViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
-        webView.customUserAgent = "XTRICronogramasMac/0.2 WKWebView"
-        webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+        webView.customUserAgent = "XTRICronogramasMac/0.3 WKWebView"
+        webView.load(URLRequest(url: url, cachePolicy: .useProtocolCachePolicy))
         context.coordinator.focus(webView)
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         if webView.url?.absoluteString != url.absoluteString {
-            webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+            webView.load(URLRequest(url: url, cachePolicy: .useProtocolCachePolicy))
             context.coordinator.focus(webView)
         }
 
@@ -102,7 +102,7 @@ struct WebAppView: NSViewRepresentable {
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
             if navigationAction.targetFrame == nil, let url = navigationAction.request.url {
-                webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+                webView.load(URLRequest(url: url, cachePolicy: .useProtocolCachePolicy))
             }
 
             return nil

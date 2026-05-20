@@ -63,8 +63,9 @@ struct ContentView: View {
             Button {
                 clearCacheToken += 1
             } label: {
-                Label("Limpar cache", systemImage: "trash")
+                Label("Limpar cache e sessão", systemImage: "trash")
             }
+            .help("Remove cache, cookies e login salvo deste app.")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
