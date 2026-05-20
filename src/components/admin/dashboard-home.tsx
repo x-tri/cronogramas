@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { simuladoSupabase } from "../../lib/simulado-supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -277,16 +278,16 @@ export function DashboardHome({
   const loadStats = useCallback(async () => {
     const [operationRes, storageRes, todayRes, weekRes] = await Promise.all([
       isSchoolScoped && userSchoolId
-        ? supabase
+        ? simuladoSupabase
             .from("executive_school_activity")
             .select("*")
             .eq("school_id", userSchoolId)
             .maybeSingle()
-        : supabase
+        : simuladoSupabase
             .from("executive_operation_metrics")
             .select("*")
             .maybeSingle(),
-      supabase
+      simuladoSupabase
         .from("executive_storage_metrics")
         .select("*")
         .maybeSingle(),
@@ -400,7 +401,7 @@ export function DashboardHome({
   }, [countScopedCronogramas, isSchoolScoped, loadScopedStudentIds, userSchoolId]);
 
   const loadSchoolHealth = useCallback(async () => {
-    let query = supabase
+    let query = simuladoSupabase
       .from("executive_school_activity")
       .select("school_id, escola, alunos_base, alunos_com_simulado, alunos_com_cronograma, alunos_atendidos, cronogramas_gerados, blocos_criados, downloads_listas, escola_ativa")
       .order("alunos_atendidos", { ascending: false });
