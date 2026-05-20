@@ -34,11 +34,23 @@ export function buildTurmaCandidates(turma: string): string[] {
 
   const candidates = new Set<string>([trimmed])
   const normalized = normalizeTurmaLabel(trimmed)
+  const asciiUpper = trimmed
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[ªº]/g, '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
 
   if (normalized.startsWith('turma ')) {
     candidates.add(trimmed.replace(/^turma\s+/i, '').trim())
   } else if (/^\d/.test(trimmed)) {
     candidates.add(`Turma ${trimmed}`)
+  }
+
+  const serieTurnoMatch = asciiUpper.match(/^(\d+)\s*(?:SERIE\s*)?([A-Z])M$/)
+  if (serieTurnoMatch) {
+    candidates.add(`${serieTurnoMatch[1]}${serieTurnoMatch[2]}M`)
   }
 
   return [...candidates].filter(Boolean)

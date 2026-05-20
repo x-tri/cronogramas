@@ -19,6 +19,11 @@ describe('supabase-repository schedule helpers', () => {
     expect(buildTurmaCandidates('Turma 301')).toEqual(['Turma 301', '301'])
   })
 
+  it('aceita turma FACEX por serie e turno e gera alias compacto', () => {
+    expect(buildTurmaCandidates('3ª SÉRIE AM')).toEqual(['3ª SÉRIE AM', 'Turma 3ª SÉRIE AM', '3AM'])
+    expect(buildTurmaCandidates('3ª SÉRIE BM')).toEqual(['3ª SÉRIE BM', 'Turma 3ª SÉRIE BM', '3BM'])
+  })
+
   it('mantem default do ano letivo alinhado ao app', () => {
     expect(DEFAULT_SCHOOL_YEAR).toBe(2026)
   })
