@@ -110,6 +110,29 @@ function startOfDay(daysAgo: number): string {
   return d.toISOString();
 }
 
+function emptyDashboardStats(): DashboardStats {
+  return {
+    escolas_ativas: 0,
+    alunos_base_escolas_ativas: 0,
+    alunos_atendidos: 0,
+    alunos_com_simulado: 0,
+    alunos_com_cronograma: 0,
+    cronogramas_gerados: 0,
+    blocos_criados: 0,
+    blocos_por_aluno_com_cronograma: 0,
+    downloads_listas: 0,
+    storage_objects: 0,
+    storage_bytes: 0,
+    cronogramas_today: 0,
+    cronogramas_week: 0,
+  };
+}
+
+function toNumber(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 function LoadingSpinner() {
@@ -197,7 +220,7 @@ export function DashboardHome({
   userRole = null,
   userSchoolId = null,
 }: DashboardHomeProps) {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<DashboardStats>(() => emptyDashboardStats());
   const [activities, setActivities] = useState<readonly AuditEntry[]>([]);
   const [activityPeriod, setActivityPeriod] = useState<"24h" | "7d">("24h");
   const [chartData, setChartData] = useState<readonly DailyCronograma[]>([]);
@@ -277,29 +300,51 @@ export function DashboardHome({
         .gte("created_at", startOfDay(7)),
     ]);
 
+    if (operationRes.error) {
+      console.error("[DashboardHome] Falha ao carregar métricas executivas", operationRes.error);
+    }
+    if (storageRes.error) {
+      console.error("[DashboardHome] Falha ao carregar métricas de storage", storageRes.error);
+    }
+    if (todayRes.error) {
+      console.error("[DashboardHome] Falha ao contar cronogramas de hoje", todayRes.error);
+    }
+    if (weekRes.error) {
+      console.error("[DashboardHome] Falha ao contar cronogramas da semana", weekRes.error);
+    }
+
     const operation = operationRes.data as Record<string, unknown> | null;
     const storage = storageRes.data as Record<string, unknown> | null;
 
-    if (!operation) return;
+    if (!operation) {
+      setStats((current) => ({
+        ...current,
+        storage_objects: toNumber(storage?.storage_objects),
+        storage_bytes: toNumber(storage?.storage_bytes),
+        cronogramas_today: todayRes.count ?? 0,
+        cronogramas_week: weekRes.count ?? 0,
+      }));
+      return;
+    }
 
-    const alunosComCronograma = Number(operation.alunos_com_cronograma ?? 0);
-    const blocosCriados = Number(operation.blocos_criados ?? 0);
+    const alunosComCronograma = toNumber(operation.alunos_com_cronograma);
+    const blocosCriados = toNumber(operation.blocos_criados);
 
     setStats({
-      escolas_ativas: isSchoolScoped ? (operation.escola_ativa ? 1 : 0) : Number(operation.escolas_ativas ?? 0),
-      alunos_base_escolas_ativas: Number(operation.alunos_base_escolas_ativas ?? operation.alunos_base ?? 0),
-      alunos_atendidos: Number(operation.alunos_atendidos ?? 0),
-      alunos_com_simulado: Number(operation.alunos_com_simulado ?? 0),
+      escolas_ativas: isSchoolScoped ? (operation.escola_ativa ? 1 : 0) : toNumber(operation.escolas_ativas),
+      alunos_base_escolas_ativas: toNumber(operation.alunos_base_escolas_ativas ?? operation.alunos_base),
+      alunos_atendidos: toNumber(operation.alunos_atendidos),
+      alunos_com_simulado: toNumber(operation.alunos_com_simulado),
       alunos_com_cronograma: alunosComCronograma,
-      cronogramas_gerados: Number(operation.cronogramas_gerados ?? 0),
+      cronogramas_gerados: toNumber(operation.cronogramas_gerados),
       blocos_criados: blocosCriados,
-      blocos_por_aluno_com_cronograma: Number(
+      blocos_por_aluno_com_cronograma: toNumber(
         operation.blocos_por_aluno_com_cronograma ??
-          (alunosComCronograma > 0 ? (blocosCriados / alunosComCronograma).toFixed(2) : 0),
+          (alunosComCronograma > 0 ? blocosCriados / alunosComCronograma : 0),
       ),
-      downloads_listas: Number(operation.downloads_listas ?? 0),
-      storage_objects: Number(storage?.storage_objects ?? 0),
-      storage_bytes: Number(storage?.storage_bytes ?? 0),
+      downloads_listas: toNumber(operation.downloads_listas),
+      storage_objects: toNumber(storage?.storage_objects),
+      storage_bytes: toNumber(storage?.storage_bytes),
       cronogramas_today: todayRes.count ?? 0,
       cronogramas_week: weekRes.count ?? 0,
     });
@@ -366,19 +411,25 @@ export function DashboardHome({
       query = query.eq("escola_ativa", true);
     }
 
-    const { data } = await query;
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[DashboardHome] Falha ao carregar saúde das escolas", error);
+      setSchoolHealth([]);
+      return;
+    }
 
     setSchoolHealth(
       (data ?? []).map((school) => ({
         school_id: String(school.school_id),
         name: String(school.escola),
-        alunos_base: Number(school.alunos_base ?? 0),
-        alunos_com_simulado: Number(school.alunos_com_simulado ?? 0),
-        alunos_com_cronograma: Number(school.alunos_com_cronograma ?? 0),
-        alunos_atendidos: Number(school.alunos_atendidos ?? 0),
-        cronogramas_gerados: Number(school.cronogramas_gerados ?? 0),
-        blocos_criados: Number(school.blocos_criados ?? 0),
-        downloads_listas: Number(school.downloads_listas ?? 0),
+        alunos_base: toNumber(school.alunos_base),
+        alunos_com_simulado: toNumber(school.alunos_com_simulado),
+        alunos_com_cronograma: toNumber(school.alunos_com_cronograma),
+        alunos_atendidos: toNumber(school.alunos_atendidos),
+        cronogramas_gerados: toNumber(school.cronogramas_gerados),
+        blocos_criados: toNumber(school.blocos_criados),
+        downloads_listas: toNumber(school.downloads_listas),
         escola_ativa: Boolean(school.escola_ativa),
       })),
     );
@@ -424,61 +475,59 @@ export function DashboardHome({
       </div>
 
       {/* KPI Cards */}
-      {stats && (
-        <div className="space-y-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8] mb-3">
-              Produção da operação
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <KpiCard
-                label="Alunos atendidos"
-                value={stats.alunos_atendidos}
-                subtitle={`${stats.alunos_com_simulado} com simulado • ${stats.alunos_com_cronograma} com cronograma`}
-                icon={<IconStudent />}
-              />
-              <KpiCard
-                label="Cronogramas gerados"
-                value={stats.cronogramas_gerados}
-                subtitle={`${stats.cronogramas_today} hoje / ${stats.cronogramas_week} esta semana`}
-                icon={<IconCalendar />}
-              />
-              <KpiCard
-                label="Blocos criados"
-                value={stats.blocos_criados}
-                subtitle={`${stats.blocos_por_aluno_com_cronograma} blocos por aluno com cronograma`}
-                icon={<IconCalendar />}
-              />
-              <KpiCard
-                label="Downloads/listas"
-                value={stats.downloads_listas}
-                subtitle="Entregas registradas pelos alunos"
-                icon={<IconDocument />}
-              />
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8] mb-3">
-              Base da plataforma
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <KpiCard
-                label={isSchoolScoped ? "Sua escola" : "Escolas"}
-                value={stats.escolas_ativas}
-                icon={<IconSchool />}
-              />
-              <KpiCard
-                label="Alunos na base ativa"
-                value={stats.alunos_base_escolas_ativas}
-                icon={<IconUsers />}
-              />
-              <KpiCard label="Objetos no storage" value={stats.storage_objects} icon={<IconStorage />} />
-              <KpiCard label="Armazenamento" value={formatBytes(stats.storage_bytes)} icon={<IconStorage />} />
-            </div>
+      <div className="space-y-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8] mb-3">
+            Produção da operação
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard
+              label="Alunos atendidos"
+              value={stats.alunos_atendidos}
+              subtitle={`${stats.alunos_com_simulado} com simulado • ${stats.alunos_com_cronograma} com cronograma`}
+              icon={<IconStudent />}
+            />
+            <KpiCard
+              label="Cronogramas gerados"
+              value={stats.cronogramas_gerados}
+              subtitle={`${stats.cronogramas_today} hoje / ${stats.cronogramas_week} esta semana`}
+              icon={<IconCalendar />}
+            />
+            <KpiCard
+              label="Blocos criados"
+              value={stats.blocos_criados}
+              subtitle={`${stats.blocos_por_aluno_com_cronograma} blocos por aluno com cronograma`}
+              icon={<IconCalendar />}
+            />
+            <KpiCard
+              label="Downloads/listas"
+              value={stats.downloads_listas}
+              subtitle="Entregas registradas pelos alunos"
+              icon={<IconDocument />}
+            />
           </div>
         </div>
-      )}
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#94a3b8] mb-3">
+            Base da plataforma
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard
+              label={isSchoolScoped ? "Sua escola" : "Escolas"}
+              value={stats.escolas_ativas}
+              icon={<IconSchool />}
+            />
+            <KpiCard
+              label="Alunos na base ativa"
+              value={stats.alunos_base_escolas_ativas}
+              icon={<IconUsers />}
+            />
+            <KpiCard label="Objetos no storage" value={stats.storage_objects} icon={<IconStorage />} />
+            <KpiCard label="Armazenamento" value={formatBytes(stats.storage_bytes)} icon={<IconStorage />} />
+          </div>
+        </div>
+      </div>
 
       {/* Activity Feed + Chart side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
