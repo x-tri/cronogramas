@@ -218,6 +218,8 @@ function AppContent() {
       <ChangePasswordForm
         userName={user.name}
         onSuccess={() => setMustChangePassword(false)}
+        onSkip={() => setMustChangePassword(false)}
+        onLogout={handleLogout}
       />
     );
   }

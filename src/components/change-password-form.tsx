@@ -4,9 +4,11 @@ import { supabase } from "../lib/supabase";
 interface ChangePasswordFormProps {
   userName: string;
   onSuccess: () => void;
+  onSkip?: () => void;
+  onLogout?: () => void;
 }
 
-export function ChangePasswordForm({ userName, onSuccess }: ChangePasswordFormProps) {
+export function ChangePasswordForm({ userName, onSuccess, onSkip, onLogout }: ChangePasswordFormProps) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -131,6 +133,31 @@ export function ChangePasswordForm({ userName, onSuccess }: ChangePasswordFormPr
                 "Definir nova senha"
               )}
             </button>
+
+            {(onSkip || onLogout) && (
+              <div className="flex items-center gap-2 pt-1">
+                {onSkip && (
+                  <button
+                    type="button"
+                    onClick={onSkip}
+                    disabled={isLoading}
+                    className="inline-flex h-9 flex-1 items-center justify-center rounded-lg border border-[#e5e7eb] bg-white text-xs font-medium text-[#475569] transition-colors hover:border-[#cbd5e1] hover:bg-[#f8fafc] hover:text-[#0f172a] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Pular por agora
+                  </button>
+                )}
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    disabled={isLoading}
+                    className="inline-flex h-9 flex-1 items-center justify-center rounded-lg border border-[#e5e7eb] bg-white text-xs font-medium text-[#475569] transition-colors hover:border-[#fecaca] hover:bg-[#fef2f2] hover:text-[#b91c1c] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Sair
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </form>
 
