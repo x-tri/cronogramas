@@ -135,17 +135,23 @@ xtri-cronogramas/
 ├── public/                  # Assets estáticos
 ├── dist/                    # Build output
 ├── test-*.spec.ts           # Testes E2E Playwright
+├── aluno/                   # App do aluno (build separado, deploy em aluno.horariodeestudos.com)
+├── .github/workflows/
+│   └── deploy-hostinger.yml # CI/CD: build + Vitest + rsync via SSH
+├── deploy-hostinger.sh      # Fallback manual (sshpass + .env.deploy)
+├── docs/                    # Auditorias e registros (ex.: auditoria-executiva-2026-05-22)
 ├── package.json
 ├── vite.config.ts
 ├── vitest.config.ts
 ├── tsconfig.json            # Referência para tsconfig.app.json e tsconfig.node.json
 ├── tsconfig.app.json        # Config TypeScript da aplicação
 ├── tsconfig.node.json       # Config TypeScript do Node/Vite
-├── eslint.config.js
-├── vercel.json              # Configuração de deploy na Vercel
-├── Dockerfile               # Container Docker multi-stage
-├── docker-compose.yml       # Orquestração Docker
-└── nginx.conf               # Configuração Nginx para produção
+└── eslint.config.js
+
+# Legado (NÃO usar — movidos em 2026-05-22):
+# Tudo em scripts/legacy/  (Dockerfile*, docker-compose.yml, nginx.conf,
+# vercel.json, *-expect.sh, deploy.sh, deploy-to-hostinger.sh, setup-*.sh,
+# DEPLOY.md, DEPLOY-RAPIDO.md, DEPLOY-AUTOMATICO.md)
 ```
 
 ---
@@ -375,6 +381,29 @@ npx playwright test --ui
 
 ## Banco de Dados (Supabase)
 
+### ⚠️ Arquitetura Dual-DB (LEGACY + PRIMARY)
+
+O XTRI Cronogramas opera com **dois Supabase independentes, sem sync**:
+
+| Banco | Project ID | Env | Papel |
+|---|---|---|---|
+| **PRIMARY** | `comwcnmvnuzqqbypjtqn` | `VITE_SUPABASE_URL` | Banco operacional. Recebe TODAS as escritas atuais. |
+| **LEGACY** | `axtmozyrnsrhqrnktshz` | `VITE_SIMULADO_SUPABASE_URL` | Banco histórico (snapshots, dados pré-2026). Somente leitura na prática. |
+
+- **Tabelas só em LEGACY:** `projetos`, `student_answers`, `list_downloads`
+- **Tabelas só em PRIMARY:** `simulados`, `simulado_itens`, `simulado_respostas`,
+  `pdf_history`, `pdf_download_log`, `audit_log`, `api_usage`, `mentor_*`
+- **Tabelas em AMBOS (conteúdo divergente):** `cronogramas`, `blocos_cronograma`,
+  `schools`, `students` — PRIMARY tem estado atual; LEGACY tem snapshot histórico.
+
+A Edge Function `get-student-performance` é a única que lê dos dois bancos e une
+em memória. **Não existe `postgres_fdw`, `pg_cron` nem sync agendada.**
+
+Ao criar uma query/view cross-data, confirmar primeiro em qual DB cada tabela
+vive — ver `docs/auditoria-executiva-2026-05-22/` para o histórico da auditoria
+e a Migration A (`20260522112100_create_executive_metrics_views_on_primary.sql`)
+que migrou as views executivas do LEGACY para o PRIMARY.
+
 ### Tabelas Principais
 
 ```sql
@@ -437,11 +466,42 @@ CREATE TABLE student_answers (...)
 
 ### Migrações
 
-Localizadas em `supabase/migrations/`. Execute no SQL Editor do Supabase:
+44 migrations em `supabase/migrations/`:
 
-1. `001_create_cronograma_tables.sql`
-2. `002_create_horarios_oficiais.sql`
-3. `003_create_alunos_xtris.sql`
+- `001-036_*.sql` — schema histórico (cronograma, horários, alunos, simulado, PDF, mentor, audit)
+- `20260508+` — migrations recentes (timestamps ISO): `student_nav_seen`,
+  `simulado_tri_audit_and_versioning`, `restrict_simulado_item_audits_to_super_admin`,
+  `bump_simulado_tri_version_1_2`, `seed_facex_schedules_3am_3bm`,
+  `allow_student_own_pdf_downloads`, `create_executive_metrics_views_on_primary`
+
+Para novas migrations, usar timestamp ISO (`YYYYMMDDHHMMSS_nome.sql`) e aplicar no
+PRIMARY via SQL Editor — ver `docs/auditoria-executiva-2026-05-22/00-aplicar-A-sql-editor.md`.
+
+### Tabelas atuais (PRIMARY)
+
+Além das tabelas-base (`cronogramas`, `blocos_cronograma`, `horarios_oficiais`,
+`alunos_xtris`, `students`, `schools`):
+
+- **Simulado:** `simulados`, `simulado_itens`, `simulado_respostas`,
+  `simulado_item_audits`
+- **PDF:** `pdf_history`, `pdf_download_log`
+- **Mentor / GLiNER:** `mentor_*` (gap analysis, taxonomy, topic mappings)
+- **Auditoria:** `audit_log` (coluna real é `metadata`, **não** `details`),
+  `api_usage`
+
+### Edge Functions (Deno)
+
+Em `supabase/functions/`:
+
+- `get-student-performance` — lê de **ambos** os Supabase (PRIMARY + LEGACY)
+  e une em memória
+- `mentor-gap-analysis` — análise de lacunas de aprendizado
+- `submit-simulado` — submissão de respostas com cálculo TRI
+- `_shared/` — utilitários compartilhados
+
+Secrets obrigatórias nas Edge Functions (nunca usar `VITE_*` como fallback):
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `INTERNAL_FUNCTION_SECRET`,
+`SIMULADO_SUPABASE_URL`, `SIMULADO_SUPABASE_SERVICE_ROLE_KEY`.
 
 ---
 
@@ -504,42 +564,69 @@ Detecção automática de área por palavras-chave no título do bloco. Ver `src
 
 ## Deploy
 
-### Frontend (Vercel)
+### Padrão: GitHub Actions → Hostinger
 
-Configurado via `vercel.json`:
-- Build command: `npm run build`
-- Output directory: `dist`
-- Framework: Vite
-- SPA routing configurado (rewrites para index.html)
+Push em `main` dispara `.github/workflows/deploy-hostinger.yml`:
 
-```bash
-# Deploy manual
-vercel --prod
-```
+1. **CI gate** — `tsc --noEmit` + 294 testes Vitest (admin) + `tsc` do aluno
+2. **Build** — admin + aluno
+3. **Snapshot** — backup do `public_html` atual no servidor (mantém últimos 3)
+4. **Deploy** — rsync via SSH para Hostinger
+5. **Verify** — checa hash do bundle servido
 
-### Docker
+Tempo médio: ~3 min. Logs na aba **Actions** do repo.
+Deploy manual via UI: **Actions → Deploy to Hostinger → Run workflow**.
 
-Configuração multi-stage:
-- **Stage 1**: Build com Node.js 20
-- **Stage 2**: Nginx Alpine para servir arquivos estáticos
+### Fallback manual: `./deploy-hostinger.sh`
+
+Para hotfix sem passar por `main` ou se o Actions estiver com outage:
 
 ```bash
-# Build e run com Docker Compose
-docker-compose up --build
+cp .env.deploy.example .env.deploy   # preencher HOSTINGER_PASSWORD
+brew install hudochenkov/sshpass/sshpass
+
+./deploy-hostinger.sh                # build + deploy admin + aluno
+./deploy-hostinger.sh --no-build     # só sobe dist/ existente
+./deploy-hostinger.sh admin          # só admin
+./deploy-hostinger.sh aluno          # só aluno
 ```
 
-### Variáveis de Ambiente na Vercel
+`.env.deploy` está no `.gitignore` — nunca commitar.
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_KEY`
+### Rollback rápido (~30s)
 
-### Configuração CORS no Supabase
+Snapshot via SSH no Hostinger:
 
-Adicione a URL da Vercel em: **Settings > API > URL Configuration > Allowed Origins**
-
+```bash
+source .env.deploy
+ssh -i ~/.ssh/hostinger_deploy -p "$HOSTINGER_PORT" \
+    "$HOSTINGER_USER@$HOSTINGER_HOST" '
+  cd domains/horariodeestudos.com
+  ls -dt public_html.bak-*           # lista snapshots
+  rm -rf public_html
+  mv public_html.bak-<timestamp> public_html
+'
 ```
-https://seu-projeto.vercel.app
-```
+
+Via Git (lento, passa pelo CI de novo): `git revert <sha> && git push origin main`.
+
+### Variáveis de ambiente
+
+Frontend (Hostinger / build local):
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY` (PRIMARY)
+- `VITE_SIMULADO_SUPABASE_URL`, `VITE_SIMULADO_SUPABASE_KEY` (LEGACY, opcional)
+- `VITE_REPOSITORY_MODE` (`supabase | mock | auto`)
+
+Edge Functions (server-side, nunca `VITE_*`):
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `INTERNAL_FUNCTION_SECRET`,
+`SIMULADO_SUPABASE_URL`, `SIMULADO_SUPABASE_SERVICE_ROLE_KEY`.
+
+### NÃO usar (legado)
+
+Todos os arquivos de deploy de iterações anteriores (Vercel, Docker self-hosted,
+Coolify, scripts `*-expect.sh`) foram movidos para `scripts/legacy/` em 2026-05-22.
+Não fazem parte do pipeline atual — não sugerir Vercel/Docker/Coolify como
+caminho de deploy.
 
 ---
 
