@@ -9,7 +9,7 @@
       "project_id": "635358eb-3936-4894-b64b-0ddcc12b6b1c",
       "matricula": "09.8835-2",
       "coverage": "fez ambos dias, 1 questao com X (ilegivel) na Q84 CH",
-      "expected": {"correct": 999, "wrong": 76, "blank": 1, "lc": 31, "ch": 33, "cn": 21, "mt": 18}
+      "expected": {"correct": 103, "wrong": 76, "blank": 1, "lc": 31, "ch": 33, "cn": 21, "mt": 18}
     },
     {
       "label": "tri_floor_zerou_areas",
