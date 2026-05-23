@@ -28,7 +28,7 @@ computed AS (
          (a.sd->>'correctAnswers')::int AS sys_c,
          (a.sd->>'wrongAnswers')::int   AS sys_w,
          (a.sd->>'blankAnswers')::int   AS sys_b,
-         SUM(CASE WHEN a.sd->'answers'->>(i-1) = a.answer_key[i] THEN 1 ELSE 0 END) + 1 AS c_c,  -- ADVERSARIAL: +1 forca divergence
+         SUM(CASE WHEN a.sd->'answers'->>(i-1) = a.answer_key[i] THEN 1 ELSE 0 END) AS c_c,
          SUM(CASE WHEN a.sd->'answers'->>(i-1) IN ('A','B','C','D','E')
                    AND a.sd->'answers'->>(i-1) <> a.answer_key[i] THEN 1 ELSE 0 END) AS c_w,
          SUM(CASE WHEN a.sd->'answers'->>(i-1) IS NULL
