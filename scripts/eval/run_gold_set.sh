@@ -37,7 +37,7 @@ while IFS=$'\t' read -r LABEL PROJECT_ID MATRICULA EXP_CORRECT EXP_WRONG EXP_BLA
   TOTAL=$((TOTAL+1))
 
   RESULT_JSON=$(sed -e "s/{{PROJECT_ID}}/$PROJECT_ID/" -e "s/{{MATRICULA}}/$MATRICULA/" "$SQL_FILE" \
-    | npx supabase db query --linked --output json -f /dev/stdin)
+    | npx supabase db query --linked --agent yes --output json -f /dev/stdin)
 
   STATUS=$(echo "$RESULT_JSON" | python3 -c "
 import json,sys
