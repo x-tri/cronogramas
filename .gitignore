@@ -65,6 +65,10 @@ playwright-report/
 supabase/.temp/
 supabase/supabase/
 
+# Outputs gerados localmente que contem PII (nomes/profile_ids de alunos)
+# NUNCA commitar — uso local de auditoria + planos de migracao
+scripts/invariants/.generated_*.sql
+
 # Debug/dev outputs locais
 output/
 tmp/
