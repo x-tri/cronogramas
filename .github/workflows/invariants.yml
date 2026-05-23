@@ -1,0 +1,41 @@
+name: Data invariants (cross-DB drift)
+
+# Detecta drift entre PRIMARY (operacional XTRI) e SIMULADO (sistema gabarito).
+# Diferente do CI eval (que valida engine de calculo per-PR), este roda em
+# schedule porque drift e estado operacional, nao mudanca de codigo.
+#
+# Triggers:
+# - schedule:  todo dia as 09:00 UTC (06:00 BRT)
+# - dispatch:  manual via UI
+# - push em scripts/invariants/**: valida o proprio script
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/invariants/**"
+      - ".github/workflows/invariants.yml"
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  check-cross-db-drift:
+    name: PRIMARY x SIMULADO drift
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run invariants
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: bash scripts/invariants/cross_db_drift.sh
