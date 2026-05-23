@@ -85,9 +85,54 @@ for c in d['cases']:
 ")
 
 echo ""
-echo "  Total: $TOTAL | PASS: $PASS | FAIL: $FAIL | NOT_FOUND: $NOT_FOUND"
+echo "  Gold-set:  $TOTAL casos | PASS: $PASS | FAIL: $FAIL | NOT_FOUND: $NOT_FOUND"
 
-if [ "$FAIL" -gt 0 ] || [ "$NOT_FOUND" -gt 0 ]; then
+# ---------------------------------------------------------------------------
+# Check 2: validação ampla (todos os projetos modernos)
+# Roda uma SQL agregada que valida sys==calc para todo students de todo
+# projeto que se qualifica como "ENEM 180 moderno" (~1400 students).
+# ---------------------------------------------------------------------------
+
+echo ""
+echo "  Rodando 02_validate_all_projetos (todos os projetos modernos)..."
+
+ALL_JSON=$(npx supabase db query --linked --agent yes --output json -f "$SCRIPT_DIR/02_validate_all_projetos.sql")
+
+ALL_STATUS=$(echo "$ALL_JSON" | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+r = d['rows'][0] if d['rows'] else None
+if not r:
+    print('NO_ROW'); sys.exit()
+status = r['status']
+print(f\"{status}|{r['total_projetos']}|{r['alunos_validados']}|{r['divergentes']}|{r['divergent_projetos']}|{json.dumps(r['sample'], ensure_ascii=False)}\")
+")
+
+IFS='|' read -r ST TPROJ TALUN DIV DPROJ SAMPLE <<< "$ALL_STATUS"
+
+case "$ST" in
+  PASS)
+    printf "  \033[32mPASS\033[0m  all-projetos: %s projetos / %s alunos consistentes\n" "$TPROJ" "$TALUN"
+    ALL_OK=1
+    ;;
+  FAIL)
+    printf "  \033[31mFAIL\033[0m  all-projetos: %s divergentes em %s projetos (de %s alunos validados)\n" "$DIV" "$DPROJ" "$TALUN"
+    echo "  primeiros divergentes:"
+    echo "$SAMPLE" | python3 -m json.tool 2>/dev/null | sed 's/^/    /'
+    ALL_OK=0
+    ;;
+  *)
+    printf "  \033[31mFAIL\033[0m  all-projetos: status inesperado '%s'\n" "$ST"
+    ALL_OK=0
+    ;;
+esac
+
+echo ""
+echo "  Resumo final:"
+echo "    - Gold-set drift:           $PASS/$TOTAL PASS"
+echo "    - All-projetos consistency: $TPROJ projetos, $TALUN alunos, $DIV divergentes"
+
+if [ "$FAIL" -gt 0 ] || [ "$NOT_FOUND" -gt 0 ] || [ "${ALL_OK:-0}" -ne 1 ]; then
   exit 1
 fi
 exit 0
