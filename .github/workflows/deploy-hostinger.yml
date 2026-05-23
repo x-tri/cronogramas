@@ -73,6 +73,8 @@ jobs:
           npx supabase link --project-ref axtmozyrnsrhqrnktshz
 
       - name: Run eval gold-set
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: pnpm eval
 
       # ALUNO
