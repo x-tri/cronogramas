@@ -14,6 +14,7 @@
     "mentor:seed-taxonomy": "python3 scripts/seed_mentor_taxonomy_from_project.py",
     "questions:audit-duplicates": "node scripts/audit_question_bank_duplicates.mjs",
     "questions:audit-run": "node scripts/run_question_bank_audit.mjs",
+    "eval": "bash scripts/eval/run_gold_set.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",

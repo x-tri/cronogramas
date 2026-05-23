@@ -1,0 +1,43 @@
+{
+  "_doc": "Gold set para regressão da pipeline de scoring de simulado. Cada caso captura uma região do espaço de comportamento (floor TRI, teto TRI, dia faltado, baseline, X-no-gabarito). Sem PII: só id+matricula+expected.",
+  "_db": "SIMULADO (axtmozyrnsrhqrnktshz)",
+  "_eval_sql": "scripts/eval/01_validate_student_scoring.sql",
+  "_validated_at": "2026-05-23",
+  "cases": [
+    {
+      "label": "luis_felipe_baseline_x_gabarito",
+      "project_id": "635358eb-3936-4894-b64b-0ddcc12b6b1c",
+      "matricula": "09.8835-2",
+      "coverage": "fez ambos dias, 1 questao com X (ilegivel) na Q84 CH",
+      "expected": {"correct": 103, "wrong": 76, "blank": 1, "lc": 31, "ch": 33, "cn": 21, "mt": 18}
+    },
+    {
+      "label": "tri_floor_zerou_areas",
+      "project_id": "635358eb-3936-4894-b64b-0ddcc12b6b1c",
+      "matricula": "23.9163-9",
+      "coverage": "faltou Dia 2, zerou CN e MT, TRI media 329 (floor)",
+      "expected": {"correct": 16, "wrong": 74, "blank": 90, "lc": 9, "ch": 7, "cn": 0, "mt": 0}
+    },
+    {
+      "label": "tri_top_completo",
+      "project_id": "635358eb-3936-4894-b64b-0ddcc12b6b1c",
+      "matricula": "16.1487-4",
+      "coverage": "fez ambos dias, 139 acertos, TRI media 772 (teto)",
+      "expected": {"correct": 139, "wrong": 41, "blank": 0, "lc": 35, "ch": 41, "cn": 30, "mt": 33}
+    },
+    {
+      "label": "faltou_dia2",
+      "project_id": "635358eb-3936-4894-b64b-0ddcc12b6b1c",
+      "matricula": "15.2460-2",
+      "coverage": "fez so Dia 1, 90 brancos no Dia 2, TRI media 516",
+      "expected": {"correct": 65, "wrong": 25, "blank": 90, "lc": 35, "ch": 30, "cn": 0, "mt": 0}
+    },
+    {
+      "label": "baseline_mediano",
+      "project_id": "635358eb-3936-4894-b64b-0ddcc12b6b1c",
+      "matricula": "24.0048-9",
+      "coverage": "fez ambos dias, distribuicao normal, TRI media 490",
+      "expected": {"correct": 67, "wrong": 113, "blank": 0, "lc": 26, "ch": 17, "cn": 13, "mt": 11}
+    }
+  ]
+}
