@@ -29,7 +29,9 @@ import {
   fetchProjetoData,
   fetchSchoolInfo,
   linkProject,
+  listAllSchools,
   listProjectsForSchool,
+  type ProjectInfo,
   type ProjetoData,
   type SchoolInfo,
 } from './lib/fetch-projeto'
@@ -421,6 +423,151 @@ async function runPdfStage(cfg: RunConfig): Promise<void> {
   console.log(`     - ${done} PDFs (cronograma por aluno, nomeados pelo nome)`)
 }
 
+// ----- Mode: test-all (Karpathy-style pipeline smoke across all schools) -----
+
+interface TestRow {
+  readonly school: SchoolInfo
+  readonly project: ProjectInfo | null
+  readonly status: 'PASS' | 'FAIL' | 'SKIP'
+  readonly reason?: string
+  readonly nAlunos?: number
+  readonly nBlocos?: number
+  readonly nValidados?: number
+  readonly nSkipped?: number
+  readonly nDropped?: number
+  readonly avgBlocos?: number
+  readonly violationsManhaDiaUtil?: number
+}
+
+function pickBestProject(projects: readonly ProjectInfo[]): ProjectInfo | null {
+  // Mais recente com students cadastrados E pelo menos um dia processado
+  const candidates = projects
+    .filter((p) => p.studentsCount > 0 && (p.dia1 || p.dia2))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return candidates[0] ?? null
+}
+
+function runTestAll(): void {
+  console.log(`\n[test-all] Karpathy-style smoke do pipeline em todas as schools`)
+  console.log(`[test-all] read-only: NÃO persiste, NÃO escreve arquivos\n`)
+
+  linkProject(SIMULADO_REF)
+  const schools = listAllSchools()
+  console.log(`[test-all] ${schools.length} schools no SIMULADO\n`)
+
+  const results: TestRow[] = []
+  const slots = buildSchedulableSlots()
+
+  for (let i = 0; i < schools.length; i++) {
+    const school = schools[i]
+    process.stderr.write(`  [${(i + 1).toString().padStart(2)}/${schools.length}] ${school.name.slice(0, 35).padEnd(35)} ... `)
+    try {
+      const projects = listProjectsForSchool(school.id)
+      const best = pickBestProject(projects)
+      if (!best) {
+        results.push({ school, project: null, status: 'SKIP', reason: 'sem projeto processado com students' })
+        process.stderr.write(`SKIP\n`)
+        continue
+      }
+      const projeto = fetchProjetoData({ projectId: best.id, schoolId: school.id })
+      const planos = projeto.students.map((s) => planForStudent(s, projeto.answerKey, slots))
+      const nValidados = planos.length
+      const nSkipped = projeto.students.length - nValidados // alunos que falharam parseProjetoStudent
+      const nBlocos = planos.reduce((sum, a) => sum + a.scheduledBlocks.length, 0)
+      const nDropped = planos.reduce((sum, a) => sum + a.droppedTopics.length, 0)
+      // Invariant check (deve ser 0)
+      const violations = planos.reduce(
+        (sum, a) =>
+          sum +
+          a.scheduledBlocks.filter(
+            (b) =>
+              b.diaSemana !== 'sabado' &&
+              b.diaSemana !== 'domingo' &&
+              b.turno === 'manha',
+          ).length,
+        0,
+      )
+      results.push({
+        school,
+        project: best,
+        status: 'PASS',
+        nAlunos: best.studentsCount,
+        nValidados,
+        nSkipped,
+        nBlocos,
+        nDropped,
+        avgBlocos: nValidados > 0 ? Math.round((nBlocos / nValidados) * 10) / 10 : 0,
+        violationsManhaDiaUtil: violations,
+      })
+      process.stderr.write(`PASS (${nValidados} alunos, ${nBlocos} blocos)\n`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      results.push({ school, project: null, status: 'FAIL', reason: msg.split('\n')[0] })
+      process.stderr.write(`FAIL: ${msg.split('\n')[0].slice(0, 60)}\n`)
+    }
+  }
+
+  printTestAllReport(results)
+}
+
+function printTestAllReport(results: readonly TestRow[]): void {
+  const pass = results.filter((r) => r.status === 'PASS')
+  const fail = results.filter((r) => r.status === 'FAIL')
+  const skip = results.filter((r) => r.status === 'SKIP')
+
+  console.log(`\n  =====================================================================`)
+  console.log(`  RESUMO TEST-ALL`)
+  console.log(`  =====================================================================`)
+  console.log(`  Schools testadas:    ${results.length}`)
+  console.log(`  PASS:                ${pass.length}`)
+  console.log(`  FAIL:                ${fail.length}`)
+  console.log(`  SKIP (sem projeto):  ${skip.length}`)
+
+  const totalAlunos = pass.reduce((s, r) => s + (r.nValidados ?? 0), 0)
+  const totalBlocos = pass.reduce((s, r) => s + (r.nBlocos ?? 0), 0)
+  const totalViolations = pass.reduce((s, r) => s + (r.violationsManhaDiaUtil ?? 0), 0)
+  const totalDropped = pass.reduce((s, r) => s + (r.nDropped ?? 0), 0)
+  const totalParseSkipped = pass.reduce((s, r) => s + (r.nSkipped ?? 0), 0)
+
+  console.log(``)
+  console.log(`  Agregado (PASS):`)
+  console.log(`    Alunos validados:           ${totalAlunos}`)
+  console.log(`    Blocos planejados:          ${totalBlocos}`)
+  console.log(`    Alunos parse-skipped:       ${totalParseSkipped}`)
+  console.log(`    Tópicos dropados (capacidade): ${totalDropped}`)
+  console.log(`    Violações manhã-dia-útil:   ${totalViolations}`)
+
+  console.log(`\n  Detalhe por school (PASS):`)
+  console.log(
+    `    ${'school'.padEnd(34)} ${'alunos'.padStart(7)} ${'blocos'.padStart(7)} ${'avg/al'.padStart(7)} ${'dropped'.padStart(7)} ${'projeto (mais recente processado)'.padEnd(40)}`,
+  )
+  for (const r of pass.sort((a, b) => (b.nValidados ?? 0) - (a.nValidados ?? 0))) {
+    const projDate = r.project?.createdAt.slice(0, 10) ?? '-'
+    const projName = r.project ? `${projDate} ${r.project.name.slice(0, 30)}` : '-'
+    console.log(
+      `    ${r.school.name.slice(0, 32).padEnd(34)} ${String(r.nValidados).padStart(7)} ${String(r.nBlocos).padStart(7)} ${String(r.avgBlocos).padStart(7)} ${String(r.nDropped).padStart(7)} ${projName}`,
+    )
+  }
+
+  if (fail.length > 0) {
+    console.log(`\n  FAILS:`)
+    for (const r of fail) {
+      console.log(`    ${r.school.name}: ${r.reason}`)
+    }
+  }
+
+  if (skip.length > 0) {
+    console.log(`\n  SKIPS (sem projeto processado):`)
+    for (const r of skip) {
+      console.log(`    ${r.school.name}`)
+    }
+  }
+
+  if (totalViolations > 0 || fail.length > 0) {
+    process.exit(1)
+  }
+}
+
 // ----- Mode: list-projects ---------------------------------------------------
 
 function runListProjects(schoolId: string): void {
@@ -451,6 +598,7 @@ function parseArgs(args: string[]): {
   projectId?: string
   weekStart?: string
   listProjects: boolean
+  testAll: boolean
 } {
   const getFlag = (name: string): string | undefined => {
     const found = args.find((a) => a.startsWith(`--${name}=`))
@@ -463,6 +611,7 @@ function parseArgs(args: string[]): {
     projectId: getFlag('project-id'),
     weekStart: getFlag('week-start'),
     listProjects: args.includes('--list-projects'),
+    testAll: args.includes('--test-all'),
   }
 }
 
@@ -496,6 +645,9 @@ Descobrir projetos disponíveis numa school:
   npx vite-node scripts/batch/generate-cronogramas.ts -- \\
     --list-projects --school-id=<uuid>
 
+Smoke do pipeline em TODAS as schools (Karpathy-style, read-only):
+  npx vite-node scripts/batch/generate-cronogramas.ts -- --test-all
+
 Stages:
   plan    (default) lê SIMULADO, computa plano, salva JSON local. SEM writes.
   persist INSERT cronograma + blocos em PRIMARY. Skip se já existir.
@@ -517,6 +669,11 @@ async function main(): Promise<void> {
 
   const parsed = parseArgs(args)
   mkdirSync(SCRIPT_DIR, { recursive: true })
+
+  if (parsed.testAll) {
+    runTestAll()
+    return
+  }
 
   if (parsed.listProjects) {
     const schoolId = requireArg(parsed.schoolId, 'school-id')
