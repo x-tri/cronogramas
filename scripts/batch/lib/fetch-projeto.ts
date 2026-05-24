@@ -103,3 +103,57 @@ export function linkProject(projectRef: string): void {
     stdio: ['inherit', 'ignore', 'inherit'],
   })
 }
+
+export interface SchoolInfo {
+  readonly id: string
+  readonly name: string
+  readonly slug: string
+}
+
+/**
+ * Busca metadata básica da school (id, name, slug) no SIMULADO.
+ * Caller precisa estar linkado em SIMULADO antes.
+ */
+export function fetchSchoolInfo(schoolId: string): SchoolInfo {
+  const sql = `SELECT id::text, name, slug FROM schools WHERE id='${schoolId}'`
+  const result = runSql(sql) as { rows: Array<{ id: string; name: string; slug: string }> }
+  if (!result.rows || result.rows.length === 0) {
+    throw new Error(`school não encontrada no SIMULADO: ${schoolId}`)
+  }
+  return result.rows[0]
+}
+
+export interface ProjectInfo {
+  readonly id: string
+  readonly name: string
+  readonly createdAt: string
+  readonly studentsCount: number
+  readonly dia1: boolean
+  readonly dia2: boolean
+}
+
+/**
+ * Lista projetos de uma school no SIMULADO, ordenados por data desc.
+ * Útil para o user descobrir o project_id correto pra rodar o batch.
+ */
+export function listProjectsForSchool(schoolId: string): ProjectInfo[] {
+  const sql = `SELECT id::text, nome AS name, created_at::text AS created_at, jsonb_array_length(students) AS students_count, dia1_processado AS dia1, dia2_processado AS dia2 FROM projetos WHERE school_id='${schoolId}' ORDER BY created_at DESC`
+  const result = runSql(sql) as {
+    rows: Array<{
+      id: string
+      name: string
+      created_at: string
+      students_count: number
+      dia1: boolean
+      dia2: boolean
+    }>
+  }
+  return result.rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    createdAt: r.created_at,
+    studentsCount: r.students_count,
+    dia1: r.dia1,
+    dia2: r.dia2,
+  }))
+}
