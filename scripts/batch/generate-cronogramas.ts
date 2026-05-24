@@ -1,18 +1,24 @@
 /**
- * Geração em lote de cronogramas + relatórios para os alunos da GRUPO INTEGRADO,
- * baseado nos erros do simulado "Diagnóstico" (project_id 635358eb-...).
+ * Geração em lote de cronogramas + PDFs para uma school+projeto+semana
+ * arbitrários. Substitui o antigo generate-integrado-cronogramas.ts, agora
+ * realmente parametrizável.
  *
- * Execução em 4 stages com check-ins:
- *   --stage plan    (default): só computa e imprime resumo. SEM writes.
- *   --stage persist          : autoriza INSERT cronograma + blocos em PRIMARY.
- *   --stage pdf              : depois de persist, renderiza PDFs e zipa.
+ * Execução:
+ *   npx vite-node scripts/batch/generate-cronogramas.ts -- \
+ *     --school-id=<uuid> --project-id=<uuid> --week-start=YYYY-MM-DD \
+ *     --stage=plan|persist|pdf [--limit=N]
  *
- * Rodar:
- *   npx vite-node scripts/batch/generate-integrado-cronogramas.ts -- --stage=plan
+ * Descoberta de projetos disponíveis (separate mode):
+ *   npx vite-node scripts/batch/generate-cronogramas.ts -- \
+ *     --list-projects --school-id=<uuid>
  *
- * Pre-req (uma vez):
- *   npx supabase link --project-ref axtmozyrnsrhqrnktshz   (para fetch)
- *   (o script alterna o link entre PRIMARY/SIMULADO conforme precisa)
+ * Constraints do produto (definidas pelo coordenador):
+ *   - Tópicos duplicados (genética, genética, genética -> 1 bloco)
+ *   - Dias úteis (seg-sex): apenas turnos tarde + noite
+ *   - Fim de semana (sáb-dom): livre (manhã + tarde + noite)
+ *
+ * Pré-req: supabase CLI autenticado (via keyring local OU
+ * SUPABASE_ACCESS_TOKEN env).
  */
 
 import { execFileSync } from 'node:child_process'
@@ -21,8 +27,11 @@ import { resolve } from 'node:path'
 
 import {
   fetchProjetoData,
+  fetchSchoolInfo,
   linkProject,
+  listProjectsForSchool,
   type ProjetoData,
+  type SchoolInfo,
 } from './lib/fetch-projeto'
 import {
   extractWrongQuestions,
@@ -38,20 +47,12 @@ import { renderCronograma, sanitizeForFilename } from './lib/render-pdf'
 import { persistAluno } from './lib/persist'
 import type { ProjetoStudent } from '../../src/lib/contracts/gabarito-scanner'
 
-// ----- Configuração ----------------------------------------------------------
+// ----- Constantes não-parametrizáveis ----------------------------------------
 
-const SCHOOL_ID = '63d2609c-c0cd-44af-8be3-5f6de8ff2788' // GRUPO INTEGRADO
-const PROJECT_ID = '635358eb-3936-4894-b64b-0ddcc12b6b1c' // Diagnóstico INTEGRADO
 const PRIMARY_REF = 'comwcnmvnuzqqbypjtqn'
 const SIMULADO_REF = 'axtmozyrnsrhqrnktshz'
-const WEEK_START = '2026-05-25' // segunda
-const WEEK_END = '2026-05-31' // domingo
 const SCRIPT_DIR = resolve(import.meta.dirname ?? __dirname)
-const PLAN_FILE = resolve(SCRIPT_DIR, '.generated_plan.json')
 const OUT_DIR = resolve(SCRIPT_DIR, 'out')
-const ZIP_PATH = resolve(OUT_DIR, `cronogramas-integrado-${WEEK_START}.zip`)
-const SCHOOL_NAME = 'GRUPO INTEGRADO'
-const SIMULADO_TITLE = 'Diagnóstico'
 
 // ----- Tipos do plano --------------------------------------------------------
 
@@ -77,7 +78,10 @@ interface AlunoPlan {
 interface BatchPlan {
   readonly meta: {
     readonly schoolId: string
+    readonly schoolName: string
+    readonly schoolSlug: string
     readonly projectId: string
+    readonly projectName: string
     readonly weekStart: string
     readonly weekEnd: string
     readonly generatedAt: string
@@ -92,27 +96,39 @@ interface BatchPlan {
   readonly alunos: readonly AlunoPlan[]
 }
 
-// ----- Pipeline por aluno ----------------------------------------------------
+interface RunConfig {
+  readonly schoolId: string
+  readonly projectId: string
+  readonly weekStart: string
+  readonly weekEnd: string
+}
+
+// ----- Helpers de path -------------------------------------------------------
+
+function planFile(schoolSlug: string, weekStart: string): string {
+  return resolve(SCRIPT_DIR, `.generated_plan_${schoolSlug}_${weekStart}.json`)
+}
+
+function zipPath(schoolSlug: string, weekStart: string): string {
+  return resolve(OUT_DIR, `cronogramas-${schoolSlug}-${weekStart}.zip`)
+}
+
+function outDirForRun(schoolSlug: string, weekStart: string): string {
+  return resolve(OUT_DIR, `${schoolSlug}-${weekStart}`)
+}
+
+// ----- Pipeline por aluno (idêntico ao antes) --------------------------------
 
 function buildAreaSummaries(student: ProjetoStudent): readonly AreaSummary[] {
   const areaCorrect = student.areaCorrectAnswers ?? {}
-  const total = student.correctAnswers ?? 0
-  const wrong = student.wrongAnswers ?? 0
-  const blank = student.blankAnswers ?? 0
-  // Inferir erros/brancos por área proporcional (best-effort; sistema não
-  // armazena erros/brancos por área). Se total*4 == soma das áreas, usa direto.
-  // Caso contrário, mostra apenas acertos por área e totais.
   const result: AreaSummary[] = []
   const labels = { LC: 'Linguagens', CH: 'Humanas', CN: 'Natureza', MT: 'Matemática' } as const
   for (const area of ['LC', 'CH', 'CN', 'MT'] as const) {
     const acertos = (areaCorrect as Record<string, number>)[area] ?? 0
-    // Aproximação: 45 questões por área; erros = 45 - acertos - brancos_estimados
-    // Como brancos por área não está armazenado, mostramos apenas acertos.
     const erros = Math.max(0, 45 - acertos)
     const brancos = 0
     result.push({ area, label: labels[area], acertos, erros, brancos })
   }
-  // Sanity: se totais batem com soma 180, usar; senão, é o melhor que dá
   return result
 }
 
@@ -124,12 +140,10 @@ function planForStudent(
   const matricula =
     student.studentNumber ?? student.matricula ?? student.student_number ?? ''
   const studentName = student.studentName ?? student.name ?? student.nome ?? null
-
   const wrong = extractWrongQuestions(student.answers, answerKey)
   const topics = dedupTopics(wrong)
   const { scheduled, dropped } = distributeTopicsToSlots(topics, slots)
   const areaSummaries = buildAreaSummaries(student)
-
   return {
     matricula,
     studentName,
@@ -144,20 +158,23 @@ function planForStudent(
 
 // ----- Stage 2: PLAN (read-only) --------------------------------------------
 
-function runPlanStage(): BatchPlan {
-  console.log(`\n[plan] semana ${WEEK_START} → ${WEEK_END}, escola ${SCHOOL_ID.slice(0, 8)}…\n`)
+function runPlanStage(cfg: RunConfig): BatchPlan {
+  console.log(`\n[plan] semana ${cfg.weekStart} → ${cfg.weekEnd}, school=${cfg.schoolId.slice(0, 8)}…\n`)
 
-  console.log(`[plan] link SIMULADO + fetch projeto ${PROJECT_ID}`)
+  console.log(`[plan] link SIMULADO + lookup school e projeto`)
   linkProject(SIMULADO_REF)
+  const school: SchoolInfo = fetchSchoolInfo(cfg.schoolId)
+  console.log(`[plan] school: "${school.name}" (slug=${school.slug})`)
+
   const projeto: ProjetoData = fetchProjetoData({
-    projectId: PROJECT_ID,
-    schoolId: SCHOOL_ID,
+    projectId: cfg.projectId,
+    schoolId: cfg.schoolId,
   })
   console.log(
-    `[plan] projeto "${projeto.projectName}"  answer_key.length=${projeto.answerKey.length}  students=${projeto.students.length}`,
+    `[plan] projeto: "${projeto.projectName}"  answer_key.length=${projeto.answerKey.length}  students=${projeto.students.length}`,
   )
 
-  const slots = buildSchedulableSlots() // default: bloqueia manhã seg-sex
+  const slots = buildSchedulableSlots()
   const slotSummary = summarizeSlots(slots)
   console.log(
     `[plan] slots disponíveis/aluno: ${slotSummary.total} (${slotSummary.byTurno.manha} manhã | ${slotSummary.byTurno.tarde} tarde | ${slotSummary.byTurno.noite} noite)`,
@@ -173,10 +190,13 @@ function runPlanStage(): BatchPlan {
 
   const plan: BatchPlan = {
     meta: {
-      schoolId: SCHOOL_ID,
-      projectId: PROJECT_ID,
-      weekStart: WEEK_START,
-      weekEnd: WEEK_END,
+      schoolId: cfg.schoolId,
+      schoolName: school.name,
+      schoolSlug: school.slug,
+      projectId: cfg.projectId,
+      projectName: projeto.projectName,
+      weekStart: cfg.weekStart,
+      weekEnd: cfg.weekEnd,
       generatedAt: new Date().toISOString(),
     },
     stats: {
@@ -190,26 +210,28 @@ function runPlanStage(): BatchPlan {
   }
 
   printPlanReport(plan)
-  writeFileSync(PLAN_FILE, JSON.stringify(plan, null, 2))
-  console.log(`\n[plan] salvo em ${PLAN_FILE}`)
+  const out = planFile(school.slug, cfg.weekStart)
+  writeFileSync(out, JSON.stringify(plan, null, 2))
+  console.log(`\n[plan] salvo em ${out}`)
   console.log(`[plan] arquivo contém PII (matricula/nomes) — protegido por .gitignore`)
-
   return plan
 }
 
 function printPlanReport(plan: BatchPlan): void {
-  const { stats, alunos } = plan
+  const { stats, alunos, meta } = plan
   console.log(`\n  =============================================`)
   console.log(`  RESUMO DO PLANO (read-only — nada foi escrito)`)
   console.log(`  =============================================`)
-  console.log(`  Total de alunos no projeto:      ${stats.totalAlunos}`)
-  console.log(`  Alunos com blocos a distribuir:  ${stats.alunosComBlocos}`)
-  console.log(`  Alunos sem erros (skip):         ${stats.alunosSemErros}`)
-  console.log(`  Total de blocos a criar:         ${stats.totalBlocos}`)
-  console.log(`  Slots disponíveis/aluno:         ${stats.slotsDisponiveisPorAluno}`)
+  console.log(`  School:                           ${meta.schoolName}`)
+  console.log(`  Projeto:                          ${meta.projectName}`)
+  console.log(`  Semana:                           ${meta.weekStart} → ${meta.weekEnd}`)
+  console.log(`  Total de alunos no projeto:       ${stats.totalAlunos}`)
+  console.log(`  Alunos com blocos a distribuir:   ${stats.alunosComBlocos}`)
+  console.log(`  Alunos sem erros (skip):          ${stats.alunosSemErros}`)
+  console.log(`  Total de blocos a criar:          ${stats.totalBlocos}`)
+  console.log(`  Slots disponíveis/aluno:          ${stats.slotsDisponiveisPorAluno}`)
   console.log(``)
 
-  // Distribuição de erros por aluno (sem PII por padrão)
   const buckets = { '0': 0, '1-5': 0, '6-10': 0, '11-20': 0, '21+': 0 }
   for (const a of alunos) {
     const n = a.uniqueTopicsCount
@@ -224,7 +246,6 @@ function printPlanReport(plan: BatchPlan): void {
     console.log(`    ${bucket.padStart(8)}: ${count} alunos`)
   }
 
-  // Alerta para alunos com mais tópicos que slots (algo dropped)
   const drops = alunos.filter((a) => a.droppedTopics.length > 0)
   if (drops.length > 0) {
     console.log(``)
@@ -237,15 +258,45 @@ function printPlanReport(plan: BatchPlan): void {
 
 // ----- Stage 3: PERSIST (writes em PRIMARY) ----------------------------------
 
-function runPersistStage(limit?: number): void {
-  if (!existsSync(PLAN_FILE)) {
-    throw new Error(
-      `plan não encontrado em ${PLAN_FILE}. Rode primeiro: --stage=plan`,
-    )
+function loadPlanOrThrow(cfg: RunConfig): BatchPlan {
+  // Tenta resolver via metadata armazenada. Precisa do schoolSlug que NÃO está
+  // em cfg → faz lookup primeiro? Simplificamos: o plan já contém schoolSlug,
+  // então não precisamos saber antes. Usamos um filename baseado em schoolId+week
+  // como fallback E procuramos o que existe.
+  // Simpler: tentamos os formatos conhecidos.
+  // Mas como sabemos o schoolSlug? Olhamos por arquivos que batem com a
+  // weekStart e schoolId no metadata.
+  const fs = require('node:fs') as typeof import('node:fs')
+  const path = require('node:path') as typeof import('node:path')
+  const candidates = fs
+    .readdirSync(SCRIPT_DIR)
+    .filter((f) => f.startsWith('.generated_plan_') && f.endsWith('.json'))
+  for (const c of candidates) {
+    try {
+      const parsed = JSON.parse(
+        fs.readFileSync(path.join(SCRIPT_DIR, c), 'utf-8'),
+      ) as BatchPlan
+      if (
+        parsed.meta.schoolId === cfg.schoolId &&
+        parsed.meta.projectId === cfg.projectId &&
+        parsed.meta.weekStart === cfg.weekStart
+      ) {
+        return parsed
+      }
+    } catch {
+      /* ignora arquivos corrompidos/parciais */
+    }
   }
-  const plan = JSON.parse(readFileSync(PLAN_FILE, 'utf-8')) as BatchPlan
+  throw new Error(
+    `plan não encontrado para (school=${cfg.schoolId.slice(0, 8)}, project=${cfg.projectId.slice(0, 8)}, week=${cfg.weekStart}). Rode primeiro: --stage=plan`,
+  )
+}
+
+function runPersistStage(cfg: RunConfig, limit?: number): void {
+  const plan = loadPlanOrThrow(cfg)
   const alunos = limit ? plan.alunos.slice(0, limit) : plan.alunos
-  console.log(`\n[persist] linkar PRIMARY para escrever cronograma + blocos`)
+  console.log(`\n[persist] school: ${plan.meta.schoolName}`)
+  console.log(`[persist] linkar PRIMARY para escrever cronograma + blocos`)
   linkProject(PRIMARY_REF)
   if (limit) {
     console.log(`[persist] MODO LIMITADO: rodando apenas ${limit}/${plan.alunos.length} alunos`)
@@ -266,10 +317,7 @@ function runPersistStage(limit?: number): void {
         studentName: aluno.studentName,
         scheduledBlocks: aluno.scheduledBlocks,
       },
-      {
-        weekStart: plan.meta.weekStart,
-        weekEnd: plan.meta.weekEnd,
-      },
+      { weekStart: plan.meta.weekStart, weekEnd: plan.meta.weekEnd },
     )
     counts[result.result] += 1
     if (result.result === 'created') totalBlocos += result.blocosCriados ?? 0
@@ -303,21 +351,18 @@ function runPersistStage(limit?: number): void {
 
 // ----- Stage 4: PDF (render + zip) -------------------------------------------
 
-async function runPdfStage(): Promise<void> {
-  if (!existsSync(PLAN_FILE)) {
-    throw new Error(
-      `plan não encontrado em ${PLAN_FILE}. Rode primeiro: --stage=plan`,
-    )
-  }
-  const plan = JSON.parse(readFileSync(PLAN_FILE, 'utf-8')) as BatchPlan
-  console.log(`\n[pdf] lendo plan de ${PLAN_FILE}`)
+async function runPdfStage(cfg: RunConfig): Promise<void> {
+  const plan = loadPlanOrThrow(cfg)
+  const alunoOutDir = outDirForRun(plan.meta.schoolSlug, plan.meta.weekStart)
+  const outZip = zipPath(plan.meta.schoolSlug, plan.meta.weekStart)
+
+  console.log(`\n[pdf] school: ${plan.meta.schoolName}`)
   console.log(`[pdf] ${plan.alunos.length} alunos para renderizar`)
 
-  // Limpa out/ se houver
-  if (existsSync(OUT_DIR)) rmSync(OUT_DIR, { recursive: true, force: true })
+  if (existsSync(alunoOutDir)) rmSync(alunoOutDir, { recursive: true, force: true })
+  mkdirSync(alunoOutDir, { recursive: true })
   mkdirSync(OUT_DIR, { recursive: true })
 
-  // Detecta nomes duplicados (raro mas possível) e adiciona sufixo de matricula
   const nameCount = new Map<string, number>()
   for (const a of plan.alunos) {
     const name = sanitizeForFilename(a.studentName, a.matricula)
@@ -336,7 +381,7 @@ async function runPdfStage(): Promise<void> {
     const filename = duplicateNames.has(sanitized)
       ? `${sanitized}-${aluno.matricula.replace(/[^a-zA-Z0-9_\-.]/g, '_')}.pdf`
       : `${sanitized}.pdf`
-    const outFilePath = `${OUT_DIR}/${filename}`
+    const outFilePath = `${alunoOutDir}/${filename}`
     try {
       await renderCronograma(
         {
@@ -349,8 +394,8 @@ async function runPdfStage(): Promise<void> {
           outFilePath,
           weekStart: plan.meta.weekStart,
           weekEnd: plan.meta.weekEnd,
-          schoolName: SCHOOL_NAME,
-          simuladoTitle: SIMULADO_TITLE,
+          schoolName: plan.meta.schoolName,
+          simuladoTitle: plan.meta.projectName,
         },
       )
       done++
@@ -367,40 +412,144 @@ async function runPdfStage(): Promise<void> {
     throw new Error('nenhum PDF renderizado — abortando antes de zipar')
   }
 
-  // Zip via CLI nativo (zero deps adicionais)
-  console.log(`[pdf] criando zip ${ZIP_PATH}`)
-  execFileSync('zip', ['-r', '-q', ZIP_PATH, '.'], { cwd: OUT_DIR, stdio: 'inherit' })
-  console.log(`\n  ✅ ZIP gerado: ${ZIP_PATH}`)
+  console.log(`[pdf] criando zip ${outZip}`)
+  execFileSync('zip', ['-r', '-q', outZip, '.'], {
+    cwd: alunoOutDir,
+    stdio: 'inherit',
+  })
+  console.log(`\n  ✅ ZIP gerado: ${outZip}`)
   console.log(`     - ${done} PDFs (cronograma por aluno, nomeados pelo nome)`)
+}
+
+// ----- Mode: list-projects ---------------------------------------------------
+
+function runListProjects(schoolId: string): void {
+  linkProject(SIMULADO_REF)
+  const school = fetchSchoolInfo(schoolId)
+  const projects = listProjectsForSchool(schoolId)
+  console.log(`\n  School: ${school.name} (${school.slug})`)
+  console.log(`  Projetos disponíveis (${projects.length}):\n`)
+  if (projects.length === 0) {
+    console.log(`    (nenhum)`)
+    return
+  }
+  console.log(`  ${'created'.padEnd(12)} ${'students'.padStart(8)} ${'d1'.padEnd(3)} ${'d2'.padEnd(3)} project_id                              nome`)
+  for (const p of projects) {
+    const date = p.createdAt.slice(0, 10)
+    console.log(
+      `  ${date.padEnd(12)} ${String(p.studentsCount).padStart(8)} ${p.dia1 ? 'ok ' : '-  '} ${p.dia2 ? 'ok ' : '-  '} ${p.id} ${p.name}`,
+    )
+  }
 }
 
 // ----- main ------------------------------------------------------------------
 
+function parseArgs(args: string[]): {
+  stage: string
+  limit?: number
+  schoolId?: string
+  projectId?: string
+  weekStart?: string
+  listProjects: boolean
+} {
+  const getFlag = (name: string): string | undefined => {
+    const found = args.find((a) => a.startsWith(`--${name}=`))
+    return found ? found.split('=').slice(1).join('=') : undefined
+  }
+  return {
+    stage: getFlag('stage') ?? 'plan',
+    limit: getFlag('limit') ? Number(getFlag('limit')) : undefined,
+    schoolId: getFlag('school-id'),
+    projectId: getFlag('project-id'),
+    weekStart: getFlag('week-start'),
+    listProjects: args.includes('--list-projects'),
+  }
+}
+
+function weekEndFromStart(weekStart: string): string {
+  // weekStart is YYYY-MM-DD; add 6 days for Sunday
+  const d = new Date(`${weekStart}T00:00:00Z`)
+  if (isNaN(d.getTime())) {
+    throw new Error(`--week-start inválido: ${weekStart} (esperado YYYY-MM-DD)`)
+  }
+  d.setUTCDate(d.getUTCDate() + 6)
+  return d.toISOString().slice(0, 10)
+}
+
+function requireArg(value: string | undefined, name: string): string {
+  if (!value) {
+    throw new Error(
+      `--${name} é obrigatório. Use --help para detalhes.\nExemplo: --school-id=<uuid> --project-id=<uuid> --week-start=2026-05-25`,
+    )
+  }
+  return value
+}
+
+function printUsage(): void {
+  console.log(`
+Uso:
+  npx vite-node scripts/batch/generate-cronogramas.ts -- \\
+    --school-id=<uuid> --project-id=<uuid> --week-start=YYYY-MM-DD \\
+    --stage=plan|persist|pdf [--limit=N]
+
+Descobrir projetos disponíveis numa school:
+  npx vite-node scripts/batch/generate-cronogramas.ts -- \\
+    --list-projects --school-id=<uuid>
+
+Stages:
+  plan    (default) lê SIMULADO, computa plano, salva JSON local. SEM writes.
+  persist INSERT cronograma + blocos em PRIMARY. Skip se já existir.
+  pdf     renderiza PDFs (1 por aluno) e zipa.
+
+Constraints aplicadas:
+  - tópicos duplicados viram 1 bloco
+  - dias úteis: apenas tarde + noite
+  - fim de semana: livre (manhã + tarde + noite)
+`)
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2)
-  const stageArg = args.find((a) => a.startsWith('--stage='))
-  const stage = stageArg ? stageArg.split('=')[1] : 'plan'
-  const limitArg = args.find((a) => a.startsWith('--limit='))
-  const limit = limitArg ? Number(limitArg.split('=')[1]) : undefined
+  if (args.includes('--help') || args.includes('-h')) {
+    printUsage()
+    return
+  }
 
+  const parsed = parseArgs(args)
   mkdirSync(SCRIPT_DIR, { recursive: true })
 
-  switch (stage) {
+  if (parsed.listProjects) {
+    const schoolId = requireArg(parsed.schoolId, 'school-id')
+    runListProjects(schoolId)
+    return
+  }
+
+  const schoolId = requireArg(parsed.schoolId, 'school-id')
+  const projectId = requireArg(parsed.projectId, 'project-id')
+  const weekStart = requireArg(parsed.weekStart, 'week-start')
+  const cfg: RunConfig = {
+    schoolId,
+    projectId,
+    weekStart,
+    weekEnd: weekEndFromStart(weekStart),
+  }
+
+  switch (parsed.stage) {
     case 'plan':
-      runPlanStage()
+      runPlanStage(cfg)
       break
     case 'persist':
-      runPersistStage(limit)
+      runPersistStage(cfg, parsed.limit)
       break
     case 'pdf':
-      await runPdfStage()
+      await runPdfStage(cfg)
       break
     default:
-      throw new Error(`stage desconhecido: ${stage}. Use plan|persist|pdf`)
+      throw new Error(`stage desconhecido: ${parsed.stage}. Use plan|persist|pdf`)
   }
 }
 
 main().catch((err) => {
-  console.error(err)
+  console.error(err instanceof Error ? err.message : err)
   process.exit(1)
 })
