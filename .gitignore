@@ -68,6 +68,8 @@ supabase/supabase/
 # Outputs gerados localmente que contem PII (nomes/profile_ids de alunos)
 # NUNCA commitar — uso local de auditoria + planos de migracao
 scripts/invariants/.generated_*.sql
+scripts/batch/.generated_*.json
+scripts/batch/out/
 
 # Debug/dev outputs locais
 output/
