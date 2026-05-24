@@ -136,6 +136,15 @@ export interface ProjectInfo {
  * Lista projetos de uma school no SIMULADO, ordenados por data desc.
  * Útil para o user descobrir o project_id correto pra rodar o batch.
  */
+/**
+ * Lista todas as schools do SIMULADO. Caller precisa estar linkado em SIMULADO.
+ */
+export function listAllSchools(): SchoolInfo[] {
+  const sql = `SELECT id::text, name, slug FROM schools ORDER BY name`
+  const result = runSql(sql) as { rows: Array<{ id: string; name: string; slug: string }> }
+  return result.rows
+}
+
 export function listProjectsForSchool(schoolId: string): ProjectInfo[] {
   const sql = `SELECT id::text, nome AS name, created_at::text AS created_at, jsonb_array_length(students) AS students_count, dia1_processado AS dia1, dia2_processado AS dia2 FROM projetos WHERE school_id='${schoolId}' ORDER BY created_at DESC`
   const result = runSql(sql) as {
