@@ -393,16 +393,28 @@ export function SimuladoAnalyzer({
 
       for (const turno of TURNOS) {
         const baseSlots = slotsOverride?.[turno] ?? TURNOS_CONFIG[turno].slots
-        const slots = hasSchoolSchedule && !isWeekend
-          ? baseSlots.filter((slot) =>
-              officialSchedule.some(
-                (horario) =>
-                  horario.diaSemana === dia &&
-                  horario.turno === turno &&
-                  horario.horarioInicio === slot.inicio,
-              ),
-            )
-          : baseSlots
+        // Filtra slots disponíveis para distribuição em dias de semana:
+      // Exclui apenas slots que conflitem com aulas reais (não-placeholder).
+      // Lógica anterior incluía só slots presentes na grade (exact match de
+      // horarioInicio), o que quebrava escolas cujos tempos não casam com
+      // TURNOS_CONFIG (ex: FACEX usa 07:00/07:50, config usa 07:15/08:05) e
+      // excluía turnos tarde/noite que a escola não cadastra mas o aluno tem livre.
+      const slots = hasSchoolSchedule && !isWeekend
+        ? baseSlots.filter((slot) =>
+            !officialSchedule.some(
+              (horario) =>
+                horario.diaSemana === dia &&
+                horario.turno === turno &&
+                !isPlaceholderHorario(horario) &&
+                timeRangesOverlap(
+                  slot.inicio,
+                  slot.fim,
+                  horario.horarioInicio,
+                  horario.horarioFim,
+                ),
+            ),
+          )
+        : baseSlots
 
         for (let i = 0; i < slots.length; i++) {
           const slot = slots[i]
