@@ -3,9 +3,10 @@ import { authenticate, login, signInWithGoogle } from "../lib/auth";
 
 interface LoginFormProps {
   onLoginSuccess: () => void;
+  sessionExpired?: boolean;
 }
 
-export function LoginForm({ onLoginSuccess }: LoginFormProps) {
+export function LoginForm({ onLoginSuccess, sessionExpired = false }: LoginFormProps) {
   const [emailLogin, setEmailLogin] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -133,6 +134,16 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
 
         {/* Login Card */}
         <div className="rounded-2xl border border-[#e5e7eb] bg-white p-6 shadow-sm space-y-4">
+          {sessionExpired && (
+            <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-3 py-2.5 text-sm text-[#92400e] flex items-center gap-2">
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Sua sessão expirou. Faça login novamente.
+            </div>
+          )}
+
           {error && (
             <div className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c]">
               {error}

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { StudentSearch } from "./components/student/student-search";
 import { AlunoAvulsoForm } from "./components/student/aluno-avulso-form";
 import { KanbanBoard } from "./components/kanban/kanban-board";
@@ -122,6 +122,9 @@ function AppContent() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userSchoolId, setUserSchoolId] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  // Ref marcado ANTES de chamar logout() explícito para distinguir de expiração
+  const isExplicitLogoutRef = useRef(false);
   useEffect(() => {
     let isMounted = true;
     (async () => {
@@ -165,6 +168,13 @@ function AppContent() {
         setUserRole(null);
         setUserSchoolId(null);
         setMustChangePassword(false);
+
+        // SIGNED_OUT não-explícito = refresh token expirou ou sessão revogada
+        // INITIAL_SESSION sem sessão = primeira visita ou cookies limpos (sem banner)
+        if (event === "SIGNED_OUT" && !isExplicitLogoutRef.current) {
+          setSessionExpired(true);
+        }
+        isExplicitLogoutRef.current = false;
       }
     });
     return () => subscription.unsubscribe();
@@ -177,6 +187,7 @@ function AppContent() {
   }, [currentStudent]);
 
   async function handleLoginSuccess() {
+    setSessionExpired(false);
     try {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
@@ -192,6 +203,7 @@ function AppContent() {
   }
 
   async function handleLogout() {
+    isExplicitLogoutRef.current = true;
     try {
       await logout();
     } finally {
@@ -211,7 +223,7 @@ function AppContent() {
     );
   }
 
-  if (!user) return <LoginForm onLoginSuccess={handleLoginSuccess} />;
+  if (!user) return <LoginForm onLoginSuccess={handleLoginSuccess} sessionExpired={sessionExpired} />;
 
   if (mustChangePassword) {
     return (
