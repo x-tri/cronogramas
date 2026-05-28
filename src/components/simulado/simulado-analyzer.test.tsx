@@ -282,7 +282,10 @@ describe('SimuladoAnalyzer', () => {
     expect(blockData.titulo).toBe('Interpretação de Texto')
   })
 
-  it('usa a grade real da escola e nao distribui em turno sem horario oficial', async () => {
+  it('distribui em turnos livres mesmo sem entrada na grade oficial, exclui apenas aulas reais', async () => {
+    // Grade oficial tem apenas slots de tarde (placeholders = livres).
+    // Com a lógica correta, manha também está livre (sem aula real lá)
+    // e deve ser preenchida antes de tarde/fds (iteração: manha → tarde → noite).
     storeState.officialSchedule = [
       {
         id: 'db-1',
@@ -291,7 +294,7 @@ describe('SimuladoAnalyzer', () => {
         turno: 'tarde',
         horarioInicio: '15:00',
         horarioFim: '15:45',
-        disciplina: '—',
+        disciplina: '—', // placeholder — não bloqueia
         professor: null,
       },
       {
@@ -301,7 +304,7 @@ describe('SimuladoAnalyzer', () => {
         turno: 'tarde',
         horarioInicio: '15:45',
         horarioFim: '16:30',
-        disciplina: '—',
+        disciplina: '—', // placeholder — não bloqueia
         professor: null,
       },
     ]
@@ -364,24 +367,29 @@ describe('SimuladoAnalyzer', () => {
       expect(storeState.addBlock).toHaveBeenCalledTimes(2)
     })
 
+    // Iteração: segunda→manha antes de tarde → primeiro slot livre é segunda-manha-07:20
     const blockData = storeState.addBlock.mock.calls[0][0] as Omit<
       BlocoCronograma,
       'id' | 'createdAt'
     >
-    expect(blockData.turno).toBe('tarde')
-    expect(blockData.horarioInicio).toBe('15:45')
-    expect(blockData.horarioFim).toBe('16:30')
+    expect(blockData.diaSemana).toBe('segunda')
+    expect(blockData.turno).toBe('manha')
+    expect(blockData.horarioInicio).toBe('07:20')
+    expect(blockData.horarioFim).toBe('08:05')
 
-    const weekendBlockData = storeState.addBlock.mock.calls[1][0] as Omit<
+    const blockData2 = storeState.addBlock.mock.calls[1][0] as Omit<
       BlocoCronograma,
       'id' | 'createdAt'
     >
-    expect(weekendBlockData.diaSemana).toBe('sabado')
-    expect(weekendBlockData.turno).toBe('manha')
-    expect(weekendBlockData.horarioInicio).toBe('07:20')
+    expect(blockData2.diaSemana).toBe('segunda')
+    expect(blockData2.turno).toBe('manha')
+    expect(blockData2.horarioInicio).toBe('08:05')
+    expect(blockData2.horarioFim).toBe('08:50')
   })
 
   it('fecha o modal mesmo quando sobram questoes pendentes por falta de horario', async () => {
+    // Segunda: slot livre (placeholder). Terça-sexta: aulas reais bloqueiam o mesmo horário.
+    // Assim apenas segunda-tarde-15:00 fica disponível em dias de semana.
     storeState.officialSchedule = [
       {
         id: 'db-1',
@@ -390,7 +398,47 @@ describe('SimuladoAnalyzer', () => {
         turno: 'tarde',
         horarioInicio: '15:00',
         horarioFim: '15:50',
-        disciplina: '—',
+        disciplina: '—', // placeholder — livre
+        professor: null,
+      },
+      {
+        id: 'db-terca',
+        turma: 'Turma 300',
+        diaSemana: 'terca',
+        turno: 'tarde',
+        horarioInicio: '15:00',
+        horarioFim: '15:50',
+        disciplina: 'MATEMÁTICA',
+        professor: null,
+      },
+      {
+        id: 'db-quarta',
+        turma: 'Turma 300',
+        diaSemana: 'quarta',
+        turno: 'tarde',
+        horarioInicio: '15:00',
+        horarioFim: '15:50',
+        disciplina: 'PORTUGUÊS',
+        professor: null,
+      },
+      {
+        id: 'db-quinta',
+        turma: 'Turma 300',
+        diaSemana: 'quinta',
+        turno: 'tarde',
+        horarioInicio: '15:00',
+        horarioFim: '15:50',
+        disciplina: 'FÍSICA',
+        professor: null,
+      },
+      {
+        id: 'db-sexta',
+        turma: 'Turma 300',
+        diaSemana: 'sexta',
+        turno: 'tarde',
+        horarioInicio: '15:00',
+        horarioFim: '15:50',
+        disciplina: 'QUÍMICA',
         professor: null,
       },
     ]
