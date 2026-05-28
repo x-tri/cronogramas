@@ -11,6 +11,8 @@ export interface CursoEscolhido {
   readonly universidade: string
   readonly estado: string
   readonly modalidade?: string // default: "Ampla concorrência"
+  readonly campus?: string | null
+  readonly turno?: string | null
 }
 
 export interface ReportInput {

@@ -671,6 +671,21 @@ function expandirSigla(input: string): string {
   return SIGLA_UNIVERSIDADE[upper] ?? input
 }
 
+/**
+ * Dentre os candidatos retornados pelo banco, prefere o que bate exatamente
+ * com campus e turno informados pelo usuário. Cai no primeiro caso não haja match.
+ */
+export function pickBestCurso(rows: CursoEncontrado[], curso: CursoEscolhido): CursoEncontrado {
+  if (!curso.campus && !curso.turno) return rows[0]
+  return (
+    rows.find(
+      (r) =>
+        (!curso.campus || r.campus === curso.campus) &&
+        (!curso.turno || r.turno === curso.turno),
+    ) ?? rows[0]
+  )
+}
+
 async function findCurso(
   curso: CursoEscolhido,
   inepClient: SupabaseClient,
@@ -688,7 +703,7 @@ async function findCurso(
     .limit(5)
 
   if (data && data.length > 0) {
-    return data[0] as CursoEncontrado
+    return pickBestCurso(data as CursoEncontrado[], curso)
   }
 
   // Busca 2: se usou sigla, tentar com sigla original (caso o banco tenha a sigla)
@@ -702,7 +717,7 @@ async function findCurso(
       .limit(5)
 
     if (siglaBusca && siglaBusca.length > 0) {
-      return siglaBusca[0] as CursoEncontrado
+      return pickBestCurso(siglaBusca as CursoEncontrado[], curso)
     }
   }
 
@@ -716,11 +731,18 @@ async function findCurso(
 
   if (!fallback || fallback.length === 0) return null
 
-  // Se encontrou, priorizar a que mais se aproxima da universidade informada
+  // Prioriza: (universidade + campus/turno) > universidade > primeiro
   const nomeUpper = nomeExpandido.toUpperCase()
-  const melhorMatch = fallback.find(
-    (c) => c.universidade?.toUpperCase().includes(nomeUpper),
-  )
+  const melhorMatch =
+    (fallback as CursoEncontrado[]).find(
+      (c) =>
+        c.universidade?.toUpperCase().includes(nomeUpper) &&
+        (!curso.campus || c.campus === curso.campus) &&
+        (!curso.turno || c.turno === curso.turno),
+    ) ??
+    (fallback as CursoEncontrado[]).find(
+      (c) => c.universidade?.toUpperCase().includes(nomeUpper),
+    )
   return (melhorMatch ?? fallback[0]) as CursoEncontrado
 }
 

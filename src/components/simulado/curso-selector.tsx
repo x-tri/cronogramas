@@ -142,6 +142,8 @@ export function CursoSelector({
       universidade: cursoSelecionado.universidade,
       estado,
       modalidade,
+      campus: cursoSelecionado.campus,
+      turno: cursoSelecionado.turno,
     }
 
     onSelect(cursoEscolhido)
