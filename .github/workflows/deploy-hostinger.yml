@@ -56,6 +56,9 @@ jobs:
       - name: Type-check admin
         run: pnpm exec tsc --noEmit
 
+      - name: Lint admin
+        run: pnpm lint
+
       - name: Run admin tests (vitest)
         run: pnpm test
 
@@ -85,6 +88,14 @@ jobs:
       - name: Type-check aluno
         working-directory: aluno
         run: pnpm exec tsc --noEmit
+
+      - name: Lint aluno
+        working-directory: aluno
+        run: pnpm lint
+
+      - name: Run aluno tests (vitest)
+        working-directory: aluno
+        run: pnpm test
 
   # -------------------------------------------------------------------------
   # Job 2: Deploy — build + snapshot + rsync + verify.

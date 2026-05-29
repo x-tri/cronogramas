@@ -22,8 +22,8 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { writeFileSync, mkdirSync, readFileSync, existsSync, rmSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { writeFileSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 
 import {
   fetchProjetoData,
@@ -268,15 +268,12 @@ function loadPlanOrThrow(cfg: RunConfig): BatchPlan {
   // Simpler: tentamos os formatos conhecidos.
   // Mas como sabemos o schoolSlug? Olhamos por arquivos que batem com a
   // weekStart e schoolId no metadata.
-  const fs = require('node:fs') as typeof import('node:fs')
-  const path = require('node:path') as typeof import('node:path')
-  const candidates = fs
-    .readdirSync(SCRIPT_DIR)
+  const candidates = readdirSync(SCRIPT_DIR)
     .filter((f) => f.startsWith('.generated_plan_') && f.endsWith('.json'))
   for (const c of candidates) {
     try {
       const parsed = JSON.parse(
-        fs.readFileSync(path.join(SCRIPT_DIR, c), 'utf-8'),
+        readFileSync(join(SCRIPT_DIR, c), 'utf-8'),
       ) as BatchPlan
       if (
         parsed.meta.schoolId === cfg.schoolId &&
