@@ -159,7 +159,7 @@ function scoreOf(results: TriResults, area: AreaKey): number | null {
 }
 
 /** Computa acertos/erros/branco por area a partir do array de respostas. */
-function computeAreaBreakdown(
+export function computeAreaBreakdown(
   answers: readonly string[],
   gabarito: readonly string[],
 ): Record<AreaKey, { acertos: number; erros: number; branco: number }> {

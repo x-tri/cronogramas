@@ -12,9 +12,16 @@ import {
   calcMediaGeral,
   calcTotals,
   groupErrorsBy,
+  groupErrorsByWithArea,
   type ExamConfig,
 } from './engine'
-import { AREAS, PROFICIENCY_LEVELS, REF_TABLES, getProficiency } from './reference-tables'
+import {
+  AREAS,
+  PROFICIENCY_LEVELS,
+  REF_TABLES,
+  getProficiency,
+  type AreaKey,
+} from './reference-tables'
 
 /** Helper: cria gabarito de 180 itens (default: todos 'A'). */
 function makeGabarito(letter = 'A'): string[] {
@@ -210,6 +217,59 @@ describe('groupErrorsBy', () => {
   })
 })
 
+describe('groupErrorsByWithArea', () => {
+  it('agrupa por topico com area; ignora branco/acerto/sem-topico/sem-area', () => {
+    const gabarito = makeGabarito('A')
+    const answers = makeGabarito('A') // todos corretos por default
+    answers[0] = 'B' // erro -> Funcoes/LC
+    answers[1] = 'B' // erro -> Funcoes/LC
+    answers[2] = 'B' // erro -> Geometria/LC
+    answers[3] = 'B' // erro -> sem topico (ignora)
+    answers[4] = 'B' // erro -> sem area (ignora)
+    answers[5] = ''  // branco (ignora)
+    answers[6] = 'A' // acerto (ignora)
+
+    const topicos: (string | null)[] = Array.from({ length: 180 }, () => null)
+    topicos[0] = 'Funcoes'
+    topicos[1] = 'Funcoes'
+    topicos[2] = 'Geometria'
+    topicos[4] = 'OrfaoSemArea'
+    topicos[6] = 'AcertoIgnorado'
+
+    const areas: (AreaKey | null)[] = Array.from({ length: 180 }, () => null)
+    areas[0] = 'LC'
+    areas[1] = 'LC'
+    areas[2] = 'LC'
+    areas[3] = 'LC'
+    areas[6] = 'LC'
+
+    const r = groupErrorsByWithArea(answers, gabarito, topicos, areas)
+    expect(r).toEqual({
+      Funcoes: { area: 'LC', n: 2 },
+      Geometria: { area: 'LC', n: 1 },
+    })
+  })
+
+  it('primeira area vista vence quando o mesmo topico aparece em areas diferentes', () => {
+    const gabarito = makeGabarito('A')
+    const answers = makeGabarito('A')
+    answers[0] = 'B'  // LC, errado
+    answers[45] = 'B' // CH, errado (mesmo topico)
+
+    const topicos: (string | null)[] = Array.from({ length: 180 }, () => null)
+    topicos[0] = 'Ambiguo'
+    topicos[45] = 'Ambiguo'
+
+    const areas: (AreaKey | null)[] = Array.from({ length: 180 }, () => null)
+    areas[0] = 'LC'
+    areas[45] = 'CH'
+
+    const r = groupErrorsByWithArea(answers, gabarito, topicos, areas)
+    // idx 0 (LC) e visto primeiro: area LC vence, n acumula para 2.
+    expect(r).toEqual({ Ambiguo: { area: 'LC', n: 2 } })
+  })
+})
+
 describe('calcMediaGeral', () => {
   it('retorna null quando nenhuma area foi respondida', () => {
     expect(calcMediaGeral({}, null)).toBeNull()
@@ -242,6 +302,17 @@ describe('precondicao de tamanho de array', () => {
   it('groupErrorsBy lanca se itemLabels tem menos que 180 itens', () => {
     expect(() =>
       groupErrorsBy(makeGabarito('A'), makeGabarito('A'), ['x']),
+    ).toThrow(/180/)
+  })
+
+  it('groupErrorsByWithArea lanca se itemAreas tem menos que 180 itens', () => {
+    expect(() =>
+      groupErrorsByWithArea(
+        makeGabarito('A'),
+        makeGabarito('A'),
+        Array.from({ length: 180 }, () => null),
+        ['LC'] as AreaKey[],
+      ),
     ).toThrow(/180/)
   })
 })

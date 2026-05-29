@@ -10,14 +10,15 @@
  *   - migrations + fixtures aplicadas (via run.sh)
  *
  * Os testes criam seu proprio escopo (UUIDs fixos unicos por teste) e limpam
- * depois. Skippam silenciosamente se a API local nao estiver disponivel, para
- * nao quebrar CI sem infra Supabase.
+ * depois. O bloco de integracao e skippado explicitamente (describe.skipIf) se
+ * a 54321 nao expuser o schema XTRI deste projeto — evita falso-positivo quando
+ * outro Supabase local ocupa a porta, e mantem CI verde sem infra Supabase.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { submitSimulado, answersMapToArray } from './submit-simulado.ts'
+import { submitSimulado, answersMapToArray, computeAreaBreakdown } from './submit-simulado.ts'
 
 // Chaves default do supabase local (HS256 assinadas com o secret conhecido
 // "super-secret-jwt-token-with-at-least-32-characters-long" exposto no env do
@@ -33,41 +34,46 @@ const SCHOOL_B = '22222222-2222-2222-2222-22222222bbbb'
 const STUDENT_A = 'aaaaaaaa-0000-0000-0000-0000000000aa'
 const STUDENT_B_OTHER_SCHOOL = 'bbbbbbbb-0000-0000-0000-0000000000bb'
 
-let client: SupabaseClient
-let isLocalAvailable = false
+const client = createClient(LOCAL_URL, LOCAL_SERVICE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+})
 
-beforeAll(async () => {
-  client = createClient(LOCAL_URL, LOCAL_SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  // Ping rapido
-  const { error } = await client.from('simulados').select('id').limit(1)
-  isLocalAvailable = !error
-  if (!isLocalAvailable) {
-    console.warn('[submit-simulado.test] Supabase local indisponivel — skippando.')
-    return
+/**
+ * Probe forte: confirma que a 54321 expoe o schema do simulado XTRI deste
+ * projeto — nao um Supabase local alheio que por acaso tem `simulados` na mesma
+ * porta (caso real: multiplos `supabase start` competindo pela 54321). Checa
+ * colunas XTRI-especificas; se qualquer query erra (coluna/tabela ausente ou
+ * rede indisponivel), este nao e nosso DB e o bloco de integracao e skippado.
+ */
+async function probeXtriSchema(c: SupabaseClient): Promise<boolean> {
+  try {
+    const probes = await Promise.all([
+      c
+        .from('simulado_respostas')
+        .select('tri_method, correction_status, areas_realizadas, confidence_level')
+        .limit(1),
+      c
+        .from('simulado_itens')
+        .select('numero, area, gabarito, dificuldade, topico, habilidade')
+        .limit(1),
+      c.from('students').select('school_id, turma').limit(1),
+    ])
+    return probes.every((r) => !r.error)
+  } catch {
+    return false
   }
+}
 
-  // Fixtures: escolas
-  await client
-    .from('schools')
-    .upsert([{ id: SCHOOL_A, name: 'Escola A' }, { id: SCHOOL_B, name: 'Escola B' }])
-  // Fixtures: students
-  await client.from('students').upsert([
-    { id: STUDENT_A, school_id: SCHOOL_A, turma: '3A', name: 'Aluno A' },
-    { id: STUDENT_B_OTHER_SCHOOL, school_id: SCHOOL_B, turma: '3B', name: 'Aluno B' },
-  ])
-})
-
-afterAll(async () => {
-  if (!isLocalAvailable) return
-  // Limpa tudo que tem student_id em scope
-  await client.from('simulado_respostas').delete().in('student_id', [
-    STUDENT_A, STUDENT_B_OTHER_SCHOOL,
-  ])
-  // Apaga simulados de teste (CASCADE cuida dos itens)
-  await client.from('simulados').delete().in('school_id', [SCHOOL_A, SCHOOL_B])
-})
+// Resolvido no topo (top-level await) para que describe.skipIf enxergue o
+// resultado no momento da coleta dos testes.
+const isLocalAvailable = await probeXtriSchema(client)
+if (!isLocalAvailable) {
+  console.warn(
+    '[submit-simulado.test] Supabase local com schema XTRI indisponivel na 54321 ' +
+      '(sem `supabase start` deste projeto, ou outro stack ocupa a porta) — ' +
+      'bloco de integracao skippado.',
+  )
+}
 
 /** Helper: cria simulado com 180 itens (gabarito= todas 'A', dif=3). */
 async function createPublishedSimulado(schoolId: string, title: string): Promise<string> {
@@ -141,9 +147,62 @@ describe('answersMapToArray', () => {
   })
 })
 
-describe('submitSimulado — integracao (requer supabase local)', () => {
+// Puro (sem banco) — roda em CI. Cobre o breakdown acertos/erros/branco por
+// area que cada aluno ve, antes era exercitado so via integracao (que pula
+// silenciosamente sem supabase local e nao roda em CI).
+describe('computeAreaBreakdown', () => {
+  // Gabarito de 180 letras 'A' (LC=1-45, CH=46-90, CN=91-135, MT=136-180).
+  const gabarito = (): string[] => Array.from({ length: 180 }, () => 'A')
+
+  it('distribui por area: LC acertos, CH erros, CN branco, MT misto', () => {
+    const g = gabarito()
+    const answers = new Array<string>(180).fill('')
+    for (let i = 0; i < 45; i++) answers[i] = 'A' // LC: 45 acertos
+    for (let i = 45; i < 90; i++) answers[i] = 'B' // CH: 45 erros
+    // CN (90..134): permanece em branco
+    for (let i = 135; i < 157; i++) answers[i] = 'A' // MT: 22 acertos
+    for (let i = 157; i < 170; i++) answers[i] = 'B' // MT: 13 erros
+    // MT (170..179): 10 em branco
+
+    const r = computeAreaBreakdown(answers, g)
+    expect(r.LC).toEqual({ acertos: 45, erros: 0, branco: 0 })
+    expect(r.CH).toEqual({ acertos: 0, erros: 45, branco: 0 })
+    expect(r.CN).toEqual({ acertos: 0, erros: 0, branco: 45 })
+    expect(r.MT).toEqual({ acertos: 22, erros: 13, branco: 10 })
+  })
+
+  it('normaliza case e trata espaco como branco', () => {
+    const g = gabarito()
+    const answers = g.map((x) => x.toLowerCase()) // 'a' minusculo -> acerto
+    answers[0] = ' ' // espaco -> branco (LC)
+    answers[1] = 'b' // erro (LC)
+
+    const r = computeAreaBreakdown(answers, g)
+    expect(r.LC).toEqual({ acertos: 43, erros: 1, branco: 1 })
+    expect(r.CH).toEqual({ acertos: 45, erros: 0, branco: 0 })
+  })
+})
+
+describe.skipIf(!isLocalAvailable)('submitSimulado — integracao (requer supabase local)', () => {
+  beforeAll(async () => {
+    // Fixtures (escolas + students) — so quando o bloco efetivamente roda.
+    await client
+      .from('schools')
+      .upsert([{ id: SCHOOL_A, name: 'Escola A' }, { id: SCHOOL_B, name: 'Escola B' }])
+    await client.from('students').upsert([
+      { id: STUDENT_A, school_id: SCHOOL_A, turma: '3A', name: 'Aluno A' },
+      { id: STUDENT_B_OTHER_SCHOOL, school_id: SCHOOL_B, turma: '3B', name: 'Aluno B' },
+    ])
+  })
+
+  afterAll(async () => {
+    await client.from('simulado_respostas').delete().in('student_id', [
+      STUDENT_A, STUDENT_B_OTHER_SCHOOL,
+    ])
+    await client.from('simulados').delete().in('school_id', [SCHOOL_A, SCHOOL_B])
+  })
+
   it('acerta todas -> TRI no teto + 180 acertos', async () => {
-    if (!isLocalAvailable) return
     const sid = await createPublishedSimulado(SCHOOL_A, 'SIM-integ-1')
     try {
       const answers: Record<string, string> = {}
@@ -168,7 +227,6 @@ describe('submitSimulado — integracao (requer supabase local)', () => {
   })
 
   it('tudo errado (B quando gabarito=A) -> piso + 180 erros', async () => {
-    if (!isLocalAvailable) return
     const sid = await createPublishedSimulado(SCHOOL_A, 'SIM-integ-2')
     try {
       const answers: Record<string, string> = {}
@@ -196,7 +254,6 @@ describe('submitSimulado — integracao (requer supabase local)', () => {
   })
 
   it('bloqueia submissao dupla (ja_submitted)', async () => {
-    if (!isLocalAvailable) return
     const sid = await createPublishedSimulado(SCHOOL_A, 'SIM-integ-3')
     try {
       const answers: Record<string, string> = {}
@@ -219,7 +276,6 @@ describe('submitSimulado — integracao (requer supabase local)', () => {
   })
 
   it('bloqueia aluno de outra escola (student_not_eligible)', async () => {
-    if (!isLocalAvailable) return
     const sid = await createPublishedSimulado(SCHOOL_A, 'SIM-integ-4')
     try {
       const answers: Record<string, string> = {}
@@ -236,7 +292,6 @@ describe('submitSimulado — integracao (requer supabase local)', () => {
   })
 
   it('bloqueia simulado em draft (simulado_not_published)', async () => {
-    if (!isLocalAvailable) return
     const { data, error } = await client
       .from('simulados')
       .insert({ title: 'SIM-integ-draft', school_id: SCHOOL_A })
@@ -259,7 +314,6 @@ describe('submitSimulado — integracao (requer supabase local)', () => {
   })
 
   it('payload invalido (sem simulado_id) -> invalid_payload', async () => {
-    if (!isLocalAvailable) return
     const result = await submitSimulado({
       client, studentId: STUDENT_A, payload: { answers: {} },
     })
@@ -269,7 +323,6 @@ describe('submitSimulado — integracao (requer supabase local)', () => {
   })
 
   it('simulado_id inexistente -> simulado_not_found', async () => {
-    if (!isLocalAvailable) return
     // UUID v4 valido mas inexistente no DB
     const fakeId = '99999999-9999-4999-8999-999999999999'
     const answers: Record<string, string> = {}
@@ -283,7 +336,6 @@ describe('submitSimulado — integracao (requer supabase local)', () => {
   })
 
   it('race de insert simultaneo -> segundo recebe already_submitted (nao db_error)', async () => {
-    if (!isLocalAvailable) return
     const sid = await createPublishedSimulado(SCHOOL_A, 'SIM-integ-race')
     try {
       const answers: Record<string, string> = {}
@@ -309,7 +361,6 @@ describe('submitSimulado — integracao (requer supabase local)', () => {
   })
 
   it('metade dos itens em branco -> calcula corretamente', async () => {
-    if (!isLocalAvailable) return
     const sid = await createPublishedSimulado(SCHOOL_A, 'SIM-integ-branco')
     try {
       const answers: Record<string, string> = {}
