@@ -93,12 +93,42 @@ describe('parseSimuladoCsv — validacao de valores', () => {
     expect(r.items[0]!.gabarito).toBe('A')
   })
 
-  it('rejeita dificuldade fora de 1..5', () => {
-    const csv = [makeHeader(), '1,X,A,0', '2,Y,A,6', '3,Z,A,abc'].join('\n')
+  it('rejeita dificuldade fora dos formatos aceitos', () => {
+    const csv = [makeHeader(), '1,X,A,6', '2,Y,A,abc', '3,Z,A,9,5'].join('\n')
     const r = parseSimuladoCsv(csv)
     expect(r.ok).toBe(false)
     if (r.ok) return
     expect(r.errors).toHaveLength(3)
+  })
+
+  it('aceita dificuldade textual e normaliza para escala Angoff 1..5', () => {
+    const csv = [
+      makeHeader(),
+      '1,X,A,muito facil',
+      '2,Y,B,Fácil',
+      '3,Z,C,médio',
+      '4,W,D,dificil',
+      '5,Q,E,VERY_HARD',
+    ].join('\n')
+    const r = parseSimuladoCsv(csv)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items.map((item) => item.dificuldade)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it('aceita param_b decimal com virgula em CSV separado por ponto-e-virgula', () => {
+    const csv = [
+      'numero;conteudo;gabarito;dificuldade',
+      '1;Texto informativo em ingles - leitura;B;0,5',
+      '2;Cancao em ingles - leitura;A;0,6',
+      '3;Item muito facil;C;-1,2',
+      '4;Item dificil;D;1,4',
+      '5;Item muito dificil;E;2,0',
+    ].join('\n')
+    const r = parseSimuladoCsv(csv)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items.map((item) => item.dificuldade)).toEqual([3, 3, 1, 4, 5])
   })
 
   it('conteudo vazio -> topico=null', () => {

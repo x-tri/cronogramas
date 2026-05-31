@@ -16,7 +16,7 @@
  *   - Valores:
  *       numero        int 1..180 (unico em todo o arquivo)
  *       gabarito      char A-E (case-insensitive)
- *       dificuldade   int 1..5
+ *       dificuldade   int 1..5, texto ou param_b decimal
  *       conteudo      string livre (maps to simulado_itens.topico; opcional)
  *
  * Retorna erros por linha ao inves de levantar excecao, para permitir que o
@@ -46,6 +46,33 @@ const REQUIRED_HEADERS = ['numero', 'conteudo', 'gabarito', 'dificuldade'] as co
 type RequiredHeader = (typeof REQUIRED_HEADERS)[number]
 
 const VALID_GABARITOS = new Set(['A', 'B', 'C', 'D', 'E'])
+const DIFICULDADE_TEXTUAL: ReadonlyMap<string, number> = new Map([
+  ['veryeasy', 1],
+  ['very_easy', 1],
+  ['muitofacil', 1],
+  ['facilima', 1],
+  ['facilimo', 1],
+  ['easy', 2],
+  ['facil', 2],
+  ['baixa', 2],
+  ['baixo', 2],
+  ['low', 2],
+  ['medium', 3],
+  ['medio', 3],
+  ['media', 3],
+  ['intermediaria', 3],
+  ['intermediario', 3],
+  ['hard', 4],
+  ['dificil', 4],
+  ['alta', 4],
+  ['alto', 4],
+  ['high', 4],
+  ['veryhard', 5],
+  ['very_hard', 5],
+  ['muitodificil', 5],
+  ['dificilima', 5],
+  ['dificilimo', 5],
+])
 
 // ---------------------------------------------------------------------------
 // Tokenizer minimalista RFC 4180-ish (sem suporte a newlines em quoted).
@@ -130,6 +157,56 @@ function indexOfHeader(headers: readonly string[], target: RequiredHeader): numb
   return headers.findIndex((h) => h === target)
 }
 
+function normalizeTextKey(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '')
+}
+
+function mapParamBToAngoff(paramB: number): number {
+  if (paramB < -1) return 1
+  if (paramB < 0) return 2
+  if (paramB < 1) return 3
+  if (paramB < 2) return 4
+  return 5
+}
+
+function parseDificuldade(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+
+  const textual = DIFICULDADE_TEXTUAL.get(normalizeTextKey(trimmed))
+  if (textual !== undefined) return textual
+
+  const normalizedNumber = trimmed.replace(',', '.')
+  if (!/^[+-]?\d+(?:\.\d+)?$/.test(normalizedNumber)) return null
+
+  const numeric = Number.parseFloat(normalizedNumber)
+  if (!Number.isFinite(numeric)) return null
+
+  const hasDecimalSeparator = /[,.]/.test(trimmed)
+
+  // Mantem compatibilidade com o contrato antigo: Angoff inteiro 1..5.
+  if (!hasDecimalSeparator && Number.isInteger(numeric) && numeric >= 1 && numeric <= 5) {
+    return numeric
+  }
+
+  // CSVs vindos do banco/API podem trazer param_b decimal (-3..+3),
+  // frequentemente com virgula decimal em planilhas BR.
+  if (numeric >= -4 && numeric <= 4) {
+    return mapParamBToAngoff(numeric)
+  }
+
+  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 5) {
+    return numeric
+  }
+
+  return null
+}
+
 // ---------------------------------------------------------------------------
 // Parse principal
 // ---------------------------------------------------------------------------
@@ -211,11 +288,11 @@ export function parseSimuladoCsv(
 
     // dificuldade
     const dificuldadeRaw = (cols[idx.dificuldade] ?? '').trim()
-    const dificuldade = Number.parseInt(dificuldadeRaw, 10)
-    if (!Number.isFinite(dificuldade) || dificuldade < 1 || dificuldade > 5) {
+    const dificuldade = parseDificuldade(dificuldadeRaw)
+    if (dificuldade === null) {
       errors.push({
         line,
-        message: `dificuldade invalida: "${dificuldadeRaw}" (esperado 1..5)`,
+        message: `dificuldade invalida: "${dificuldadeRaw}" (esperado 1..5, texto ou param_b decimal)`,
       })
       continue
     }

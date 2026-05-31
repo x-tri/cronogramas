@@ -33,7 +33,7 @@ export interface StepItemsProps {
 const CSV_TEMPLATE =
   "numero,conteudo,gabarito,dificuldade\n" +
   "1,Funcoes exponenciais,A,3\n" +
-  "2,Geometria analitica,B,4\n" +
+  "2,Geometria analitica,B,dificil\n" +
   "...,...,...,...\n" +
   "180,Ultimo item,E,3\n";
 
@@ -161,6 +161,7 @@ export function StepItems({ items, onChange }: StepItemsProps) {
           <code className="rounded bg-[#f4f4f5] px-1 py-0.5 text-[11px]">
             numero,conteudo,gabarito,dificuldade
           </code>
+          {" "}• dificuldade aceita 1..5, facil/medio/dificil ou param_b decimal
         </p>
 
         {/* Input escondido + botao custom */}
