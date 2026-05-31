@@ -207,6 +207,16 @@ function parseDificuldade(raw: string): number | null {
   return null
 }
 
+function isBlankDataRow(
+  cols: readonly string[],
+  indexes: Record<RequiredHeader, number>,
+): boolean {
+  return REQUIRED_HEADERS.every((header) => {
+    const value = cols[indexes[header]] ?? ''
+    return value.trim().length === 0
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Parse principal
 // ---------------------------------------------------------------------------
@@ -266,6 +276,9 @@ export function parseSimuladoCsv(
 
   for (const { content, line } of nonEmpty.slice(1)) {
     const cols = splitCsvLine(content, delimiter)
+    if (isBlankDataRow(cols, idx)) {
+      continue
+    }
 
     // numero
     const numeroRaw = (cols[idx.numero] ?? '').trim()

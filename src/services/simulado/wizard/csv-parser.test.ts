@@ -58,6 +58,22 @@ describe('parseSimuladoCsv — cabecalho', () => {
     if (!r.ok) return
     expect(r.items).toHaveLength(2)
   })
+
+  it('ignora linhas vazias serializadas pelo Excel como delimitadores finais', () => {
+    const csv = [
+      'numero;conteudo;gabarito;dificuldade',
+      '179;Álgebra - expressão algébrica;C;Média',
+      '180;Álgebra - sequência periódica;A;Média',
+      ';;;',
+      ';;;',
+      ';;;',
+    ].join('\n')
+    const r = parseSimuladoCsv(csv)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items).toHaveLength(2)
+    expect(r.items.map((item) => item.numero)).toEqual([179, 180])
+  })
 })
 
 // ----------------------------------------------------------------------
