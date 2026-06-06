@@ -72,7 +72,7 @@ export default function LinkMatricula({ onLinked }: LinkMatriculaProps) {
       return;
     }
 
-    const result = data as LinkResult;
+    const result = data as unknown as LinkResult;
     if (!result.success) {
       setError(result.error === "Matrícula não encontrada"
         ? "Matrícula não encontrada. Verifique o número com seu coordenador."

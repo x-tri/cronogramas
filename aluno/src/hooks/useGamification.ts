@@ -36,7 +36,7 @@ export function useGamification(studentKey: string | undefined) {
         return EMPTY_GAMIFICATION;
       }
 
-      return (data as GamificationData) ?? EMPTY_GAMIFICATION;
+      return (data as unknown as GamificationData) ?? EMPTY_GAMIFICATION;
     },
     enabled: !!studentKey,
     staleTime: 2 * 60 * 1000,
