@@ -4,6 +4,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GraduationCap, ChevronDown, ChevronUp, XCircle, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { ReportData } from "@/components/analise/types";
+import type { Tables } from "@/integrations/supabase/types";
 import { SectionSisu } from "@/components/analise/SectionSisu";
 import { SectionRoi } from "@/components/analise/SectionRoi";
 import { SectionHabilidades } from "@/components/analise/SectionHabilidades";
@@ -53,7 +54,7 @@ function ReportCard({
   report,
   index,
 }: {
-  report: { readonly report_data?: ReportData | null };
+  report: Tables<"student_reports">;
   index: number;
 }) {
   const [expanded, setExpanded] = useState(index === 0);

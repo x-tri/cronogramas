@@ -1281,6 +1281,63 @@ export type Database = {
         }
         Relationships: []
       }
+      pdf_download_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          matricula: string | null
+          pdf_history_id: string
+          school_id: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          matricula?: string | null
+          pdf_history_id: string
+          school_id: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          matricula?: string | null
+          pdf_history_id?: string
+          school_id?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
+      student_question_responses: {
+        Row: {
+          answered: string
+          co_item: number
+          correct: boolean
+          created_at: string | null
+          id: string
+          student_key: string
+          xp_earned: number
+        }
+        Insert: {
+          answered: string
+          co_item: number
+          correct: boolean
+          created_at?: string | null
+          id?: string
+          student_key: string
+          xp_earned: number
+        }
+        Update: {
+          answered?: string
+          co_item?: number
+          correct?: boolean
+          created_at?: string | null
+          id?: string
+          student_key?: string
+          xp_earned?: number
+        }
+        Relationships: []
+      }
       student_reports: {
         Row: {
           created_at: string
@@ -1468,6 +1525,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_student_gamification: {
+        Args: { p_student_key: string }
+        Returns: Json
+      }
+      get_student_notifications: {
+        Args: { p_student_key: string }
+        Returns: Json
+      }
+      get_student_simulados_pendentes: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_student_simulado_resultado: {
+        Args: { p_simulado_id: string }
+        Returns: Json
+      }
+      link_google_to_student: {
+        Args: { p_matricula: string }
+        Returns: Json
+      }
       add_project_user:
         | {
             Args: {

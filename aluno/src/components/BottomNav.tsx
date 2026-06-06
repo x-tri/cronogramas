@@ -13,8 +13,8 @@ const JS_DAY_TO_KEY = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta
 const tabs = [
   { to: "/", icon: Calendar, label: "Plano", indicator: "plano" },
   { to: "/simulados", icon: ClipboardList, label: "Simulados", indicator: "simulados" },
-  { to: "/desempenho", icon: BarChart3, label: "Evolução" },
-  { to: "/analise", icon: FileSearch, label: "Análise" },
+  { to: "/desempenho", icon: BarChart3, label: "Evolução", indicator: undefined },
+  { to: "/analise", icon: FileSearch, label: "Análise", indicator: undefined },
   { to: "/avisos", icon: Bell, label: "Avisos", indicator: "avisos" },
 ] as const;
 

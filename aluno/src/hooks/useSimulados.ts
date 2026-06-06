@@ -29,7 +29,7 @@ export function useSimuladosPendentes() {
         "get_student_simulados_pendentes",
       );
       if (error) throw new Error(error.message);
-      return (data ?? []) as SimuladoPendenteRow[];
+      return (data ?? []) as unknown as SimuladoPendenteRow[];
     },
     staleTime: 2 * 60 * 1000,
   });
@@ -49,7 +49,7 @@ export function useSimuladoResultado(simuladoId: string | undefined) {
         { p_simulado_id: simuladoId },
       );
       if (error) throw new Error(error.message);
-      return (data ?? null) as SimuladoResultado | null;
+      return (data ?? null) as unknown as SimuladoResultado | null;
     },
     enabled: !!simuladoId,
     staleTime: 30 * 1000,

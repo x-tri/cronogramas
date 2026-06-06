@@ -17,6 +17,7 @@ export interface HabilidadeCritica {
 }
 
 export interface QuestaoRecomendada {
+  coItem?: number;
   sourceExam: string;
   enunciado: string;
   textoApoio?: string;

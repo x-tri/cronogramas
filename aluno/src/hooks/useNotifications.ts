@@ -26,7 +26,7 @@ export function useNotifications(studentKey: string | undefined) {
         return [];
       }
 
-      return (data as ReadonlyArray<StudentNotification>) ?? [];
+      return (data as unknown as ReadonlyArray<StudentNotification>) ?? [];
     },
     enabled: !!studentKey,
     staleTime: 2 * 60 * 1000,
