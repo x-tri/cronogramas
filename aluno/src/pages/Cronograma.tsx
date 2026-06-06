@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronLeft, ChevronRight, Check, Star, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ActivityHeatmapCard } from "@/components/ActivityHeatmapCard";
 
 const DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"];
 const DIAS_LABEL: Record<string, string> = {
@@ -94,6 +95,8 @@ export default function Cronograma() {
 
   return (
     <div className="p-4 pb-24 max-w-lg mx-auto">
+      <ActivityHeatmapCard student={student} />
+
       {/* Week nav */}
       <div className="flex items-center justify-between mb-3">
         <Button
