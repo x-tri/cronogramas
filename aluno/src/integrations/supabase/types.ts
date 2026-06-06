@@ -119,6 +119,13 @@ export type Database = {
             foreignKeyName: "api_usage_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "api_usage_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
@@ -162,6 +169,13 @@ export type Database = {
           user_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "audit_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
           {
             foreignKeyName: "audit_log_school_id_fkey"
             columns: ["school_id"]
@@ -307,6 +321,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coordinator_invites_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
           },
           {
             foreignKeyName: "coordinator_invites_school_id_fkey"
@@ -532,6 +553,13 @@ export type Database = {
             foreignKeyName: "mentor_alerts_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "mentor_alerts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
@@ -550,11 +578,13 @@ export type Database = {
           avg_mastery_critical: number
           avg_mastery_planned: number
           briefing: string
+          fontes_dados: string[]
           id: string
           mentor_plan_id: string
           overall_status: string
           school_id: string
           student_key: string
+          tri_context: Json | null
           unmapped_questions_count: number
         }
         Insert: {
@@ -562,11 +592,13 @@ export type Database = {
           avg_mastery_critical?: number
           avg_mastery_planned?: number
           briefing: string
+          fontes_dados?: string[]
           id?: string
           mentor_plan_id: string
           overall_status: string
           school_id: string
           student_key: string
+          tri_context?: Json | null
           unmapped_questions_count?: number
         }
         Update: {
@@ -574,11 +606,13 @@ export type Database = {
           avg_mastery_critical?: number
           avg_mastery_planned?: number
           briefing?: string
+          fontes_dados?: string[]
           id?: string
           mentor_plan_id?: string
           overall_status?: string
           school_id?: string
           student_key?: string
+          tri_context?: Json | null
           unmapped_questions_count?: number
         }
         Relationships: [
@@ -588,6 +622,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mentor_plans"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mentor_analysis_runs_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
           },
           {
             foreignKeyName: "mentor_analysis_runs_school_id_fkey"
@@ -730,7 +771,77 @@ export type Database = {
             foreignKeyName: "mentor_plans_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "mentor_plans_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pdf_download_log: {
+        Row: {
+          downloaded_at: string
+          id: string
+          matricula: string | null
+          pdf_history_id: string
+          school_id: string
+          student_id: string | null
+        }
+        Insert: {
+          downloaded_at?: string
+          id?: string
+          matricula?: string | null
+          pdf_history_id: string
+          school_id: string
+          student_id?: string | null
+        }
+        Update: {
+          downloaded_at?: string
+          id?: string
+          matricula?: string | null
+          pdf_history_id?: string
+          school_id?: string
+          student_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_download_log_pdf_history_id_fkey"
+            columns: ["pdf_history_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdf_download_log_pdf_history_id_fkey"
+            columns: ["pdf_history_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_history_with_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdf_download_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "pdf_download_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdf_download_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -783,6 +894,13 @@ export type Database = {
             foreignKeyName: "pdf_history_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "pdf_history_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
@@ -830,6 +948,13 @@ export type Database = {
             foreignKeyName: "profiles_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "profiles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
@@ -842,6 +967,8 @@ export type Database = {
           created_at: string | null
           email: string
           id: string
+          invite_code: string | null
+          invite_used_at: string | null
           invited_by: string | null
           is_active: boolean | null
           must_change_password: boolean
@@ -857,6 +984,8 @@ export type Database = {
           created_at?: string | null
           email: string
           id?: string
+          invite_code?: string | null
+          invite_used_at?: string | null
           invited_by?: string | null
           is_active?: boolean | null
           must_change_password?: boolean
@@ -872,6 +1001,8 @@ export type Database = {
           created_at?: string | null
           email?: string
           id?: string
+          invite_code?: string | null
+          invite_used_at?: string | null
           invited_by?: string | null
           is_active?: boolean | null
           must_change_password?: boolean
@@ -882,6 +1013,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "project_users_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
           {
             foreignKeyName: "project_users_school_id_fkey"
             columns: ["school_id"]
@@ -1255,6 +1393,13 @@ export type Database = {
             foreignKeyName: "school_schedules_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_schedules_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
@@ -1281,30 +1426,341 @@ export type Database = {
         }
         Relationships: []
       }
-      pdf_download_log: {
+      simulado_item_audits: {
         Row: {
-          created_at: string | null
+          alternativa_mais_marcada: string | null
+          alternativa_mais_marcada_pct: number | null
+          alternativas: Json
+          area: string
+          audit_version: string
+          audited_at: string
+          classifications: string[]
+          created_at: string
+          dificuldade_original: number
+          discriminacao_proxy: number | null
+          erro_padrao_taxa: number | null
+          gabarito: string
           id: string
-          matricula: string | null
-          pdf_history_id: string
-          school_id: string
-          student_id: string
+          item_id: string
+          n_acertos: number
+          n_brancos: number
+          n_respondidas: number
+          n_respostas: number
+          numero: number
+          recalculo_bloqueado: boolean
+          review_notes: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          simulado_id: string
+          taxa_acerto: number | null
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          alternativa_mais_marcada?: string | null
+          alternativa_mais_marcada_pct?: number | null
+          alternativas?: Json
+          area: string
+          audit_version?: string
+          audited_at?: string
+          classifications?: string[]
+          created_at?: string
+          dificuldade_original: number
+          discriminacao_proxy?: number | null
+          erro_padrao_taxa?: number | null
+          gabarito: string
           id?: string
-          matricula?: string | null
-          pdf_history_id: string
-          school_id: string
-          student_id: string
+          item_id: string
+          n_acertos: number
+          n_brancos: number
+          n_respondidas: number
+          n_respostas: number
+          numero: number
+          recalculo_bloqueado?: boolean
+          review_notes?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          simulado_id: string
+          taxa_acerto?: number | null
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          alternativa_mais_marcada?: string | null
+          alternativa_mais_marcada_pct?: number | null
+          alternativas?: Json
+          area?: string
+          audit_version?: string
+          audited_at?: string
+          classifications?: string[]
+          created_at?: string
+          dificuldade_original?: number
+          discriminacao_proxy?: number | null
+          erro_padrao_taxa?: number | null
+          gabarito?: string
           id?: string
-          matricula?: string | null
-          pdf_history_id?: string
-          school_id?: string
+          item_id?: string
+          n_acertos?: number
+          n_brancos?: number
+          n_respondidas?: number
+          n_respostas?: number
+          numero?: number
+          recalculo_bloqueado?: boolean
+          review_notes?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          simulado_id?: string
+          taxa_acerto?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulado_item_audits_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "simulado_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "simulado_item_audits_simulado_id_fkey"
+            columns: ["simulado_id"]
+            isOneToOne: false
+            referencedRelation: "simulados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      simulado_itens: {
+        Row: {
+          area: string
+          created_at: string
+          dificuldade: number
+          gabarito: string
+          habilidade: string | null
+          id: string
+          numero: number
+          simulado_id: string
+          topico: string | null
+          updated_at: string
+        }
+        Insert: {
+          area: string
+          created_at?: string
+          dificuldade: number
+          gabarito: string
+          habilidade?: string | null
+          id?: string
+          numero: number
+          simulado_id: string
+          topico?: string | null
+          updated_at?: string
+        }
+        Update: {
+          area?: string
+          created_at?: string
+          dificuldade?: number
+          gabarito?: string
+          habilidade?: string | null
+          id?: string
+          numero?: number
+          simulado_id?: string
+          topico?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulado_itens_simulado_id_fkey"
+            columns: ["simulado_id"]
+            isOneToOne: false
+            referencedRelation: "simulados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      simulado_respostas: {
+        Row: {
+          acertos_ch: number
+          acertos_cn: number
+          acertos_lc: number
+          acertos_mt: number
+          answers: Json
+          areas_realizadas: string[]
+          branco_ch: number
+          branco_cn: number
+          branco_lc: number
+          branco_mt: number
+          confidence_level: string
+          correction_status: string
+          erros_ch: number
+          erros_cn: number
+          erros_lc: number
+          erros_mt: number
+          erros_por_habilidade: Json
+          erros_por_topico: Json
+          id: string
+          simulado_id: string
+          student_id: string
+          submitted_at: string
+          tri_ch: number | null
+          tri_cn: number | null
+          tri_lc: number | null
+          tri_method: string
+          tri_mt: number | null
+          tri_version: string
+        }
+        Insert: {
+          acertos_ch?: number
+          acertos_cn?: number
+          acertos_lc?: number
+          acertos_mt?: number
+          answers?: Json
+          areas_realizadas?: string[]
+          branco_ch?: number
+          branco_cn?: number
+          branco_lc?: number
+          branco_mt?: number
+          confidence_level?: string
+          correction_status?: string
+          erros_ch?: number
+          erros_cn?: number
+          erros_lc?: number
+          erros_mt?: number
+          erros_por_habilidade?: Json
+          erros_por_topico?: Json
+          id?: string
+          simulado_id: string
+          student_id: string
+          submitted_at?: string
+          tri_ch?: number | null
+          tri_cn?: number | null
+          tri_lc?: number | null
+          tri_method?: string
+          tri_mt?: number | null
+          tri_version?: string
+        }
+        Update: {
+          acertos_ch?: number
+          acertos_cn?: number
+          acertos_lc?: number
+          acertos_mt?: number
+          answers?: Json
+          areas_realizadas?: string[]
+          branco_ch?: number
+          branco_cn?: number
+          branco_lc?: number
+          branco_mt?: number
+          confidence_level?: string
+          correction_status?: string
+          erros_ch?: number
+          erros_cn?: number
+          erros_lc?: number
+          erros_mt?: number
+          erros_por_habilidade?: Json
+          erros_por_topico?: Json
+          id?: string
+          simulado_id?: string
           student_id?: string
+          submitted_at?: string
+          tri_ch?: number | null
+          tri_cn?: number | null
+          tri_lc?: number | null
+          tri_method?: string
+          tri_mt?: number | null
+          tri_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulado_respostas_simulado_id_fkey"
+            columns: ["simulado_id"]
+            isOneToOne: false
+            referencedRelation: "simulados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "simulado_respostas_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      simulados: {
+        Row: {
+          caderno_url: string | null
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          published_at: string | null
+          school_id: string
+          status: string
+          title: string
+          turmas: string[]
+          updated_at: string
+        }
+        Insert: {
+          caderno_url?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published_at?: string | null
+          school_id: string
+          status?: string
+          title: string
+          turmas?: string[]
+          updated_at?: string
+        }
+        Update: {
+          caderno_url?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published_at?: string | null
+          school_id?: string
+          status?: string
+          title?: string
+          turmas?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulados_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "simulados_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_nav_seen: {
+        Row: {
+          fingerprint: string
+          profile_id: string
+          section: string
+          seen_at: string
+        }
+        Insert: {
+          fingerprint: string
+          profile_id?: string
+          section: string
+          seen_at?: string
+        }
+        Update: {
+          fingerprint?: string
+          profile_id?: string
+          section?: string
+          seen_at?: string
         }
         Relationships: []
       }
@@ -1313,7 +1769,7 @@ export type Database = {
           answered: string
           co_item: number
           correct: boolean
-          created_at: string | null
+          created_at: string
           id: string
           student_key: string
           xp_earned: number
@@ -1322,16 +1778,16 @@ export type Database = {
           answered: string
           co_item: number
           correct: boolean
-          created_at?: string | null
+          created_at?: string
           id?: string
           student_key: string
-          xp_earned: number
+          xp_earned?: number
         }
         Update: {
           answered?: string
           co_item?: number
           correct?: boolean
-          created_at?: string | null
+          created_at?: string
           id?: string
           student_key?: string
           xp_earned?: number
@@ -1396,6 +1852,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "student_reports_pdf_history_id_fkey"
+            columns: ["pdf_history_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_history_with_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_reports_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
             foreignKeyName: "student_reports_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
@@ -1413,6 +1883,11 @@ export type Database = {
           profile_id: string | null
           school_id: string | null
           sheet_code: string | null
+          sisu_curso_nome: string | null
+          sisu_nota_corte: number | null
+          sisu_uf: string | null
+          sisu_universidade: string | null
+          sisu_updated_at: string | null
           turma: string | null
         }
         Insert: {
@@ -1423,6 +1898,11 @@ export type Database = {
           profile_id?: string | null
           school_id?: string | null
           sheet_code?: string | null
+          sisu_curso_nome?: string | null
+          sisu_nota_corte?: number | null
+          sisu_uf?: string | null
+          sisu_universidade?: string | null
+          sisu_updated_at?: string | null
           turma?: string | null
         }
         Update: {
@@ -1433,9 +1913,21 @@ export type Database = {
           profile_id?: string | null
           school_id?: string | null
           sheet_code?: string | null
+          sisu_curso_nome?: string | null
+          sisu_nota_corte?: number | null
+          sisu_uf?: string | null
+          sisu_universidade?: string | null
+          sisu_updated_at?: string | null
           turma?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
           {
             foreignKeyName: "students_school_id_fkey"
             columns: ["school_id"]
@@ -1444,27 +1936,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      student_nav_seen: {
-        Row: {
-          fingerprint: string
-          profile_id: string
-          section: string
-          seen_at: string
-        }
-        Insert: {
-          fingerprint: string
-          profile_id?: string
-          section: string
-          seen_at?: string
-        }
-        Update: {
-          fingerprint?: string
-          profile_id?: string
-          section?: string
-          seen_at?: string
-        }
-        Relationships: []
       }
       topic_edges: {
         Row: {
@@ -1522,51 +1993,92 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      executive_operation_metrics: {
+        Row: {
+          alunos_atendidos: number | null
+          alunos_base_escolas_ativas: number | null
+          alunos_com_cronograma: number | null
+          alunos_com_simulado: number | null
+          blocos_criados: number | null
+          blocos_por_aluno_com_cronograma: number | null
+          cronogramas_gerados: number | null
+          downloads_listas: number | null
+          escolas_ativas: number | null
+        }
+        Relationships: []
+      }
+      executive_school_activity: {
+        Row: {
+          alunos_atendidos: number | null
+          alunos_base: number | null
+          alunos_com_cronograma: number | null
+          alunos_com_download: number | null
+          alunos_com_simulado: number | null
+          blocos_criados: number | null
+          cronogramas_gerados: number | null
+          downloads_listas: number | null
+          escola: string | null
+          escola_ativa: boolean | null
+          school_id: string | null
+          slug: string | null
+        }
+        Relationships: []
+      }
+      executive_storage_metrics: {
+        Row: {
+          storage_bytes: number | null
+          storage_objects: number | null
+        }
+        Relationships: []
+      }
+      pdf_history_with_status: {
+        Row: {
+          aluno_id: string | null
+          aluno_nome: string | null
+          created_at: string | null
+          created_by: string | null
+          download_count: number | null
+          file_size: number | null
+          filename: string | null
+          first_downloaded_at: string | null
+          id: string | null
+          last_downloaded_at: string | null
+          matricula: string | null
+          school_id: string | null
+          storage_path: string | null
+          tipo: string | null
+          turma: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_history_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "executive_school_activity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "pdf_history_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      get_student_gamification: {
-        Args: { p_student_key: string }
+      add_project_user: {
+        Args: {
+          p_allowed_series?: string[]
+          p_email: string
+          p_name?: string
+          p_password?: string
+          p_role?: string
+          p_school_id?: string
+        }
         Returns: Json
       }
-      get_student_notifications: {
-        Args: { p_student_key: string }
-        Returns: Json
-      }
-      get_student_simulados_pendentes: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      get_student_simulado_resultado: {
-        Args: { p_simulado_id: string }
-        Returns: Json
-      }
-      link_google_to_student: {
-        Args: { p_matricula: string }
-        Returns: Json
-      }
-      add_project_user:
-        | {
-            Args: {
-              p_allowed_series?: string[]
-              p_email: string
-              p_name?: string
-              p_password?: string
-              p_role?: string
-              p_school_id?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_allowed_series?: string[]
-              p_email: string
-              p_name?: string
-              p_role?: string
-              p_school_id: string
-            }
-            Returns: Json
-          }
       aluno_belongs_to_my_school: {
         Args: { p_aluno_id: string }
         Returns: boolean
@@ -1581,6 +2093,7 @@ export type Database = {
           updated_mappings: number
         }[]
       }
+      area_from_numero: { Args: { p_numero: number }; Returns: string }
       can_access_school: {
         Args: { target_school_id: string }
         Returns: boolean
@@ -1592,6 +2105,16 @@ export type Database = {
           archived_mappings: number
           archived_topics: number
         }[]
+      }
+      clone_simulado_to_school: {
+        Args: {
+          p_copy_caderno_url?: boolean
+          p_new_title?: string
+          p_new_turmas?: string[]
+          p_source_simulado_id: string
+          p_target_school_id: string
+        }
+        Returns: string
       }
       count_cronogramas_by_school: {
         Args: { p_school_id: string; p_since: string }
@@ -1605,6 +2128,16 @@ export type Database = {
           p_school_id: string
         }
         Returns: Json
+      }
+      create_simulado_with_items: {
+        Args: {
+          p_caderno_url?: string
+          p_items: Json
+          p_school_id: string
+          p_title: string
+          p_turmas: string[]
+        }
+        Returns: string
       }
       current_project_role: { Args: never; Returns: string }
       current_school_id: { Args: never; Returns: string }
@@ -1642,6 +2175,11 @@ export type Database = {
         Returns: Record<string, unknown>[]
       }
       dblink_is_busy: { Args: { "": string }; Returns: number }
+      delete_simulado_resposta: {
+        Args: { p_resposta_id: string }
+        Returns: Json
+      }
+      generate_invite_code: { Args: never; Returns: string }
       get_admin_dashboard_stats: { Args: never; Returns: Json }
       get_my_student_id: { Args: never; Returns: string }
       get_project_role: { Args: never; Returns: string }
@@ -1653,16 +2191,60 @@ export type Database = {
           name: string
         }[]
       }
+      get_student_gamification: {
+        Args: { p_student_key: string }
+        Returns: Json
+      }
+      get_student_notifications: {
+        Args: { p_student_key: string }
+        Returns: Json
+      }
+      get_student_simulado_resultado: {
+        Args: { p_simulado_id: string }
+        Returns: Json
+      }
+      get_student_simulados_pendentes: {
+        Args: never
+        Returns: {
+          caderno_url: string
+          id: string
+          ja_respondeu: boolean
+          published_at: string
+          school_id: string
+          submitted_at: string
+          title: string
+          turmas: string[]
+        }[]
+      }
       get_user_role: { Args: never; Returns: string }
       get_user_school_id: { Args: never; Returns: string }
       is_my_aluno_id: { Args: { p_aluno_id: string }; Returns: boolean }
       is_my_cronograma: { Args: { p_cronograma_id: string }; Returns: boolean }
       is_project_super_admin: { Args: never; Returns: boolean }
+      is_student_own_pdf_storage_path: {
+        Args: { p_storage_path: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: never; Returns: boolean }
+      link_google_to_coordinator: {
+        Args: { p_invite_code: string }
+        Returns: Json
+      }
+      link_google_to_student: { Args: { p_matricula: string }; Returns: Json }
       link_my_auth_uid: { Args: never; Returns: Json }
       mark_password_changed: { Args: never; Returns: undefined }
       remove_coordinator: { Args: { p_email: string }; Returns: string }
       remove_project_user: { Args: { p_email: string }; Returns: string }
+      student_school_id: { Args: never; Returns: string }
+      student_turma: { Args: never; Returns: string }
+      unlink_google_student: {
+        Args: { p_matricula: string }
+        Returns: undefined
+      }
+      validate_simulado_complete: {
+        Args: { p_simulado_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
