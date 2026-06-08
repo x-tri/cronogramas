@@ -9,10 +9,12 @@ import { useStudentProfile } from "@/hooks/useStudentData";
 import { useGamification } from "@/hooks/useGamification";
 import { MascotWithBubble } from "@/components/MascotWithBubble";
 import type { MascotAnimation } from "@/components/MascotAvatar";
+import type { QuestionResponse, QuestionResponseMap } from "@/hooks/useQuestionResponses";
 
 interface Props {
   questoes: QuestaoRecomendada[];
   titulo: string;
+  responses?: QuestionResponseMap;
 }
 
 const XP_CORRECT = 20;
@@ -36,7 +38,7 @@ const CONFETTI_PARTICLES = Array.from({ length: 12 }, (_, i) => ({
   icon: ["⭐", "🔥", "💎", "✨", "🎯", "💪"][i % 6],
 }));
 
-export function SectionQuestoes({ questoes, titulo }: Props) {
+export function SectionQuestoes({ questoes, titulo, responses }: Props) {
   const ordenadas = [...questoes].sort(byDifficultyAsc);
   return (
     <div className="border-t border-border/50 px-3 pb-3 pt-2 space-y-3">
@@ -44,7 +46,12 @@ export function SectionQuestoes({ questoes, titulo }: Props) {
         Questões para treinar — {titulo}
       </p>
       {ordenadas.map((q, i) => (
-        <QuestaoCard key={q.coItem ?? i} questao={q} index={i} />
+        <QuestaoCard
+          key={q.coItem ?? i}
+          questao={q}
+          index={i}
+          prior={q.coItem != null ? responses?.get(q.coItem) : undefined}
+        />
       ))}
     </div>
   );
@@ -70,11 +77,20 @@ function saveQuestionResponse(
     });
 }
 
-function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: number }) {
-  const [selected, setSelected] = useState<string | null>(null);
+function QuestaoCard({
+  questao,
+  index,
+  prior,
+}: {
+  questao: QuestaoRecomendada;
+  index: number;
+  prior?: QuestionResponse;
+}) {
+  const [selected, setSelected] = useState<string | null>(prior?.answered ?? null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [mascotReaction, setMascotReaction] = useState<MascotAnimation | null>(null);
-  const [scored, setScored] = useState(false); // 1ª tentativa já registrada (conta XP)
+  const [scored, setScored] = useState(!!prior); // já respondida antes (1ª tentativa registrada)
+  const [awarded, setAwarded] = useState(false); // XP concedido NESTA sessão
   const [replay, setReplay] = useState(false); // resposta atual é treino (sem XP/registro)
   const { data: student } = useStudentProfile();
   const studentKey = student?.matricula || student?.id;
@@ -102,6 +118,7 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
       }
       setScored(true);
       setReplay(false);
+      setAwarded(true);
       if (isCorrect) {
         setShowCelebration(true);
         setTimeout(() => setShowCelebration(false), 2000);
@@ -109,9 +126,10 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
       const studentKey = student?.matricula || student?.id;
       if (studentKey && questao.coItem) {
         saveQuestionResponse(studentKey, questao.coItem, letra, isCorrect);
-        // Atualizar XP no header após 1s
+        // Atualizar XP no header + progresso por habilidade após 1s
         setTimeout(() => {
           void queryClient.invalidateQueries({ queryKey: ["gamification"] });
+          void queryClient.invalidateQueries({ queryKey: ["question-responses"] });
         }, 1000);
       }
     },
@@ -254,7 +272,7 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
             {correct ? (
               <>
                 Correto!
-                {!replay && (
+                {awarded && (
                   <span className="inline-flex items-center gap-0.5 bg-primary/15 text-primary rounded-full px-1.5 py-0.5 text-[9px] font-black">
                     <Zap className="h-2.5 w-2.5" />+{XP_CORRECT}
                   </span>
@@ -263,7 +281,7 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
             ) : (
               <>
                 Resposta: {questao.gabarito}
-                {!replay && (
+                {awarded && (
                   <span className="inline-flex items-center gap-0.5 bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[9px] font-black">
                     <Zap className="h-2.5 w-2.5" />+{XP_WRONG}
                   </span>
@@ -271,6 +289,9 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
               </>
             )}
             {replay && <span className="text-[9px] font-bold text-muted-foreground">treino</span>}
+            {!replay && !awarded && prior && (
+              <span className="text-[9px] font-bold text-muted-foreground">já respondida</span>
+            )}
           </div>
           <button
             onClick={handleRetry}

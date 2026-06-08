@@ -4,12 +4,16 @@ import { cn } from "@/lib/utils";
 import { HabilidadeCritica, AREA_COLORS } from "./types";
 import { SectionQuestoes } from "./SectionQuestoes";
 import { useState } from "react";
+import { useStudentProfile } from "@/hooks/useStudentData";
+import { useQuestionResponses, type QuestionResponseMap } from "@/hooks/useQuestionResponses";
 
 interface Props {
   habilidades: HabilidadeCritica[];
 }
 
 export function SectionHabilidades({ habilidades }: Props) {
+  const { data: student } = useStudentProfile();
+  const { data: responses } = useQuestionResponses(student?.matricula || student?.id);
   const sorted = [...habilidades].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const comQuestoes = sorted.filter((h) => (h.questoesRecomendadas?.length ?? 0) > 0);
   const semQuestoes = sorted.filter((h) => (h.questoesRecomendadas?.length ?? 0) === 0);
@@ -24,7 +28,7 @@ export function SectionHabilidades({ habilidades }: Props) {
           </h4>
           <div className="space-y-2">
             {comQuestoes.map((hab, i) => (
-              <HabilidadeCard key={hab.identificador || i} hab={hab} index={i} />
+              <HabilidadeCard key={hab.identificador || i} hab={hab} index={i} responses={responses} />
             ))}
           </div>
         </div>
@@ -36,7 +40,7 @@ export function SectionHabilidades({ habilidades }: Props) {
           </h4>
           <div className="space-y-2">
             {semQuestoes.map((hab, i) => (
-              <HabilidadeCard key={hab.identificador || i} hab={hab} index={i} />
+              <HabilidadeCard key={hab.identificador || i} hab={hab} index={i} responses={responses} />
             ))}
           </div>
         </div>
@@ -45,10 +49,21 @@ export function SectionHabilidades({ habilidades }: Props) {
   );
 }
 
-function HabilidadeCard({ hab, index }: { hab: HabilidadeCritica; index: number }) {
+function HabilidadeCard({
+  hab,
+  index,
+  responses,
+}: {
+  hab: HabilidadeCritica;
+  index: number;
+  responses?: QuestionResponseMap;
+}) {
   const [showQuestoes, setShowQuestoes] = useState(false);
   const colorClass = AREA_COLORS[hab.area || ""] || AREA_COLORS.CH;
   const hasQuestoes = hab.questoesRecomendadas && hab.questoesRecomendadas.length > 0;
+  const acertadas = responses
+    ? hab.questoesRecomendadas.filter((q) => q.coItem != null && responses.get(q.coItem)?.correct).length
+    : 0;
 
   return (
     <div
@@ -70,6 +85,11 @@ function HabilidadeCard({ hab, index }: { hab: HabilidadeCritica; index: number 
             {hab.totalErros ?? 0} erros
           </span>
           <span>📊 {hab.percentualIncidencia != null ? `${hab.percentualIncidencia.toFixed(1)}%` : "—"} ENEM</span>
+          {acertadas > 0 && (
+            <span className="font-bold text-emerald-600">
+              ✓ {acertadas}/{hab.questoesRecomendadas.length} acertadas
+            </span>
+          )}
           {hasQuestoes && (
             <button
               onClick={() => setShowQuestoes(!showQuestoes)}
@@ -86,6 +106,7 @@ function HabilidadeCard({ hab, index }: { hab: HabilidadeCritica; index: number 
         <SectionQuestoes
           questoes={hab.questoesRecomendadas}
           titulo={`${hab.identificador} — ${hab.pedagogicalLabel}`}
+          responses={responses}
         />
       )}
     </div>
