@@ -16,6 +16,10 @@ export const GABARITO_REVIEW_TOP_ALT_PCT = 0.35
 // gabarito para caracterizar chave provavelmente errada. Guarda conservador —
 // junto com discriminação não-positiva — para não acusar gabarito por ruído.
 export const GABARITO_MISKEY_MARGIN = 0.1
+// Margem (em erros-padrão) exigida para sinalizar dificuldade: o acerto observado
+// precisa contradizer o rótulo ALÉM do ruído amostral. 1.0 (~84% unilateral) foi
+// calibrado no dado real — mantém os mismatches claros e descarta os a <=1 SE do corte.
+export const DIFFICULTY_CI_Z = 1.0
 
 export type ItemAuditClassification =
   | 'confiavel_operacionalmente'
@@ -304,9 +308,12 @@ export function computeItemAudits(
       ) {
         classifications.add('sinal_revisao_gabarito')
       }
+      // Dificuldade: só sinaliza quando o acerto contradiz o rótulo além de ~1 erro-padrão
+      // (com N baixo, taxa tem ruído de ~7pp — evita falso sinal no limite do corte).
+      const seAcerto = erroPadrao ?? 0
       if (
-        (item.dificuldade <= 2 && (taxaAcerto ?? 1) < 0.5) ||
-        (item.dificuldade >= 4 && (taxaAcerto ?? 0) > 0.8)
+        (item.dificuldade <= 2 && (taxaAcerto ?? 1) + DIFFICULTY_CI_Z * seAcerto < 0.5) ||
+        (item.dificuldade >= 4 && (taxaAcerto ?? 0) - DIFFICULTY_CI_Z * seAcerto > 0.8)
       ) {
         classifications.add('sinal_revisao_dificuldade')
       }

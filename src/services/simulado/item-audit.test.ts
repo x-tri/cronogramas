@@ -61,6 +61,29 @@ function answersFor(item1: string, rest2to20: string): Record<string, string> {
   return a
 }
 
+function difItem(dificuldade: number): AuditItemInput {
+  return { id: 't', simulado_id: 's', numero: 1, area: 'LC', gabarito: 'A', dificuldade }
+}
+
+// Item único (numero 1, LC, gabarito A): nCorrect marcam A, nWrong espalhados em B/C/D/E
+// (para o gabarito seguir como mais marcado e isolar o sinal de dificuldade).
+function difResponses(nCorrect: number, nWrong: number): AuditResponseInput[] {
+  const wrongs = ['B', 'C', 'D', 'E']
+  const zero = {
+    acertos_ch: 0, erros_ch: 0, branco_ch: 0,
+    acertos_cn: 0, erros_cn: 0, branco_cn: 0,
+    acertos_mt: 0, erros_mt: 0, branco_mt: 0,
+  }
+  const out: AuditResponseInput[] = []
+  for (let i = 0; i < nCorrect; i++) {
+    out.push({ id: `c${i}`, answers: { '1': 'A' }, acertos_lc: 1, erros_lc: 0, branco_lc: 0, ...zero })
+  }
+  for (let i = 0; i < nWrong; i++) {
+    out.push({ id: `w${i}`, answers: { '1': wrongs[i % 4]! }, acertos_lc: 0, erros_lc: 1, branco_lc: 0, ...zero })
+  }
+  return out
+}
+
 describe('computeResponseIntegrity', () => {
   it('confirma totais quando answers e agregados batem', () => {
     const items = makeItems()
@@ -157,6 +180,19 @@ describe('computeItemAudits', () => {
     expect(
       item2.classifications.some((c) => c === 'gabarito_provavel_errado' || c.startsWith('sinal_')),
     ).toBe(false)
+  })
+
+  it('dificuldade: não sinaliza quando o acerto baixo está dentro de ~1 erro-padrão do corte', () => {
+    // dif 2 (fácil), 21/47 ≈ 45% de acerto, SE ≈ 7pp → 45% + 1·SE > 50% (ruído).
+    const audit = computeItemAudits([difItem(2)], difResponses(21, 26))[0]!
+    expect(audit.classifications).not.toContain('sinal_revisao_dificuldade')
+    expect(audit.classifications).not.toContain('sinal_revisao_gabarito')
+  })
+
+  it('dificuldade: sinaliza item fácil com acerto claramente abaixo do corte', () => {
+    // dif 2, 14/47 ≈ 30% → 30% + 1·SE < 50% (mismatch claro).
+    const audit = computeItemAudits([difItem(2)], difResponses(14, 33))[0]!
+    expect(audit.classifications).toContain('sinal_revisao_dificuldade')
   })
 })
 
