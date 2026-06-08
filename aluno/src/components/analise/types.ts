@@ -26,6 +26,9 @@ export interface QuestaoRecomendada {
   linkImagem?: string;
   imagemUrl?: string;
   matchedTopicLabel?: string;
+  // Parâmetro b da TRI (vem como string no JSON do relatório). Usado só para
+  // ordenar fácil→difícil e derivar o rótulo Fácil/Médio/Difícil.
+  dificuldade?: number | string;
 }
 
 export interface CenarioData {

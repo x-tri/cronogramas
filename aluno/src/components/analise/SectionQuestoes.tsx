@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { QuestaoRecomendada } from "./types";
+import { byDifficultyAsc, difficultyTier, type DifficultyTier } from "@/lib/question-difficulty";
 import { CheckCircle, XCircle, RotateCcw, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,6 +17,17 @@ interface Props {
 
 const XP_CORRECT = 20;
 const XP_WRONG = 5;
+
+const TIER_LABEL: Record<DifficultyTier, string> = {
+  facil: "Fácil",
+  medio: "Médio",
+  dificil: "Difícil",
+};
+const TIER_CLASS: Record<DifficultyTier, string> = {
+  facil: "bg-emerald-500/15 text-emerald-600",
+  medio: "bg-amber-500/15 text-amber-600",
+  dificil: "bg-red-500/15 text-red-600",
+};
 const CONFETTI_PARTICLES = Array.from({ length: 12 }, (_, i) => ({
   id: i,
   left: `${10 + ((i * 37) % 80)}%`,
@@ -25,12 +37,13 @@ const CONFETTI_PARTICLES = Array.from({ length: 12 }, (_, i) => ({
 }));
 
 export function SectionQuestoes({ questoes, titulo }: Props) {
+  const ordenadas = [...questoes].sort(byDifficultyAsc);
   return (
     <div className="border-t border-border/50 px-3 pb-3 pt-2 space-y-3">
       <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">
         Questões para treinar — {titulo}
       </p>
-      {questoes.map((q, i) => (
+      {ordenadas.map((q, i) => (
         <QuestaoCard key={q.coItem ?? i} questao={q} index={i} />
       ))}
     </div>
@@ -48,7 +61,9 @@ function saveQuestionResponse(
     .from("student_question_responses")
     .upsert(
       { student_key: studentKey, co_item: coItem, answered, correct, xp_earned: xp },
-      { onConflict: "student_key,co_item" },
+      // Preserva a 1ª tentativa: no conflito não sobrescreve (sinal e XP honestos,
+      // sem farmar via "Tentar" depois de ver o gabarito).
+      { onConflict: "student_key,co_item", ignoreDuplicates: true },
     )
     .then(({ error }) => {
       if (error) console.warn("[questoes] Falha ao salvar resposta:", error.message);
@@ -59,6 +74,8 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
   const [selected, setSelected] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [mascotReaction, setMascotReaction] = useState<MascotAnimation | null>(null);
+  const [scored, setScored] = useState(false); // 1ª tentativa já registrada (conta XP)
+  const [replay, setReplay] = useState(false); // resposta atual é treino (sem XP/registro)
   const { data: student } = useStudentProfile();
   const studentKey = student?.matricula || student?.id;
   const { data: gamification } = useGamification(studentKey);
@@ -67,21 +84,28 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
 
   const answered = selected !== null;
   const correct = selected === questao.gabarito;
+  const tier = difficultyTier(questao.dificuldade);
 
   const handleAnswer = useCallback(
     (letra: string) => {
       setSelected(letra);
       const isCorrect = letra === questao.gabarito;
 
-      // Mascote + celebração
+      // Mascote sempre (feedback de aprendizado)
       setMascotReaction(isCorrect ? "jump" : "hit");
+      setTimeout(() => setMascotReaction(null), 1500);
+
+      // Só a 1ª tentativa conta: celebração, XP e registro. Retry = treino.
+      if (scored) {
+        setReplay(true);
+        return;
+      }
+      setScored(true);
+      setReplay(false);
       if (isCorrect) {
         setShowCelebration(true);
         setTimeout(() => setShowCelebration(false), 2000);
       }
-      setTimeout(() => setMascotReaction(null), 1500);
-
-      // Salvar resposta + invalidar cache de gamificação
       const studentKey = student?.matricula || student?.id;
       if (studentKey && questao.coItem) {
         saveQuestionResponse(studentKey, questao.coItem, letra, isCorrect);
@@ -91,7 +115,7 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
         }, 1000);
       }
     },
-    [questao.gabarito, questao.coItem, student, queryClient],
+    [questao.gabarito, questao.coItem, student, queryClient, scored],
   );
 
   const handleRetry = () => {
@@ -136,8 +160,15 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black text-primary uppercase">{questao.sourceExam}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[10px] font-black text-primary uppercase">{questao.sourceExam}</span>
+          {tier && (
+            <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-bold", TIER_CLASS[tier])}>
+              {TIER_LABEL[tier]}
+            </span>
+          )}
+        </div>
         {questao.matchedTopicLabel && (
           <span className="text-[10px] font-semibold text-muted-foreground truncate ml-2">
             {questao.matchedTopicLabel}
@@ -223,18 +254,23 @@ function QuestaoCard({ questao, index }: { questao: QuestaoRecomendada; index: n
             {correct ? (
               <>
                 Correto!
-                <span className="inline-flex items-center gap-0.5 bg-primary/15 text-primary rounded-full px-1.5 py-0.5 text-[9px] font-black">
-                  <Zap className="h-2.5 w-2.5" />+{XP_CORRECT}
-                </span>
+                {!replay && (
+                  <span className="inline-flex items-center gap-0.5 bg-primary/15 text-primary rounded-full px-1.5 py-0.5 text-[9px] font-black">
+                    <Zap className="h-2.5 w-2.5" />+{XP_CORRECT}
+                  </span>
+                )}
               </>
             ) : (
               <>
                 Resposta: {questao.gabarito}
-                <span className="inline-flex items-center gap-0.5 bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[9px] font-black">
-                  <Zap className="h-2.5 w-2.5" />+{XP_WRONG}
-                </span>
+                {!replay && (
+                  <span className="inline-flex items-center gap-0.5 bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[9px] font-black">
+                    <Zap className="h-2.5 w-2.5" />+{XP_WRONG}
+                  </span>
+                )}
               </>
             )}
+            {replay && <span className="text-[9px] font-bold text-muted-foreground">treino</span>}
           </div>
           <button
             onClick={handleRetry}

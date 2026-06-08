@@ -11,18 +11,36 @@ interface Props {
 
 export function SectionHabilidades({ habilidades }: Props) {
   const sorted = [...habilidades].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const comQuestoes = sorted.filter((h) => (h.questoesRecomendadas?.length ?? 0) > 0);
+  const semQuestoes = sorted.filter((h) => (h.questoesRecomendadas?.length ?? 0) === 0);
 
   return (
-    <div>
-      <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-        <Flame className="h-3.5 w-3.5 text-destructive" />
-        Habilidades Críticas
-      </h4>
-      <div className="space-y-2">
-        {sorted.map((hab, i) => (
-          <HabilidadeCard key={hab.identificador || i} hab={hab} index={i} />
-        ))}
-      </div>
+    <div className="space-y-4">
+      {comQuestoes.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Flame className="h-3.5 w-3.5 text-destructive" />
+            Habilidades críticas — treinar agora
+          </h4>
+          <div className="space-y-2">
+            {comQuestoes.map((hab, i) => (
+              <HabilidadeCard key={hab.identificador || i} hab={hab} index={i} />
+            ))}
+          </div>
+        </div>
+      )}
+      {semQuestoes.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-wider mb-2">
+            Também caiu — fique de olho
+          </h4>
+          <div className="space-y-2">
+            {semQuestoes.map((hab, i) => (
+              <HabilidadeCard key={hab.identificador || i} hab={hab} index={i} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
