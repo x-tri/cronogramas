@@ -130,11 +130,11 @@ export function ActivityHeatmapCard({ student }: ActivityHeatmapCardProps) {
         <img src={logoXtri} alt="XTRI" className="h-7 w-7 flex-shrink-0" />
       </div>
 
-      {/* Heatmap grid — 7 rows (Mon..Sun) × WEEKS columns */}
-      <div className="mt-4 overflow-x-auto">
+      {/* Heatmap grid — 7 rows (Mon..Sun) × WEEKS columns, esticado p/ preencher a largura */}
+      <div className="mt-4">
         <div className="flex gap-[3px]">
           {weeks.map((week, w) => (
-            <div key={w} className="flex flex-col gap-[3px]">
+            <div key={w} className="flex flex-1 flex-col gap-[3px]">
               {week.map((cell) => (
                 <div
                   key={cell.date}
@@ -148,7 +148,7 @@ export function ActivityHeatmapCard({ student }: ActivityHeatmapCardProps) {
                         )}`
                   }
                   className={cn(
-                    "h-3 w-3 flex-shrink-0 rounded-[3px]",
+                    "aspect-square w-full rounded-[3px]",
                     cell.isFuture ? "bg-muted/40" : LEVEL_CLASS[cell.level],
                   )}
                 />
