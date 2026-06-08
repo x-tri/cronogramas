@@ -55,6 +55,12 @@ function makeResponse(id: string, answers: Record<string, string>): AuditRespons
   }
 }
 
+function answersFor(item1: string, rest2to20: string): Record<string, string> {
+  const a: Record<string, string> = { '1': item1 }
+  for (let n = 2; n <= 20; n++) a[String(n)] = rest2to20
+  return a
+}
+
 describe('computeResponseIntegrity', () => {
   it('confirma totais quando answers e agregados batem', () => {
     const items = makeItems()
@@ -113,6 +119,44 @@ describe('computeItemAudits', () => {
     expect(lcAudit.n_brancos).toBe(0)
     expect(chAudit.n_respostas).toBe(1)
     expect(chAudit.n_brancos).toBe(0)
+  })
+
+  it('marca gabarito provável errado quando o distrator domina e a discriminação é não-positiva', () => {
+    const items = makeItems()
+    // 6 alunos que acertam o resto (2-20) marcam B no item 1 (errado); 4 que erram o
+    // resto marcam A (gabarito) -> distrator domina e discriminação fica negativa.
+    const responses = [
+      ...Array.from({ length: 6 }, (_, i) => makeResponse(`forte-${i}`, answersFor('B', 'A'))),
+      ...Array.from({ length: 4 }, (_, i) => makeResponse(`fraco-${i}`, answersFor('A', 'B'))),
+    ]
+
+    const item1 = computeItemAudits(items, responses).find((a) => a.numero === 1)!
+
+    expect(item1.alternativa_mais_marcada).toBe('B')
+    expect(item1.discriminacao_proxy).not.toBeNull()
+    expect(item1.discriminacao_proxy!).toBeLessThanOrEqual(0)
+    expect(item1.classifications).toContain('gabarito_provavel_errado')
+    // o sinal forte substitui o genérico e item com sinal nunca é "confiável"
+    expect(item1.classifications).not.toContain('sinal_revisao_gabarito')
+    expect(item1.classifications).not.toContain('confiavel_operacionalmente')
+  })
+
+  it('marca confiável operacionalmente apenas quando o item não tem nenhum sinal de revisão', () => {
+    const items = makeItems()
+    const responses = [
+      ...Array.from({ length: 6 }, (_, i) => makeResponse(`forte-${i}`, answersFor('B', 'A'))),
+      ...Array.from({ length: 4 }, (_, i) => makeResponse(`fraco-${i}`, answersFor('A', 'B'))),
+    ]
+
+    const audits = computeItemAudits(items, responses)
+    const item1 = audits.find((a) => a.numero === 1)! // tem sinal de revisão
+    const item2 = audits.find((a) => a.numero === 2)! // limpo: gabarito A, maioria acerta, disc positiva
+
+    expect(item1.classifications).not.toContain('confiavel_operacionalmente')
+    expect(item2.classifications).toContain('confiavel_operacionalmente')
+    expect(
+      item2.classifications.some((c) => c === 'gabarito_provavel_errado' || c.startsWith('sinal_')),
+    ).toBe(false)
   })
 })
 

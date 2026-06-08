@@ -12,10 +12,15 @@ import type { AreaKey } from './tri-engine/reference-tables.ts'
 export const SIMULADO_AUDIT_VERSION = '1.0'
 export const MIN_STRONG_ITEM_N = 60
 export const GABARITO_REVIEW_TOP_ALT_PCT = 0.35
+// Margem mínima (entre quem respondeu) pela qual o distrator precisa superar o
+// gabarito para caracterizar chave provavelmente errada. Guarda conservador —
+// junto com discriminação não-positiva — para não acusar gabarito por ruído.
+export const GABARITO_MISKEY_MARGIN = 0.1
 
 export type ItemAuditClassification =
   | 'confiavel_operacionalmente'
   | 'sinal_revisao_gabarito'
+  | 'gabarito_provavel_errado'
   | 'sinal_revisao_dificuldade'
   | 'sinal_revisao_discriminacao'
   | 'amostra_insuficiente'
@@ -267,16 +272,34 @@ export function computeItemAudits(
         top && nRespondidas > 0 ? top[1] / nRespondidas : null
       const discriminacaoProxy = pearson(itemScores, areaScoresWithoutItem)
 
+      // Acerto e margem do distrator medidos sobre quem respondeu (mesmo denominador
+      // de alternativa_mais_marcada_pct), para comparação justa.
+      const acertoEntreRespondidas = nRespondidas > 0 ? nAcertos / nRespondidas : null
+      const margemDistrator =
+        alternativaMaisMarcadaPct != null && acertoEntreRespondidas != null
+          ? alternativaMaisMarcadaPct - acertoEntreRespondidas
+          : null
+      const topDifereDoGabarito =
+        alternativaMaisMarcada != null && alternativaMaisMarcada !== gabarito
+
       const classifications = new Set<ItemAuditClassification>()
-      classifications.add('confiavel_operacionalmente')
       classifications.add('bloqueado_para_recalculo')
 
       if (nRespostas < MIN_STRONG_ITEM_N) {
         classifications.add('amostra_insuficiente')
       }
+      // Gabarito: assinatura forte de chave errada (distrator supera o gabarito por
+      // >= GABARITO_MISKEY_MARGIN E discriminação item-resto não-positiva) vs. sinal
+      // genérico de distrator. Os dois são apenas sinais de revisão, não veredito.
       if (
-        alternativaMaisMarcada != null &&
-        alternativaMaisMarcada !== gabarito &&
+        topDifereDoGabarito &&
+        discriminacaoProxy != null &&
+        discriminacaoProxy <= 0 &&
+        (margemDistrator ?? 0) >= GABARITO_MISKEY_MARGIN
+      ) {
+        classifications.add('gabarito_provavel_errado')
+      } else if (
+        topDifereDoGabarito &&
         (alternativaMaisMarcadaPct ?? 0) >= GABARITO_REVIEW_TOP_ALT_PCT
       ) {
         classifications.add('sinal_revisao_gabarito')
@@ -289,6 +312,17 @@ export function computeItemAudits(
       }
       if (discriminacaoProxy != null && discriminacaoProxy < 0.1) {
         classifications.add('sinal_revisao_discriminacao')
+      }
+      // Confiável operacionalmente = nenhum sinal de revisão acima.
+      const temSinalDeRevisao = [...classifications].some(
+        (c) =>
+          c === 'gabarito_provavel_errado' ||
+          c === 'sinal_revisao_gabarito' ||
+          c === 'sinal_revisao_dificuldade' ||
+          c === 'sinal_revisao_discriminacao',
+      )
+      if (!temSinalDeRevisao) {
+        classifications.add('confiavel_operacionalmente')
       }
 
       return {
@@ -389,6 +423,7 @@ export function auditSummary(audits: readonly ItemAuditResult[]): Record<ItemAud
   const out: Record<ItemAuditClassification, number> = {
     confiavel_operacionalmente: 0,
     sinal_revisao_gabarito: 0,
+    gabarito_provavel_errado: 0,
     sinal_revisao_dificuldade: 0,
     sinal_revisao_discriminacao: 0,
     amostra_insuficiente: 0,

@@ -51,6 +51,7 @@ interface IntegrityState {
 
 const CLASSIFICATION_LABELS: Record<ItemAuditClassification, string> = {
   confiavel_operacionalmente: "Confiável operacionalmente",
+  gabarito_provavel_errado: "Gabarito provável errado",
   sinal_revisao_gabarito: "Revisar gabarito/distrator",
   sinal_revisao_dificuldade: "Revisar dificuldade",
   sinal_revisao_discriminacao: "Revisar discriminação",
@@ -59,6 +60,7 @@ const CLASSIFICATION_LABELS: Record<ItemAuditClassification, string> = {
 };
 
 const PRIORITY: readonly ItemAuditClassification[] = [
+  "gabarito_provavel_errado",
   "sinal_revisao_gabarito",
   "sinal_revisao_discriminacao",
   "sinal_revisao_dificuldade",
@@ -66,6 +68,16 @@ const PRIORITY: readonly ItemAuditClassification[] = [
   "bloqueado_para_recalculo",
   "confiavel_operacionalmente",
 ];
+
+// Classificações que são sinal de revisão (mostradas como badge na linha).
+// As demais (confiável / recálculo bloqueado / amostra insuficiente) são estados
+// constantes e ficam fora das linhas para reduzir ruído.
+const REVIEW_CLASSIFICATIONS: ReadonlySet<ItemAuditClassification> = new Set([
+  "gabarito_provavel_errado",
+  "sinal_revisao_gabarito",
+  "sinal_revisao_discriminacao",
+  "sinal_revisao_dificuldade",
+]);
 
 function toNum(v: number | string | null): number | null {
   if (v == null) return null;
@@ -107,7 +119,7 @@ function formatNum(v: number | null): string {
 }
 
 function hasAnySignal(audit: ItemAuditResult): boolean {
-  return audit.classifications.some((c) => c.startsWith("sinal_"));
+  return audit.classifications.some((c) => REVIEW_CLASSIFICATIONS.has(c));
 }
 
 export function SimuladoItemAudit({
@@ -158,6 +170,10 @@ export function SimuladoItemAudit({
       const aPriority = PRIORITY.findIndex((c) => a.classifications.includes(c));
       const bPriority = PRIORITY.findIndex((c) => b.classifications.includes(c));
       if (aPriority !== bPriority) return aPriority - bPriority;
+      // Mesmo nível: pior primeiro (discriminação mais baixa/negativa).
+      const aDisc = a.discriminacao_proxy ?? Number.POSITIVE_INFINITY;
+      const bDisc = b.discriminacao_proxy ?? Number.POSITIVE_INFINITY;
+      if (aDisc !== bDisc) return aDisc - bDisc;
       return a.numero - b.numero;
     });
   }, [audits, showOnlySignals]);
@@ -236,17 +252,25 @@ export function SimuladoItemAudit({
             </section>
           )}
 
-          <section className="grid gap-3 md:grid-cols-6">
-            {PRIORITY.map((key) => (
-              <div key={key} className="rounded-lg border border-[#e5e7eb] bg-white p-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#94a3b8]">
-                  {CLASSIFICATION_LABELS[key]}
-                </p>
-                <p className="mt-1 text-2xl font-black text-[#1d1d1f]">
-                  {summary[key]}
-                </p>
-              </div>
-            ))}
+          <section className="grid gap-3 md:grid-cols-4 lg:grid-cols-7">
+            {PRIORITY.map((key) => {
+              const critico = key === "gabarito_provavel_errado" && summary[key] > 0;
+              return (
+                <div
+                  key={key}
+                  className={`rounded-lg border bg-white p-3 ${
+                    critico ? "border-[#fca5a5]" : "border-[#e5e7eb]"
+                  }`}
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#94a3b8]">
+                    {CLASSIFICATION_LABELS[key]}
+                  </p>
+                  <p className={`mt-1 text-2xl font-black ${critico ? "text-[#b91c1c]" : "text-[#1d1d1f]"}`}>
+                    {summary[key]}
+                  </p>
+                </div>
+              );
+            })}
           </section>
 
           <section className="rounded-xl border border-[#e5e7eb] bg-white">
@@ -302,14 +326,30 @@ export function SimuladoItemAudit({
                         <td className="px-2 py-2 text-center">{formatNum(audit.discriminacao_proxy)}</td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-1">
-                            {audit.classifications.map((c) => (
-                              <span
-                                key={c}
-                                className="rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[10px] font-semibold text-[#334155]"
-                              >
-                                {CLASSIFICATION_LABELS[c]}
-                              </span>
-                            ))}
+                            {(() => {
+                              const sinais = audit.classifications.filter((c) =>
+                                REVIEW_CLASSIFICATIONS.has(c),
+                              );
+                              if (sinais.length === 0) {
+                                return (
+                                  <span className="text-[10px] text-[#94a3b8]">
+                                    Confiável operacionalmente
+                                  </span>
+                                );
+                              }
+                              return sinais.map((c) => (
+                                <span
+                                  key={c}
+                                  className={
+                                    c === "gabarito_provavel_errado"
+                                      ? "rounded-full bg-[#fee2e2] px-2 py-0.5 text-[10px] font-bold text-[#b91c1c]"
+                                      : "rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[10px] font-semibold text-[#334155]"
+                                  }
+                                >
+                                  {CLASSIFICATION_LABELS[c]}
+                                </span>
+                              ));
+                            })()}
                           </div>
                         </td>
                       </tr>
