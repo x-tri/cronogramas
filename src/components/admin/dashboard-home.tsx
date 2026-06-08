@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+// Leitura cruzada (sem juntar bancos): cronograma/atendimento vem do PRIMARY (supabase),
+// alcance/simulado vem do LEGACY de gabaritos (simuladoSupabase). Merge só na exibição, por school_id.
 import { simuladoSupabase } from "../../lib/simulado-supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -276,21 +278,28 @@ export function DashboardHome({
   }, []);
 
   const loadStats = useCallback(async () => {
-    const [operationRes, storageRes, todayRes, weekRes] = await Promise.all([
+    // PRIMARY = produção real (cronograma, blocos). LEGACY = alcance (simulado, base, downloads).
+    const primaryQuery =
+      isSchoolScoped && userSchoolId
+        ? supabase
+            .from("executive_school_activity")
+            .select("*")
+            .eq("school_id", userSchoolId)
+            .maybeSingle()
+        : supabase.from("executive_operation_metrics").select("*").maybeSingle();
+    const legacyQuery =
       isSchoolScoped && userSchoolId
         ? simuladoSupabase
             .from("executive_school_activity")
             .select("*")
             .eq("school_id", userSchoolId)
             .maybeSingle()
-        : simuladoSupabase
-            .from("executive_operation_metrics")
-            .select("*")
-            .maybeSingle(),
-      simuladoSupabase
-        .from("executive_storage_metrics")
-        .select("*")
-        .maybeSingle(),
+        : simuladoSupabase.from("executive_operation_metrics").select("*").maybeSingle();
+
+    const [primaryRes, legacyRes, storageRes, todayRes, weekRes] = await Promise.all([
+      primaryQuery,
+      legacyQuery,
+      simuladoSupabase.from("executive_storage_metrics").select("*").maybeSingle(),
       supabase
         .from("cronogramas")
         .select("*", { count: "exact", head: true })
@@ -301,8 +310,11 @@ export function DashboardHome({
         .gte("created_at", startOfDay(7)),
     ]);
 
-    if (operationRes.error) {
-      console.error("[DashboardHome] Falha ao carregar métricas executivas", operationRes.error);
+    if (primaryRes.error) {
+      console.error("[DashboardHome] Falha ao carregar métricas de cronograma (PRIMARY)", primaryRes.error);
+    }
+    if (legacyRes.error) {
+      console.error("[DashboardHome] Falha ao carregar métricas de simulado/alcance (LEGACY)", legacyRes.error);
     }
     if (storageRes.error) {
       console.error("[DashboardHome] Falha ao carregar métricas de storage", storageRes.error);
@@ -314,36 +326,28 @@ export function DashboardHome({
       console.error("[DashboardHome] Falha ao contar cronogramas da semana", weekRes.error);
     }
 
-    const operation = operationRes.data as Record<string, unknown> | null;
+    const primary = primaryRes.data as Record<string, unknown> | null; // cronograma (PRIMARY)
+    const legacy = legacyRes.data as Record<string, unknown> | null; // simulado/alcance (LEGACY)
     const storage = storageRes.data as Record<string, unknown> | null;
 
-    if (!operation) {
-      setStats((current) => ({
-        ...current,
-        storage_objects: toNumber(storage?.storage_objects),
-        storage_bytes: toNumber(storage?.storage_bytes),
-        cronogramas_today: todayRes.count ?? 0,
-        cronogramas_week: weekRes.count ?? 0,
-      }));
-      return;
-    }
-
-    const alunosComCronograma = toNumber(operation.alunos_com_cronograma);
-    const blocosCriados = toNumber(operation.blocos_criados);
+    const alunosComCronograma = toNumber(primary?.alunos_com_cronograma);
+    const blocosCriados = toNumber(primary?.blocos_criados);
 
     setStats({
-      escolas_ativas: isSchoolScoped ? (operation.escola_ativa ? 1 : 0) : toNumber(operation.escolas_ativas),
-      alunos_base_escolas_ativas: toNumber(operation.alunos_base_escolas_ativas ?? operation.alunos_base),
-      alunos_atendidos: toNumber(operation.alunos_atendidos),
-      alunos_com_simulado: toNumber(operation.alunos_com_simulado),
+      escolas_ativas: isSchoolScoped
+        ? (legacy?.escola_ativa || alunosComCronograma > 0 ? 1 : 0)
+        : toNumber(legacy?.escolas_ativas),
+      alunos_base_escolas_ativas: toNumber(legacy?.alunos_base_escolas_ativas ?? legacy?.alunos_base),
+      alunos_atendidos: alunosComCronograma, // atendido = aluno com cronograma gerado (PRIMARY)
+      alunos_com_simulado: toNumber(legacy?.alunos_com_simulado), // alcance (LEGACY)
       alunos_com_cronograma: alunosComCronograma,
-      cronogramas_gerados: toNumber(operation.cronogramas_gerados),
+      cronogramas_gerados: toNumber(primary?.cronogramas_gerados),
       blocos_criados: blocosCriados,
       blocos_por_aluno_com_cronograma: toNumber(
-        operation.blocos_por_aluno_com_cronograma ??
+        primary?.blocos_por_aluno_com_cronograma ??
           (alunosComCronograma > 0 ? blocosCriados / alunosComCronograma : 0),
       ),
-      downloads_listas: toNumber(operation.downloads_listas),
+      downloads_listas: toNumber(legacy?.downloads_listas),
       storage_objects: toNumber(storage?.storage_objects),
       storage_bytes: toNumber(storage?.storage_bytes),
       cronogramas_today: todayRes.count ?? 0,
@@ -401,39 +405,75 @@ export function DashboardHome({
   }, [countScopedCronogramas, isSchoolScoped, loadScopedStudentIds, userSchoolId]);
 
   const loadSchoolHealth = useCallback(async () => {
-    let query = simuladoSupabase
+    // LEGACY: alcance por escola (base, simulado, downloads, nome) — mantém TODAS as escolas
+    // que fizeram simulado, mesmo sem cronograma. PRIMARY: cronograma/blocos reais, sobrepostos.
+    let legacyQuery = simuladoSupabase
       .from("executive_school_activity")
-      .select("school_id, escola, alunos_base, alunos_com_simulado, alunos_com_cronograma, alunos_atendidos, cronogramas_gerados, blocos_criados, downloads_listas, escola_ativa")
-      .order("alunos_atendidos", { ascending: false });
+      .select("school_id, escola, alunos_base, alunos_com_simulado, downloads_listas, escola_ativa");
+    let primaryQuery = supabase
+      .from("executive_school_activity")
+      .select("school_id, alunos_com_cronograma, cronogramas_gerados, blocos_criados");
 
     if (isSchoolScoped && userSchoolId) {
-      query = query.eq("school_id", userSchoolId);
+      legacyQuery = legacyQuery.eq("school_id", userSchoolId);
+      primaryQuery = primaryQuery.eq("school_id", userSchoolId);
     } else {
-      query = query.eq("escola_ativa", true);
+      legacyQuery = legacyQuery.eq("escola_ativa", true);
     }
 
-    const { data, error } = await query;
+    const [legacyRes, primaryRes] = await Promise.all([legacyQuery, primaryQuery]);
 
-    if (error) {
-      console.error("[DashboardHome] Falha ao carregar saúde das escolas", error);
+    if (legacyRes.error) {
+      console.error("[DashboardHome] Falha ao carregar alcance das escolas (LEGACY)", legacyRes.error);
       setSchoolHealth([]);
       return;
     }
+    if (primaryRes.error) {
+      console.error("[DashboardHome] Falha ao carregar cronograma das escolas (PRIMARY)", primaryRes.error);
+    }
 
-    setSchoolHealth(
-      (data ?? []).map((school) => ({
+    const cronogramaBySchool = new Map<
+      string,
+      { cronograma: number; cronogramas_gerados: number; blocos: number }
+    >();
+    for (const row of primaryRes.data ?? []) {
+      cronogramaBySchool.set(String(row.school_id), {
+        cronograma: toNumber(row.alunos_com_cronograma),
+        cronogramas_gerados: toNumber(row.cronogramas_gerados),
+        blocos: toNumber(row.blocos_criados),
+      });
+    }
+
+    const merged: SchoolHealth[] = (legacyRes.data ?? [])
+      .filter((school) => !/^teste/i.test(String(school.escola ?? "").trim()))
+      .map((school) => {
+      const cron = cronogramaBySchool.get(String(school.school_id)) ?? {
+        cronograma: 0,
+        cronogramas_gerados: 0,
+        blocos: 0,
+      };
+      return {
         school_id: String(school.school_id),
         name: String(school.escola),
         alunos_base: toNumber(school.alunos_base),
         alunos_com_simulado: toNumber(school.alunos_com_simulado),
-        alunos_com_cronograma: toNumber(school.alunos_com_cronograma),
-        alunos_atendidos: toNumber(school.alunos_atendidos),
-        cronogramas_gerados: toNumber(school.cronogramas_gerados),
-        blocos_criados: toNumber(school.blocos_criados),
+        alunos_com_cronograma: cron.cronograma,
+        alunos_atendidos: cron.cronograma, // atendido = cronograma (PRIMARY), não simulado
+        cronogramas_gerados: cron.cronogramas_gerados,
+        blocos_criados: cron.blocos,
         downloads_listas: toNumber(school.downloads_listas),
         escola_ativa: Boolean(school.escola_ativa),
-      })),
+      };
+    });
+
+    // Atendimento (cronograma) primeiro; depois alcance (simulado).
+    merged.sort(
+      (a, b) =>
+        b.alunos_atendidos - a.alunos_atendidos ||
+        b.alunos_com_simulado - a.alunos_com_simulado,
     );
+
+    setSchoolHealth(merged);
   }, [isSchoolScoped, userSchoolId]);
 
   useEffect(() => {
@@ -470,8 +510,8 @@ export function DashboardHome({
           O que foi produzido na operação e como cada escola está rodando
         </h2>
         <p className="mt-1 text-sm text-[#64748b]">
-          Esta tela separa atendimento de cronograma: alunos com simulado entram como
-          atendidos, enquanto cronogramas e blocos medem a produção de planos de estudo.
+          Atendimento = aluno com cronograma de estudo gerado (produção real). "Fizeram simulado"
+          é o alcance — quem fez a prova, mesmo sem plano ainda. Cobertura = atendidos / base.
         </p>
       </div>
 
@@ -485,7 +525,7 @@ export function DashboardHome({
             <KpiCard
               label="Alunos atendidos"
               value={stats.alunos_atendidos}
-              subtitle={`${stats.alunos_com_simulado} com simulado • ${stats.alunos_com_cronograma} com cronograma`}
+              subtitle={`com cronograma gerado • ${stats.alunos_com_simulado} fizeram simulado`}
               icon={<IconStudent />}
             />
             <KpiCard
@@ -619,7 +659,7 @@ export function DashboardHome({
                   <div className="grid grid-cols-2 gap-2 text-xs text-[#64748b]">
                     <span>{school.alunos_atendidos}/{school.alunos_base} atendidos</span>
                     <span>{coverage}% cobertura</span>
-                    <span>{school.alunos_com_cronograma} com cronograma</span>
+                    <span>{school.alunos_com_simulado} fizeram simulado</span>
                     <span>{school.blocos_criados} blocos</span>
                   </div>
                 </div>
