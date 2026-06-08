@@ -500,6 +500,12 @@ export function DashboardHome({
 
   const maxChartValue = Math.max(...chartData.map((d) => d.count), 1);
 
+  // Backlog: escolas que fizeram simulado mas ainda não têm nenhum cronograma gerado.
+  const backlogSchools = schoolHealth.filter(
+    (s) => s.alunos_com_simulado > 0 && s.alunos_atendidos === 0,
+  );
+  const backlogAlunos = backlogSchools.reduce((sum, s) => sum + s.alunos_com_simulado, 0);
+
   return (
     <div className="space-y-8">
       <div className="rounded-2xl border border-[#e5e7eb] bg-white p-5">
@@ -645,16 +651,39 @@ export function DashboardHome({
         {schoolHealth.length === 0 ? (
           <p className="text-sm text-[#94a3b8]">Nenhuma escola cadastrada</p>
         ) : (
+          <>
+            {backlogSchools.length > 0 && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#fcd34d] bg-[#fffbeb] px-4 py-3">
+                <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#dc2626]" />
+                <p className="text-sm text-[#92400e]">
+                  <span className="font-semibold">{backlogSchools.length} escolas</span>
+                  {" • "}
+                  <span className="font-semibold">{backlogAlunos} alunos</span> fizeram simulado e
+                  ainda não têm cronograma gerado — fila de plano a produzir.
+                </p>
+              </div>
+            )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {schoolHealth.map((school) => {
               const coverage = school.alunos_base > 0 ? Math.round((school.alunos_atendidos / school.alunos_base) * 100) : 0;
               const dotColor = coverage >= 80 ? "bg-[#10b981]" : coverage >= 40 ? "bg-[#f59e0b]" : "bg-[#dc2626]";
+              const isBacklog = school.alunos_com_simulado > 0 && school.alunos_atendidos === 0;
 
               return (
-                <div key={school.school_id} className="bg-white rounded-2xl border border-[#e5e7eb] p-4">
+                <div
+                  key={school.school_id}
+                  className={`rounded-2xl border p-4 ${
+                    isBacklog ? "border-[#fcd34d] bg-[#fffdf5]" : "border-[#e5e7eb] bg-white"
+                  }`}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
                     <h4 className="text-sm font-semibold text-[#1d1d1f] truncate">{school.name}</h4>
+                    {isBacklog && (
+                      <span className="ml-auto shrink-0 rounded-full bg-[#fef3c7] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#92400e]">
+                        sem plano
+                      </span>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs text-[#64748b]">
                     <span>{school.alunos_atendidos}/{school.alunos_base} atendidos</span>
@@ -666,6 +695,7 @@ export function DashboardHome({
               );
             })}
           </div>
+          </>
         )}
       </div>
     </div>
