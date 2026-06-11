@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { DEFAULT_SCHOOL_YEAR } from "../../data/supabase-repository";
 
 interface School {
   id: string;
@@ -24,7 +25,6 @@ interface AdminHorariosProps {
   embedded?: boolean;
 }
 
-const DEFAULT_SCHOOL_YEAR = 2026;
 const DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado"] as const;
 const DIA_LABELS: Record<string, string> = {
   segunda: "Seg",
