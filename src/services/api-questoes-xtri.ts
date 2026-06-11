@@ -243,6 +243,8 @@ export function mapApiToQuestionCandidate(q: ApiQuestion): QuestionCandidateRow 
     image_url: q.image,
     image_alt: null,
     difficulty: paramBToBucket(q.param_b),
+    param_b: q.param_b,
+    param_a: q.param_a,
     created_at: null,
   }
 }

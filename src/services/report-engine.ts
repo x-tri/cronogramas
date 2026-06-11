@@ -52,6 +52,7 @@ import {
   filterPdfSafeRecommendations,
   getDifficultyWindowForTri,
   mergeRecommendationsForStudent,
+  normalizeIrtParam,
   pickRecommendationsForStudent,
 } from './report-recommendations'
 import {
@@ -508,8 +509,8 @@ async function computeParametrosTRI(
       const params = coItemMap.get(coItem)
       if (!params) continue
 
-      const b = Number(params.param_dificuldade ?? 0)
-      const a = Number(params.param_discriminacao ?? 0)
+      const b = normalizeIrtParam(Number(params.param_dificuldade ?? 0))
+      const a = normalizeIrtParam(Number(params.param_discriminacao ?? 0))
       const c = Number(params.param_acerto_casual ?? 0)
 
       itensErrados.push({
@@ -1251,8 +1252,10 @@ async function fetchTopicMatchedRecommendations(params: {
           selectionSource: 'same_topic' as const,
           sourceExam: candidate.source_exam ?? null,
           sourceExamUsed,
-          dificuldade: difficultyByBucket[(candidate.difficulty as string) ?? ''] ?? 0,
-          discriminacao: 0,
+          // param_b/param_a reais da API quando presentes (requireParamB=true
+          // garante b); bucket textual é só rede de segurança
+          dificuldade: candidate.param_b != null ? normalizeIrtParam(candidate.param_b) : difficultyByBucket[(candidate.difficulty as string) ?? ''] ?? 0,
+          discriminacao: normalizeIrtParam(candidate.param_a),
           linkImagem: null,
           gabarito: correctOpt?.letter ?? null,
           posicaoCaderno: candidate.source_question as number | null,
@@ -1399,14 +1402,14 @@ async function computeQuestoesRecomendadas(
         const itensQuery = useAreaFallback
           ? inepClient
               .from('enem_itens')
-              .select('co_item, param_dificuldade, numero_habilidade')
+              .select('co_item, param_dificuldade, param_discriminacao, numero_habilidade')
               .eq('area', area)
               .gte('param_dificuldade', paramBMin)
               .lte('param_dificuldade', paramBMax)
               .limit(60)
           : inepClient
               .from('enem_itens')
-              .select('co_item, param_dificuldade, numero_habilidade')
+              .select('co_item, param_dificuldade, param_discriminacao, numero_habilidade')
               .eq('area', area)
               .in('numero_habilidade', habNums)
               .gte('param_dificuldade', paramBMin)
@@ -1421,12 +1424,12 @@ async function computeQuestoesRecomendadas(
               const fallbackQuery = useAreaFallback
                 ? inepClient
                     .from('enem_itens')
-                    .select('co_item, param_dificuldade, numero_habilidade')
+                    .select('co_item, param_dificuldade, param_discriminacao, numero_habilidade')
                     .eq('area', area)
                     .limit(60)
                 : inepClient
                     .from('enem_itens')
-                    .select('co_item, param_dificuldade, numero_habilidade')
+                    .select('co_item, param_dificuldade, param_discriminacao, numero_habilidade')
                     .eq('area', area)
                     .in('numero_habilidade', habNums)
               const { data } = await fallbackQuery
@@ -1435,7 +1438,8 @@ async function computeQuestoesRecomendadas(
 
         if (itensParaUsar.length > 0) {
           const coItems = [...new Set(itensParaUsar.map(i => i.co_item as number))]
-          const diffMap = new Map(itensParaUsar.map(i => [i.co_item as number, Number(i.param_dificuldade ?? 0)]))
+          const diffMap = new Map(itensParaUsar.map(i => [i.co_item as number, normalizeIrtParam(Number(i.param_dificuldade ?? 0))]))
+          const discMap = new Map(itensParaUsar.map(i => [i.co_item as number, normalizeIrtParam(Number(i.param_discriminacao ?? 0))]))
           const habMap = new Map(itensParaUsar.map(i => [i.co_item as number, i.numero_habilidade as number]))
 
           // 1c. Buscar posições no caderno para esses co_items (anos recentes)
@@ -1455,6 +1459,7 @@ async function computeQuestoesRecomendadas(
               posicaoCaderno: number
               paramB: number
               dificuldade: number
+              discriminacao: number
               habNum: number
               coItem: number
             }> = []
@@ -1468,6 +1473,7 @@ async function computeQuestoesRecomendadas(
                   posicaoCaderno: p.posicao as number,
                   paramB: diffMap.get(p.co_item as number) ?? 0,
                   dificuldade: diffMap.get(p.co_item as number) ?? 0,
+                  discriminacao: discMap.get(p.co_item as number) ?? 0,
                   habNum: habMap.get(p.co_item as number) ?? topHab.numeroHabilidade,
                   coItem: p.co_item as number,
                 })
@@ -1524,7 +1530,7 @@ async function computeQuestoesRecomendadas(
                       sourceExam: q.source_exam ?? null,
                       sourceExamUsed,
                       dificuldade: pair?.paramB ?? 0,
-                      discriminacao: 0,
+                      discriminacao: pair?.discriminacao ?? 0,
                       linkImagem: null,
                       gabarito: correctOpt?.letter ?? null,
                       posicaoCaderno: q.source_question as number | null,
@@ -1603,8 +1609,8 @@ async function computeQuestoesRecomendadas(
                 selectionSource: 'area_fallback' as const,
                 sourceExam: q.source_exam ?? null,
                 sourceExamUsed,
-                dificuldade: diffMap[(q.difficulty as string) ?? ''] ?? 0,
-                discriminacao: 0,
+                dificuldade: q.param_b != null ? normalizeIrtParam(q.param_b) : diffMap[(q.difficulty as string) ?? ''] ?? 0,
+                discriminacao: normalizeIrtParam(q.param_a),
                 linkImagem: null,
                 gabarito: correctOpt?.letter ?? null,
                 posicaoCaderno: q.source_question as number | null,

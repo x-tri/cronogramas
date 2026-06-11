@@ -6,8 +6,31 @@ import {
   filterPdfSafeRecommendations,
   getDifficultyWindowForTri,
   mergeRecommendationsForStudent,
+  normalizeIrtParam,
   pickRecommendationsForStudent,
 } from './report-recommendations'
+
+describe('normalizeIrtParam', () => {
+  // ~4% dos itens INEP têm escala x100 por erro de importação
+  // (1.06685 importado como 106.685). Detectado em 2026-06-11.
+  it('corrige parâmetros importados com fator x100', () => {
+    expect(normalizeIrtParam(106.685)).toBeCloseTo(1.06685)
+    expect(normalizeIrtParam(221.619)).toBeCloseTo(2.21619)
+    expect(normalizeIrtParam(-180.5)).toBeCloseTo(-1.805)
+  })
+
+  it('mantém parâmetros na escala IRT normal', () => {
+    expect(normalizeIrtParam(0.36753)).toBe(0.36753)
+    expect(normalizeIrtParam(-2.4)).toBe(-2.4)
+    expect(normalizeIrtParam(3.9)).toBe(3.9)
+  })
+
+  it('nulo/indefinido/NaN viram 0', () => {
+    expect(normalizeIrtParam(null)).toBe(0)
+    expect(normalizeIrtParam(undefined)).toBe(0)
+    expect(normalizeIrtParam(Number.NaN)).toBe(0)
+  })
+})
 
 describe('report-recommendations', () => {
   it('deduplica por ano e posicao do caderno antes de limitar', () => {
@@ -48,6 +71,51 @@ describe('report-recommendations', () => {
 
     expect(lowTri.map((item) => item.coItem)).toEqual([2, 1, 3])
     expect(highTri.map((item) => item.coItem)).toEqual([3, 2, 1])
+  })
+
+  it('em dificuldade equivalente, prefere a questao mais discriminativa (param_a)', () => {
+    // Itens praticamente no mesmo nível (mesma faixa de 0.1 de distância do
+    // alvo): o de maior discriminação informa mais sobre o aluno (a²·P·Q).
+    // TRI 600 = faixa balanceada, sem viés de lado interferindo.
+    const picked = pickRecommendationsForStudent(
+      [
+        { ano: 2024, dificuldade: 1.02, posicaoCaderno: 10, coItem: 1, discriminacao: 0.8 },
+        { ano: 2023, dificuldade: 1.04, posicaoCaderno: 11, coItem: 2, discriminacao: 2.1 },
+        { ano: 2022, dificuldade: 0.98, posicaoCaderno: 12, coItem: 3, discriminacao: 1.4 },
+      ],
+      600, // alvo b = 1.0
+      3,
+    )
+
+    expect(picked.map((item) => item.coItem)).toEqual([2, 3, 1])
+  })
+
+  it('discriminacao nao passa na frente de proximidade do nivel', () => {
+    const picked = pickRecommendationsForStudent(
+      [
+        // longe do alvo (b=0.4) mas muito discriminativa
+        { ano: 2024, dificuldade: 1.2, posicaoCaderno: 10, coItem: 1, discriminacao: 2.5 },
+        // no alvo, discriminação baixa
+        { ano: 2023, dificuldade: 0.4, posicaoCaderno: 11, coItem: 2, discriminacao: 0.5 },
+      ],
+      540,
+      2,
+    )
+
+    expect(picked.map((item) => item.coItem)).toEqual([2, 1])
+  })
+
+  it('itens sem discriminacao continuam ordenando como antes', () => {
+    const picked = pickRecommendationsForStudent(
+      [
+        { ano: 2022, dificuldade: 0.9, posicaoCaderno: 2, coItem: 1 },
+        { ano: 2022, dificuldade: 0.4, posicaoCaderno: 3, coItem: 2 },
+      ],
+      540,
+      2,
+    )
+
+    expect(picked.map((item) => item.coItem)).toEqual([2, 1])
   })
 
   it('prioriza questoes com imagem quando estao na faixa adequada do aluno', () => {

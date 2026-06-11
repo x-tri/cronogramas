@@ -1,6 +1,8 @@
 export interface RecommendationLike {
   readonly ano: number
   readonly dificuldade: number
+  /** param_a da TRI — itens mais discriminativos informam mais (a²·P·Q) */
+  readonly discriminacao?: number
   readonly posicaoCaderno: number | null
   readonly coItem: number
   readonly imagemUrl?: string | null
@@ -39,6 +41,17 @@ export interface DifficultyWindow {
 }
 
 type DifficultyBias = 'easier' | 'balanced' | 'harder'
+
+/**
+ * Normaliza parâmetro IRT vindo dos microdados/API. ~4% dos itens da tabela
+ * INEP têm escala x100 por erro de importação (1.06685 → 106.685) — detectado
+ * em 2026-06-11. Parâmetros IRT legítimos vivem em |x| ≤ 10.
+ */
+export function normalizeIrtParam(value: number | null | undefined): number {
+  if (value == null || Number.isNaN(value)) return 0
+  if (Math.abs(value) > 10) return value / 100
+  return value
+}
 
 export function getDifficultyWindowForTri(
   tri: number | null | undefined,
@@ -215,6 +228,21 @@ export function sortRecommendationsByStudentLevel<T extends RecommendationLike>(
 
     const leftDistance = Math.abs(left.dificuldade - target)
     const rightDistance = Math.abs(right.dificuldade - target)
+
+    // Distância em faixas de 0.1: dentro da mesma faixa, dificuldades são
+    // pedagogicamente equivalentes — desempata pela discriminação (param_a),
+    // que mede o quanto o item informa sobre o nível do aluno.
+    const leftDistanceBucket = Math.round(leftDistance * 10)
+    const rightDistanceBucket = Math.round(rightDistance * 10)
+    if (leftDistanceBucket !== rightDistanceBucket) {
+      return leftDistanceBucket - rightDistanceBucket
+    }
+
+    const leftDiscrimination = left.discriminacao ?? 0
+    const rightDiscrimination = right.discriminacao ?? 0
+    if (leftDiscrimination !== rightDiscrimination) {
+      return rightDiscrimination - leftDiscrimination
+    }
 
     if (leftDistance !== rightDistance) {
       return leftDistance - rightDistance

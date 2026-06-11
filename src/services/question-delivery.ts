@@ -18,6 +18,10 @@ export interface QuestionCandidateRow {
   readonly image_url: string | null
   readonly image_alt?: string | null
   readonly difficulty?: string | null
+  /** param_b TRI real da API (escala IRT) — preferir ao bucket textual */
+  readonly param_b?: number | null
+  /** param_a TRI real da API (discriminação) */
+  readonly param_a?: number | null
 }
 
 export interface QuestionOptionRow {
