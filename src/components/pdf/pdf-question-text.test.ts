@@ -17,7 +17,7 @@ describe('sanitizeQuestionText', () => {
     ).toBe('Girassol da madrugada Teu dedo curioso me segue')
     expect(
       sanitizeQuestionText('VIEIRA JR., I.** Torto arado**. São Paulo: Todavia, 2019.'),
-    ).toBe('VIEIRA JR., I. Torto arado . São Paulo: Todavia, 2019.')
+    ).toBe('VIEIRA JR., I. Torto arado. São Paulo: Todavia, 2019.')
   })
 
   it('continua removendo imagens markdown', () => {
@@ -28,6 +28,31 @@ describe('sanitizeQuestionText', () => {
 
   it('não toca asteriscos isolados (multiplicação em MT)', () => {
     expect(sanitizeQuestionText('3 * 4 = 12')).toBe('3 * 4 = 12')
+  })
+
+  // Cicatrizes restantes no caderno da Nicole (4), 2026-06-11:
+  it('remove itálico markdown de underscore sem quebrar subscritos', () => {
+    expect(
+      sanitizeQuestionText('_Mindset_, empoderamento, _millennials_, _networking_, coworking'),
+    ).toBe('Mindset, empoderamento, millennials, networking, coworking')
+    // subscrito matemático não é par de itálico
+    expect(sanitizeQuestionText('x_1 + y_2 = z')).toBe('x_1 + y_2 = z')
+  })
+
+  it('remove escapes de barra invertida em pontuação', () => {
+    expect(sanitizeQuestionText('velho Chico Lourenço \\[seu pai\\].')).toBe(
+      'velho Chico Lourenço [seu pai].',
+    )
+    expect(sanitizeQuestionText('pedante e chato. \\[…\\]')).toBe('pedante e chato. […]')
+  })
+
+  it('remove espaço órfão antes de pontuação (sobra do **)', () => {
+    expect(sanitizeQuestionText('**Tudo sobre arte**. Rio de Janeiro')).toBe(
+      'Tudo sobre arte. Rio de Janeiro',
+    )
+    expect(sanitizeQuestionText('KEYS, A. **Here**. Estados Unidos')).toBe(
+      'KEYS, A. Here. Estados Unidos',
+    )
   })
 
   it('colapsa espaços múltiplos resultantes da limpeza', () => {

@@ -15,9 +15,17 @@ export function sanitizeQuestionText(text: string | null | undefined): string {
   return text
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\*\*/g, ' ')
+    // itálico markdown `_..._` — só quando o underscore abre após
+    // início/espaço/parêntese e fecha antes de espaço/pontuação, para não
+    // tocar subscritos matemáticos como x_1
+    .replace(/(^|[\s(])_([^_\n]+?)_(?=$|[\s).,;:!?])/gm, '$1$2')
+    // escapes de barra invertida vazados do markdown: \[ \] \( \) etc.
+    .replace(/\\([[\]().,;:!?*_-])/g, '$1')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]{2,}/g, ' ')
+    // espaço órfão antes de pontuação (sobra da remoção do **)
+    .replace(/ +([.,;:!?])/g, '$1')
     .trim()
 }
 
