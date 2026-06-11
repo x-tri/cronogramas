@@ -1,11 +1,17 @@
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer'
 import type { ReportData, HabilidadeCritica, QuestaoRecomendada, AreaSigla } from '../../types/report'
-import { shouldRenderQuestionImage } from '../../services/question-delivery'
 import {
   buildQuestionImageLayoutKey,
   DEFAULT_QUESTION_IMAGE_LAYOUT,
   type QuestionImageLayout,
 } from '../../services/question-image-layout'
+import {
+  buildAreaQuestionRows,
+  COLUMN_IMAGE_HEIGHT_PT,
+  isValidImageUrl,
+  shouldRenderVisualImage,
+  type AreaQuestionRow,
+} from './pdf-caderno-layout'
 import {
   summarizeAreaFocus,
 } from '../../services/question-content-label'
@@ -32,27 +38,6 @@ function truncateTextoApoio(txt: string, maxChars = 900): string {
   return txt.slice(0, maxChars).trimEnd() + ' (...)'
 }
 
-/**
- * Valida se a URL é segura pra ser usada como <Image src={...}> no @react-pdf/renderer.
- * O renderer exige extensão reconhecida (png/jpg/jpeg/gif/bmp/webp) no pathname.
- * URLs markdown, relative, data URLs mal-formadas ou sem extensão são rejeitadas.
- */
-function isValidImageUrl(url: string | null | undefined): url is string {
-  if (!url || typeof url !== 'string') return false
-  const trimmed = url.trim()
-  if (trimmed.length === 0) return false
-  if (/^data:image\/(png|jpe?g|gif|bmp|webp);base64,/i.test(trimmed)) {
-    return true
-  }
-  try {
-    const u = new URL(trimmed)
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false
-    return /\.(png|jpe?g|gif|bmp|webp)$/i.test(u.pathname)
-  } catch {
-    return false
-  }
-}
-
 function groupByArea(
   habs: ReadonlyArray<HabilidadeCritica>,
 ): ReadonlyArray<{ area: AreaSigla; items: ReadonlyArray<HabilidadeCritica> }> {
@@ -64,6 +49,49 @@ function groupByArea(
     if (existing) { existing.push(h) } else { map.set(h.area, [h]) }
   }
   return order.filter(a => map.has(a)).map(area => ({ area, items: map.get(area)! }))
+}
+
+interface RenderRow {
+  readonly kind: AreaQuestionRow['kind']
+  readonly items: ReadonlyArray<{ numero: number; questao: QuestaoRecomendada } | null>
+}
+
+/**
+ * Monta as linhas por área (pareadas por altura estimada — pdf-caderno-layout)
+ * e numera as questões NA ORDEM VISUAL final, para numeração e gabarito
+ * acompanharem a leitura.
+ */
+function buildCadernoRenderModel(
+  grouped: ReturnType<typeof groupByArea>,
+  imageLayoutByQuestionKey: Readonly<Record<string, QuestionImageLayout>>,
+): {
+  areasRender: Array<{
+    area: AreaSigla
+    items: ReadonlyArray<HabilidadeCritica>
+    renderRows: RenderRow[]
+  }>
+  todasQuestoes: Array<{ numero: number; questao: QuestaoRecomendada; area: AreaSigla }>
+} {
+  const todasQuestoes: Array<{ numero: number; questao: QuestaoRecomendada; area: AreaSigla }> = []
+  let contador = 1
+
+  const areasRender = grouped.map(({ area, items }) => {
+    const questoesDaArea = items.flatMap((hab) => hab.questoesRecomendadas)
+    const rows = buildAreaQuestionRows(questoesDaArea, imageLayoutByQuestionKey)
+    const renderRows: RenderRow[] = rows.map((row) => ({
+      kind: row.kind,
+      items: row.items.map((questao) => {
+        if (!questao) return null
+        const item = { numero: contador, questao }
+        todasQuestoes.push({ ...item, area })
+        contador += 1
+        return item
+      }),
+    }))
+    return { area, items, renderRows }
+  })
+
+  return { areasRender, todasQuestoes }
 }
 
 const M = 28
@@ -146,84 +174,9 @@ interface Props {
   readonly imageLayoutByQuestionKey?: Readonly<Record<string, QuestionImageLayout>>
 }
 
-interface QuestionRenderItem {
-  readonly numero: number
-  readonly questao: QuestaoRecomendada
-  readonly area: AreaSigla
-}
-
-const MAX_COLUMN_VISUAL_WIDTH_PT = 340
-const MAX_COLUMN_VISUAL_HEIGHT_PT = 280
 const FULL_IMAGE_WIDTH_PT = 440
 const FULL_IMAGE_HEIGHT_PT = 260
 const COLUMN_IMAGE_WIDTH_PT = 210
-const COLUMN_IMAGE_HEIGHT_PT = 220
-
-type AreaQuestionRow =
-  | {
-      readonly kind: 'full'
-      readonly items: readonly [QuestionRenderItem]
-    }
-  | {
-      readonly kind: 'columns'
-      readonly items: readonly [QuestionRenderItem, QuestionRenderItem | null]
-    }
-
-function shouldRenderVisualImage(
-  question: QuestaoRecomendada,
-): boolean {
-  return (
-    isValidImageUrl(question.imagemUrl) &&
-    (
-      question.imagemUrl.startsWith('data:image/') ||
-      shouldRenderQuestionImage(question)
-    )
-  )
-}
-
-function shouldUseFullWidthQuestion(
-  question: QuestaoRecomendada,
-  imageLayoutByQuestionKey: Readonly<Record<string, QuestionImageLayout>>,
-): boolean {
-  if (!shouldRenderVisualImage(question)) {
-    return false
-  }
-
-  const layout =
-    imageLayoutByQuestionKey[buildQuestionImageLayoutKey(question)] ??
-    DEFAULT_QUESTION_IMAGE_LAYOUT
-
-  return (
-    layout.width > MAX_COLUMN_VISUAL_WIDTH_PT ||
-    layout.height > MAX_COLUMN_VISUAL_HEIGHT_PT
-  )
-}
-
-function buildAreaQuestionRows(
-  questions: ReadonlyArray<QuestionRenderItem>,
-  imageLayoutByQuestionKey: Readonly<Record<string, QuestionImageLayout>>,
-): AreaQuestionRow[] {
-  const rows: AreaQuestionRow[] = []
-
-  for (let index = 0; index < questions.length; index += 1) {
-    const current = questions[index]
-    if (shouldUseFullWidthQuestion(current.questao, imageLayoutByQuestionKey)) {
-      rows.push({ kind: 'full', items: [current] })
-      continue
-    }
-
-    const next = questions[index + 1]
-    if (next && !shouldUseFullWidthQuestion(next.questao, imageLayoutByQuestionKey)) {
-      rows.push({ kind: 'columns', items: [current, next] })
-      index += 1
-      continue
-    }
-
-    rows.push({ kind: 'columns', items: [current, null] })
-  }
-
-  return rows
-}
 
 export function QuestoesRecomendadasPDF({
   report,
@@ -233,33 +186,21 @@ export function QuestoesRecomendadasPDF({
   const hoje = new Date(report.computedAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
   const grouped = groupByArea(report.questoesRecomendadas.habilidadesCriticas)
 
-  // Numerar sequencialmente todas as questoes
-  const todasQuestoes: Array<{ numero: number; questao: QuestaoRecomendada; area: AreaSigla }> = []
-  let contador = 1
-  for (const { area, items } of grouped) {
-    for (const hab of items) {
-      for (const q of hab.questoesRecomendadas) {
-        todasQuestoes.push({
-          numero: contador,
-          questao: q,
-          area,
-        })
-        contador++
-      }
-    }
-  }
+  const { areasRender, todasQuestoes } = buildCadernoRenderModel(
+    grouped,
+    imageLayoutByQuestionKey,
+  )
 
   const totalQuestoes = todasQuestoes.length
 
   return (
     <Document title={`Caderno de Questoes -- ${nomeAluno}`}>
       {/* PAGINAS DE QUESTOES -- por area */}
-      {grouped.map(({ area, items }, groupIdx) => {
+      {areasRender.map(({ area, items, renderRows }, groupIdx) => {
         const areaColor = AREA_COLORS[area] ?? '#6b7280'
         const areaBg = AREA_BG[area] ?? '#f9fafb'
         const totalErrosArea = items.reduce((sum, h) => sum + h.totalErros, 0)
 
-        // Coletar questoes da area
         const questoesDaArea = todasQuestoes.filter(tq => tq.area === area)
         const areaFocus = summarizeAreaFocus(
           questoesDaArea.map((item) => item.questao),
@@ -277,7 +218,6 @@ export function QuestoesRecomendadasPDF({
                   : ''
               }`
             : `${calibration.complementares} questoes da área`
-        const rows = buildAreaQuestionRows(questoesDaArea, imageLayoutByQuestionKey)
 
         return (
           <Page key={area} size="A4" style={s.page}>
@@ -306,7 +246,7 @@ export function QuestoesRecomendadasPDF({
             </View>
 
             {/* Layout híbrido: texto em duas colunas, questões visuais em largura total */}
-            {rows.map((row) => (
+            {renderRows.map((row) => (
               <View
                 key={row.items
                   .flatMap((item) =>
@@ -316,7 +256,7 @@ export function QuestoesRecomendadasPDF({
                 style={s.questaoRow}
                 wrap={false}
               >
-                {row.kind === 'full' ? (
+                {row.kind === 'full' && row.items[0] ? (
                   <View style={s.questaoFull}>
                     <QuestionCard
                       area={area}
@@ -328,7 +268,7 @@ export function QuestoesRecomendadasPDF({
                       questao={row.items[0].questao}
                     />
                   </View>
-                ) : (
+                ) : row.items[0] ? (
                   <>
                     <View style={s.questaoCol}>
                       <QuestionCard
@@ -357,7 +297,7 @@ export function QuestoesRecomendadasPDF({
                       <View style={s.questaoColSpacer} />
                     )}
                   </>
-                )}
+                ) : null}
               </View>
             ))}
 
