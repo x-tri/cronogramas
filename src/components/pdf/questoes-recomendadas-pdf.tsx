@@ -9,6 +9,11 @@ import {
 import {
   summarizeAreaFocus,
 } from '../../services/question-content-label'
+import {
+  normalizeAlternativeText,
+  sanitizeQuestionText,
+  summarizeTriCalibration,
+} from './pdf-question-text'
 
 const AREA_COLORS: Record<string, string> = {
   CN: '#10b981', CH: '#f97316', LC: '#3b82f6', MT: '#ef4444',
@@ -46,20 +51,6 @@ function isValidImageUrl(url: string | null | undefined): url is string {
   } catch {
     return false
   }
-}
-
-/**
- * Remove literais markdown `![alt](url)` do texto — essas tags vazam do banco como
- * texto cru e aparecem no PDF como `![imagem](https://…)`. Também colapsa múltiplos
- * espaços/quebras resultantes da remoção.
- */
-function stripMarkdownImages(text: string | null | undefined): string {
-  if (!text) return ''
-  return text
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
 }
 
 function groupByArea(
@@ -266,7 +257,6 @@ export function QuestoesRecomendadasPDF({
       {grouped.map(({ area, items }, groupIdx) => {
         const areaColor = AREA_COLORS[area] ?? '#6b7280'
         const areaBg = AREA_BG[area] ?? '#f9fafb'
-        const totalArea = items.reduce((sum, h) => sum + h.questoesRecomendadas.length, 0)
         const totalErrosArea = items.reduce((sum, h) => sum + h.totalErros, 0)
 
         // Coletar questoes da area
@@ -274,6 +264,19 @@ export function QuestoesRecomendadasPDF({
         const areaFocus = summarizeAreaFocus(
           questoesDaArea.map((item) => item.questao),
         )
+        // Cabeçalho honesto: só conta como "calibrada" questão com param_b
+        // real fora do fallback de área (dificuldade textual)
+        const calibration = summarizeTriCalibration(
+          questoesDaArea.map((item) => item.questao),
+        )
+        const calibrationLabel =
+          calibration.calibradas > 0
+            ? `${calibration.calibradas} calibradas ao seu TRI${
+                calibration.complementares > 0
+                  ? ` + ${calibration.complementares} da área`
+                  : ''
+              }`
+            : `${calibration.complementares} questoes da área`
         const rows = buildAreaQuestionRows(questoesDaArea, imageLayoutByQuestionKey)
 
         return (
@@ -297,8 +300,8 @@ export function QuestoesRecomendadasPDF({
               <Text style={[s.areaName, { color: areaColor }]}>{AREA_NOMES[area] ?? area}</Text>
               <Text style={s.areaInfo}>
                 {totalErrosArea} erros · {areaFocus.label
-                  ? `foco principal confirmado: ${areaFocus.label}`
-                  : 'foco principal não confirmado'} · {totalArea} questoes calibradas ao seu TRI
+                  ? `foco principal: ${areaFocus.label}`
+                  : 'foco por habilidade'} · {calibrationLabel}
               </Text>
             </View>
 
@@ -426,8 +429,8 @@ function QuestionCard({
   numero,
   questao,
 }: QuestionCardProps) {
-  const textoApoioLimpo = stripMarkdownImages(questao.textoApoio)
-  const enunciadoLimpo = stripMarkdownImages(questao.enunciado)
+  const textoApoioLimpo = sanitizeQuestionText(questao.textoApoio)
+  const enunciadoLimpo = sanitizeQuestionText(questao.enunciado)
   const imagemValida = shouldRenderVisualImage(questao)
   const imageLayout =
     imageLayoutByQuestionKey[buildQuestionImageLayoutKey(questao)] ??
@@ -500,7 +503,9 @@ function QuestionCard({
               {isValidImageUrl(alt.imagemUrl) ? (
                 <Image src={alt.imagemUrl as string} style={s.alternativaImagem} />
               ) : (
-                <Text style={s.alternativaTexto}>{alt.texto}</Text>
+                <Text style={s.alternativaTexto}>
+                  {normalizeAlternativeText(alt.letra, alt.texto)}
+                </Text>
               )}
             </View>
           ))}
