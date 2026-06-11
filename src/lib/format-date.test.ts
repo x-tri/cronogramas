@@ -8,7 +8,9 @@ import {
   formatDayMonthBR,
 } from './format-date'
 
-const ISO = '2026-06-11T14:30:00-03:00'
+// Sem offset de fuso: interpretado como hora LOCAL em qualquer máquina —
+// o teste passa igual no runner do CI (UTC) e em dev (UTC-3).
+const ISO = '2026-06-11T14:30:00'
 
 describe('format-date', () => {
   it('formatDateShortBR: dd/mm/aaaa', () => {
