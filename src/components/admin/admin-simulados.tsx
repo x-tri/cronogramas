@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useSchools } from "../../hooks/use-schools";
 
 import { supabase } from "../../lib/supabase";
 import { CloneSimuladoModal } from "./simulado-actions/clone-simulado-modal";
@@ -26,10 +27,6 @@ import { formatDateMediumBR as formatDate } from "../../lib/format-date"
 
 type SimuladoStatus = "draft" | "published" | "closed";
 
-interface School {
-  readonly id: string;
-  readonly name: string;
-}
 
 interface SimuladoRow {
   readonly id: string;
@@ -75,7 +72,8 @@ export function AdminSimulados({
 }: AdminSimuladosProps) {
   const isSchoolScoped = userRole !== "super_admin" && Boolean(userSchoolId);
 
-  const [schools, setSchools] = useState<ReadonlyArray<School>>([]);
+  // super_admin: lista de escolas para filtro (coordenador escopado não usa)
+  const { schools } = useSchools({ enabled: !isSchoolScoped });
   const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<SimuladoStatus | "all">("all");
   const [simulados, setSimulados] = useState<ReadonlyArray<SimuladoRow>>([]);
@@ -111,23 +109,6 @@ export function AdminSimulados({
     id: string;
     name: string | null;
   } | null>(null);
-
-  // super_admin: carrega lista de escolas para filtro.
-  useEffect(() => {
-    if (isSchoolScoped) return;
-    let cancelled = false;
-    supabase
-      .from("schools")
-      .select("id, name")
-      .order("name")
-      .then(({ data }) => {
-        if (cancelled) return;
-        setSchools((data ?? []) as School[]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isSchoolScoped]);
 
   const effectiveSchoolId = useMemo<string>(() => {
     if (isSchoolScoped && userSchoolId) return userSchoolId;

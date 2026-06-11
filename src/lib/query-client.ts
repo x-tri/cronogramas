@@ -53,6 +53,11 @@ export const queryKeys = {
     all: ['subjects'] as const,
     byCode: (code: string) => ['subjects', code] as const,
   },
+  schools: {
+    all: ['schools'] as const,
+    list: (scopedSchoolId: string | null) =>
+      scopedSchoolId ? (['schools', scopedSchoolId] as const) : (['schools'] as const),
+  },
 } as const
 
 // Helper para invalidar queries relacionadas

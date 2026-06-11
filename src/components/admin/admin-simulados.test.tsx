@@ -13,8 +13,16 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, within, waitFor, fireEvent } from '@testing-library/react'
+import { render as rtlRender, screen, within, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
+
+// useSchools (hook compartilhado) usa react-query — provider obrigatório
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 // ---------------------------------------------------------------------------
 // Helpers para mockar o query builder do supabase-js (chain fluente)

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSchools, type SchoolOption } from "../../hooks/use-schools";
 import { supabase } from "../../lib/supabase";
 import { logAudit } from "../../services/audit";
 
@@ -31,29 +32,25 @@ interface AdminCoordinadoresProps {
 export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps) {
   const [users, setUsers] = useState<ProjectUser[]>([]);
   const [pendingInvites, setPendingInvites] = useState<ProjectUser[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
+  const { schools } = useSchools();
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [filterSchool, setFilterSchool] = useState("");
 
   const loadData = useCallback(async () => {
-    const [usersRes, schoolsRes] = await Promise.all([
-      supabase
-        .from("project_users")
-        .select("*, school:schools(id, name, slug)")
-        .eq("is_active", true)
-        .in("role", ["super_admin", "coordinator", "viewer"])
-        .order("role")
-        .order("name"),
-      supabase.from("schools").select("*").order("name"),
-    ]);
+    const usersRes = await supabase
+      .from("project_users")
+      .select("*, school:schools(id, name, slug)")
+      .eq("is_active", true)
+      .in("role", ["super_admin", "coordinator", "viewer"])
+      .order("role")
+      .order("name");
 
     const allUsers = (usersRes.data ?? []) as ProjectUser[];
     // Usuarios com auth_uid = linked (ja logaram)
     setUsers(allUsers.filter((u) => u.auth_uid !== null));
     // Usuarios sem auth_uid = convite pendente (nunca logaram)
     setPendingInvites(allUsers.filter((u) => u.auth_uid === null));
-    setSchools(schoolsRes.data ?? []);
     setLoading(false);
   }, []);
 
@@ -351,7 +348,7 @@ function AddUserModal({
   onClose,
   onSuccess,
 }: {
-  schools: School[];
+  schools: SchoolOption[];
   onClose: () => void;
   onSuccess: () => void;
 }) {

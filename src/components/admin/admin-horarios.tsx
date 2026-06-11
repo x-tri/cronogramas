@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { DEFAULT_SCHOOL_YEAR } from "../../data/supabase-repository";
-
-interface School {
-  id: string;
-  name: string;
-}
+import { useSchools } from "../../hooks/use-schools";
 
 interface ScheduleEntry {
   id: string;
@@ -36,24 +32,18 @@ const DIA_LABELS: Record<string, string> = {
 };
 
 export function AdminHorarios({ onBack, embedded }: AdminHorariosProps) {
-  const [schools, setSchools] = useState<School[]>([]);
-  const [selectedSchool, setSelectedSchool] = useState("");
+  const { schools, loading } = useSchools();
+  const [selectedSchoolChoice, setSelectedSchool] = useState("");
   const [turmas, setTurmas] = useState<string[]>([]);
   const [selectedTurma, setSelectedTurma] = useState("");
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [selectedAnoLetivo, setSelectedAnoLetivo] = useState(DEFAULT_SCHOOL_YEAR);
-  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<ScheduleEntry | null>(null);
 
-  // Load schools
-  useEffect(() => {
-    supabase.from("schools").select("id, name").order("name").then(({ data }) => {
-      setSchools(data ?? []);
-      if (data && data.length > 0) setSelectedSchool(data[0].id);
-      setLoading(false);
-    });
-  }, []);
+  // Escola efetiva: escolha do usuário ou a primeira da lista (derivado —
+  // sem effect de sincronização)
+  const selectedSchool = selectedSchoolChoice || schools[0]?.id || "";
 
   // Load turmas when school changes
   useEffect(() => {

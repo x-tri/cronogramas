@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSchools } from "../../hooks/use-schools";
 import { supabase } from "../../lib/supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -15,10 +16,6 @@ interface AuditEntry {
   readonly details: Record<string, unknown> | null;
 }
 
-interface School {
-  readonly id: string;
-  readonly name: string;
-}
 
 type PeriodFilter = "today" | "7d" | "30d";
 
@@ -129,7 +126,6 @@ export function AuditLog({
   userSchoolId = null,
 }: AuditLogProps) {
   const [entries, setEntries] = useState<readonly AuditEntry[]>([]);
-  const [schools, setSchools] = useState<readonly School[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -140,6 +136,7 @@ export function AuditLog({
   const [actionFilter, setActionFilter] = useState("");
   const [searchText, setSearchText] = useState("");
   const isSchoolScoped = userRole !== "super_admin" && Boolean(userSchoolId);
+  const { schools } = useSchools({ userSchoolId: isSchoolScoped ? userSchoolId : null });
 
   const PAGE_SIZE = 50;
 
@@ -182,27 +179,6 @@ export function AuditLog({
     setHasMore(rows.length === PAGE_SIZE);
     setLoadingMore(false);
   }, [buildQuery, entries.length]);
-
-  const loadSchools = useCallback(async () => {
-    const query = isSchoolScoped && userSchoolId
-      ? supabase
-          .from("schools")
-          .select("id, name")
-          .eq("id", userSchoolId)
-          .order("name")
-      : supabase.from("schools").select("id, name").order("name");
-
-    const { data } = await query;
-    setSchools(data ?? []);
-  }, [isSchoolScoped, userSchoolId]);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      void loadSchools();
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [loadSchools]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {

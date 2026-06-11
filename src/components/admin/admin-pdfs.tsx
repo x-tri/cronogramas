@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { deletePdf, deleteAllSchoolPdfs } from "../../services/pdf-storage";
+import { useSchools } from "../../hooks/use-schools";
 import { copyPdfLink, openPdfInNewTab } from "./pdf-actions";
 import { PdfStudentHistoryDrawer } from "./pdf-student-history-drawer";
-import { PDF_TYPE_LABELS, formatFileSize, type PdfRecord, type PdfSchool as School } from "./pdf-types";
+import { PDF_TYPE_LABELS, formatFileSize, type PdfRecord } from "./pdf-types";
 
 type StatusFilter = "all" | "downloaded" | "not_downloaded";
 
@@ -17,7 +18,8 @@ interface AdminPdfsProps {
 export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdfsProps) {
   const isCoordinator = userRole === "coordinator" && !!userSchoolId;
   const [records, setRecords] = useState<PdfRecord[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
+  // Coordenador não vê o filtro de escola — não precisa da lista
+  const { schools } = useSchools({ enabled: !isCoordinator });
   const [selectedSchool, setSelectedSchool] = useState(isCoordinator ? userSchoolId! : "");
   const [filterTurma, setFilterTurma] = useState("");
   const [filterStatus, setFilterStatus] = useState<StatusFilter>("all");
@@ -40,12 +42,8 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
       pdfsQuery = pdfsQuery.eq("school_id", userSchoolId!);
     }
 
-    const [pdfsRes, schoolsRes] = await Promise.all([
-      pdfsQuery,
-      supabase.from("schools").select("id, name").order("name"),
-    ]);
+    const pdfsRes = await pdfsQuery;
     setRecords(pdfsRes.data ?? []);
-    setSchools(schoolsRes.data ?? []);
     setLoading(false);
   }, [isCoordinator, userSchoolId]);
 
