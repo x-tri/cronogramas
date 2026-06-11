@@ -12,6 +12,7 @@
 import { useEffect, useState, type ReactElement } from 'react'
 
 import { getSignedPdfUrl } from '../../services/pdf-storage'
+import { copyPdfLink, downloadPdfFile, triggerBrowserDownload } from './pdf-actions'
 import { downloadAllSequential, selectStudentHistory } from './pdf-student-history'
 import { PDF_TYPE_LABELS, formatFileSize, type PdfRecord } from './pdf-types'
 
@@ -20,16 +21,6 @@ export interface PdfStudentHistoryDrawerProps {
   readonly alunoId: string | null
   readonly records: readonly PdfRecord[]
   readonly onClose: () => void
-}
-
-function triggerBrowserDownload(url: string, filename: string): void {
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  anchor.rel = 'noopener'
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
 }
 
 function formatDate(iso: string): string {
@@ -92,24 +83,11 @@ export function PdfStudentHistoryDrawer({
   }
 
   async function handleDownloadOne(record: PdfRecord) {
-    const url = await getSignedPdfUrl(record.storage_path, undefined, {
-      downloadAs: record.filename,
-    })
-    if (!url) {
-      alert('Não foi possível gerar o link. Verifique permissões no bucket.')
-      return
-    }
-    triggerBrowserDownload(url, record.filename)
+    await downloadPdfFile(record.storage_path, record.filename)
   }
 
   async function handleCopyLink(record: PdfRecord) {
-    const url = await getSignedPdfUrl(record.storage_path)
-    if (!url) {
-      alert('Não foi possível gerar o link. Verifique permissões no bucket.')
-      return
-    }
-    await navigator.clipboard.writeText(url)
-    alert('Link copiado! (válido por 1 hora)')
+    await copyPdfLink(record.storage_path)
   }
 
   return (

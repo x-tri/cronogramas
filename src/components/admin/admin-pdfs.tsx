@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { deletePdf, deleteAllSchoolPdfs, getSignedPdfUrl } from "../../services/pdf-storage";
+import { deletePdf, deleteAllSchoolPdfs } from "../../services/pdf-storage";
+import { copyPdfLink, openPdfInNewTab } from "./pdf-actions";
 import { PdfStudentHistoryDrawer } from "./pdf-student-history-drawer";
 import { PDF_TYPE_LABELS, formatFileSize, type PdfRecord, type PdfSchool as School } from "./pdf-types";
 
@@ -98,25 +99,6 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
 
     await loadData();
     setDeleting(false);
-  }
-
-  async function copyLink(storagePath: string) {
-    const url = await getSignedPdfUrl(storagePath);
-    if (!url) {
-      alert("Não foi possível gerar o link. Verifique permissões no bucket.");
-      return;
-    }
-    await navigator.clipboard.writeText(url);
-    alert("Link copiado! (válido por 1 hora)");
-  }
-
-  async function openPdf(storagePath: string) {
-    const url = await getSignedPdfUrl(storagePath);
-    if (!url) {
-      alert("Não foi possível abrir o PDF. Verifique permissões no bucket.");
-      return;
-    }
-    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   if (loading) {
@@ -312,7 +294,7 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
                       <div className="flex items-center justify-end gap-1">
                         {/* Download */}
                         <button
-                          onClick={() => openPdf(r.storage_path)}
+                          onClick={() => void openPdfInNewTab(r.storage_path)}
                           className="rounded p-1.5 text-[#2563eb] hover:bg-[#dbeafe] transition-colors"
                           title="Baixar (link temporário)"
                         >
@@ -322,7 +304,7 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
                         </button>
                         {/* Copy link */}
                         <button
-                          onClick={() => void copyLink(r.storage_path)}
+                          onClick={() => void copyPdfLink(r.storage_path)}
                           className="rounded p-1.5 text-[#64748b] hover:bg-[#f1f5f9] transition-colors"
                           title="Copiar link (válido por 1 hora)"
                         >
