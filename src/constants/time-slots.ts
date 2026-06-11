@@ -1,4 +1,4 @@
-import type { DiaConfig, DiaSemana, Turno, TurnoConfig } from '../types/domain'
+import type { DiaConfig, DiaSemana, TimeSlot, Turno, TurnoConfig } from '../types/domain'
 
 /**
  * Marker que indica "slot existe na grade mas nao tem aula real" — usado
@@ -10,6 +10,56 @@ export const PLACEHOLDER_DISCIPLINA = '—'
 
 export function isPlaceholderHorario(h: { disciplina: string }): boolean {
   return h.disciplina === PLACEHOLDER_DISCIPLINA
+}
+
+/**
+ * Deriva os slots de horário por turno a partir da grade oficial da escola.
+ *
+ * Fonte ÚNICA da derivação usada pelo Kanban (cronograma-store) e pelo PDF
+ * (schedule-pdf-slots) — era duplicada e as cópias divergiram no fallback,
+ * causando o bug FACEX de 2026-06-11 (blocos de tarde/noite sumindo do PDF).
+ *
+ * Semântica: slots distintos por horário de início, ordenados; quando o
+ * turno tem placeholders ('—'), só eles definem a grade (aulas reais
+ * sobrepostas não criam linhas extras). Turno sem horários deriva VAZIO —
+ * cada consumidor aplica seu próprio fallback explicitamente (Kanban: grade
+ * default; PDF: blocos do aluno).
+ */
+export function deriveSlotsByTurnoFromSchedule(
+  schedule: ReadonlyArray<{
+    turno: Turno
+    horarioInicio: string
+    horarioFim: string
+    disciplina: string
+  }>,
+): Record<Turno, TimeSlot[]> {
+  const byTurno: Record<Turno, Map<string, string>> = {
+    manha: new Map(),
+    tarde: new Map(),
+    noite: new Map(),
+  }
+
+  for (const turno of ['manha', 'tarde', 'noite'] as const) {
+    const turnoSchedules = schedule.filter((h) => h.turno === turno)
+    const source = turnoSchedules.some(isPlaceholderHorario)
+      ? turnoSchedules.filter(isPlaceholderHorario)
+      : turnoSchedules
+
+    for (const horario of source) {
+      byTurno[turno].set(horario.horarioInicio, horario.horarioFim)
+    }
+  }
+
+  const toSlots = (m: Map<string, string>): TimeSlot[] =>
+    [...m.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([inicio, fim]) => ({ inicio, fim }))
+
+  return {
+    manha: toSlots(byTurno.manha),
+    tarde: toSlots(byTurno.tarde),
+    noite: toSlots(byTurno.noite),
+  }
 }
 
 export function timeToMinutes(time: string): number {

@@ -13,9 +13,9 @@ import type {
   SimuladoResult,
 } from '../types/supabase'
 import {
+  deriveSlotsByTurnoFromSchedule,
   getSlotByIndex,
   TURNOS_CONFIG,
-  isPlaceholderHorario,
 } from '../constants/time-slots'
 import { getRepository } from '../data/factory'
 
@@ -153,34 +153,8 @@ export const useCronogramaStore = create<CronogramaState>()(
           set({ slotsOverride: null })
           return
         }
-        // Deriva slots distintos por turno, ordenados por horario_inicio.
-        // Quando ha placeholders ('—') em um turno, eles sao a grade editavel
-        // daquele turno. Aulas reais que sobrepoem estes slots bloqueiam a
-        // celula, mas nao devem criar linhas extras fora do grid Pomodoro.
-        const byTurno: Record<Turno, Map<string, string>> = {
-          manha: new Map(),
-          tarde: new Map(),
-          noite: new Map(),
-        }
-        for (const turno of ['manha', 'tarde', 'noite'] as const) {
-          const turnoSchedules = schedule.filter((h) => h.turno === turno)
-          const source = turnoSchedules.some(isPlaceholderHorario)
-            ? turnoSchedules.filter(isPlaceholderHorario)
-            : turnoSchedules
-
-          for (const h of source) {
-            byTurno[turno].set(h.horarioInicio, h.horarioFim)
-          }
-        }
-        const toSlots = (m: Map<string, string>) =>
-          [...m.entries()]
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([inicio, fim]) => ({ inicio, fim }))
-        const derived: TimeSlotsByTurno = {
-          manha: toSlots(byTurno.manha),
-          tarde: toSlots(byTurno.tarde),
-          noite: toSlots(byTurno.noite),
-        }
+        // Derivação compartilhada com o PDF — ver deriveSlotsByTurnoFromSchedule.
+        const derived: TimeSlotsByTurno = deriveSlotsByTurnoFromSchedule(schedule)
         // Se identico ao default Marista em todos os turnos, nao precisa
         // override (evita recalculo inutil downstream).
         const identical = (['manha', 'tarde', 'noite'] as const).every((t) => {

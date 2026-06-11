@@ -1,5 +1,8 @@
 import type { BlocoCronograma, HorarioOficial, Turno } from '../../types/domain'
-import { TURNOS_CONFIG, isPlaceholderHorario } from '../../constants/time-slots'
+import {
+  TURNOS_CONFIG,
+  deriveSlotsByTurnoFromSchedule,
+} from '../../constants/time-slots'
 
 export function getSchedulePdfSlotsByTurno(
   officialSchedule: readonly HorarioOficial[],
@@ -13,44 +16,27 @@ export function getSchedulePdfSlotsByTurno(
     }
   }
 
-  const byTurno: Record<Turno, Map<string, string>> = {
-    manha: new Map(),
-    tarde: new Map(),
-    noite: new Map(),
-  }
+  // Derivação compartilhada com o Kanban (deriveSlotsByTurnoFromSchedule).
+  // Fallback próprio do PDF: turno sem aulas na grade deriva as linhas dos
+  // blocos do aluno — o Kanban permite criar blocos nesses turnos (fallback
+  // de grade default no store). Sem blocos, o turno segue vazio (não inventa
+  // linhas — caso Dom Bosco sem noite).
+  const derived = deriveSlotsByTurnoFromSchedule(officialSchedule)
 
+  const result = {} as Record<Turno, ReadonlyArray<{ inicio: string; fim: string }>>
   for (const turno of ['manha', 'tarde', 'noite'] as const) {
-    const turnoSchedules = officialSchedule.filter((h) => h.turno === turno)
-    const source = turnoSchedules.some(isPlaceholderHorario)
-      ? turnoSchedules.filter(isPlaceholderHorario)
-      : turnoSchedules
-
-    for (const horario of source) {
-      byTurno[turno].set(horario.horarioInicio, horario.horarioFim)
+    if (derived[turno].length > 0) {
+      result[turno] = derived[turno]
+      continue
     }
-
-    // Turno sem aulas na grade deriva as linhas dos blocos do aluno — o
-    // Kanban permite criar blocos nesses turnos (fallback de slots default
-    // em applySlotsOverrideFromSchedule). Sem isso, escolas com grade só de
-    // manhã (ex: FACEX) saíam com tarde/noite SEM linhas no PDF e os blocos
-    // desses turnos desapareciam. Sem blocos, o turno segue vazio (não
-    // inventa linhas — caso Dom Bosco sem noite).
-    if (byTurno[turno].size === 0) {
-      for (const block of blocks) {
-        if (block.turno !== turno) continue
-        byTurno[turno].set(block.horarioInicio, block.horarioFim)
-      }
+    const fromBlocks = new Map<string, string>()
+    for (const block of blocks) {
+      if (block.turno !== turno) continue
+      fromBlocks.set(block.horarioInicio, block.horarioFim)
     }
-  }
-
-  const toSlots = (m: Map<string, string>) =>
-    [...m.entries()]
+    result[turno] = [...fromBlocks.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([inicio, fim]) => ({ inicio, fim }))
-
-  return {
-    manha: toSlots(byTurno.manha),
-    tarde: toSlots(byTurno.tarde),
-    noite: toSlots(byTurno.noite),
   }
+  return result
 }

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   TURNOS_CONFIG,
   DIAS_CONFIG,
+  deriveSlotsByTurnoFromSchedule,
   getSlotIndex,
   getSlotByIndex,
   getTurnoFromTime,
@@ -118,6 +119,55 @@ describe('time-slots', () => {
     it('detecta sobreposicao parcial entre aula oficial e pomodoro', () => {
       expect(timeRangesOverlap('17:30', '18:20', '17:15', '18:00')).toBe(true)
       expect(timeRangesOverlap('18:00', '18:50', '17:15', '18:00')).toBe(false)
+    })
+  })
+
+  // Fonte única da derivação de slots por turno — antes duplicada entre
+  // cronograma-store (Kanban) e schedule-pdf-slots (PDF); a divergência das
+  // cópias causou o bug FACEX de 2026-06-11 (blocos sumindo do PDF).
+  describe('deriveSlotsByTurnoFromSchedule', () => {
+    const aula = (turno: 'manha' | 'tarde' | 'noite', inicio: string, fim: string, disciplina = 'FÍSICA') => ({
+      turno,
+      horarioInicio: inicio,
+      horarioFim: fim,
+      disciplina,
+    })
+
+    it('deriva slots distintos por turno, ordenados por inicio', () => {
+      const derived = deriveSlotsByTurnoFromSchedule([
+        aula('manha', '07:50', '08:40'),
+        aula('manha', '07:00', '07:50'),
+        aula('manha', '07:00', '07:50'), // mesmo horario em outro dia -> 1 slot
+        aula('tarde', '14:35', '15:25'),
+      ])
+
+      expect(derived.manha).toEqual([
+        { inicio: '07:00', fim: '07:50' },
+        { inicio: '07:50', fim: '08:40' },
+      ])
+      expect(derived.tarde).toEqual([{ inicio: '14:35', fim: '15:25' }])
+      expect(derived.noite).toEqual([])
+    })
+
+    it('quando ha placeholders no turno, so eles definem a grade', () => {
+      const derived = deriveSlotsByTurnoFromSchedule([
+        aula('tarde', '16:30', '17:20', '—'),
+        aula('tarde', '17:30', '18:20', '—'),
+        aula('tarde', '17:15', '18:00', 'EDUCAÇÃO FÍSICA'), // aula real sobreposta
+      ])
+
+      expect(derived.tarde).toEqual([
+        { inicio: '16:30', fim: '17:20' },
+        { inicio: '17:30', fim: '18:20' },
+      ])
+    })
+
+    it('grade vazia deriva vazio em todos os turnos (fallback e dos consumidores)', () => {
+      const derived = deriveSlotsByTurnoFromSchedule([])
+
+      expect(derived.manha).toEqual([])
+      expect(derived.tarde).toEqual([])
+      expect(derived.noite).toEqual([])
     })
   })
 })
