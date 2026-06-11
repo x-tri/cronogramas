@@ -177,7 +177,21 @@ export async function uploadPdf({
 
   // Registra no historico. Sem isso o PDF existe no storage, mas nao aparece
   // no portal do aluno nem na auditoria do coordenador.
-  const { error: historyError } = await supabase.from("pdf_history").insert({
+  //
+  // Upsert lógico por storage_path: o upload acima sobrescreve o objeto
+  // (upsert: true), então regenerar a mesma semana deve ATUALIZAR a linha
+  // existente — duplicatas apontando para o mesmo objeto faziam o deletePdf
+  // de uma delas apagar o arquivo compartilhado e orfanar as outras
+  // (incidente FACEX 2026-06-11).
+  const { data: existingRow } = await supabase
+    .from("pdf_history")
+    .select("id")
+    .eq("storage_path", storagePath)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const historyValues = {
     school_id: resolvedSchoolId,
     aluno_id: alunoId,
     aluno_nome: alunoNome,
@@ -187,7 +201,14 @@ export async function uploadPdf({
     filename,
     storage_path: storagePath,
     file_size: blob.size,
-  });
+  };
+
+  const { error: historyError } = existingRow?.id
+    ? await supabase
+        .from("pdf_history")
+        .update({ ...historyValues, created_at: new Date().toISOString() })
+        .eq("id", existingRow.id)
+    : await supabase.from("pdf_history").insert(historyValues);
 
   if (historyError) {
     console.error("[pdf-storage] Falha ao registrar pdf_history:", historyError.message, {
@@ -214,7 +235,18 @@ export async function uploadPdf({
  * Delete a single PDF from storage and history
  */
 export async function deletePdf(id: string, storagePath: string): Promise<boolean> {
-  await supabase.storage.from(BUCKET).remove([storagePath]);
+  // Linhas duplicadas legadas podem compartilhar o mesmo objeto no storage —
+  // só remove o arquivo quando esta é a última linha apontando para o path.
+  const { count } = await supabase
+    .from("pdf_history")
+    .select("id", { count: "exact", head: true })
+    .eq("storage_path", storagePath)
+    .neq("id", id);
+
+  if (!count) {
+    await supabase.storage.from(BUCKET).remove([storagePath]);
+  }
+
   const { error } = await supabase.from("pdf_history").delete().eq("id", id);
   if (!error) {
     logAudit("delete_pdf", "pdf", id, { storagePath });
