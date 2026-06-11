@@ -56,6 +56,20 @@ export function buildTurmaCandidates(turma: string): string[] {
   return [...candidates].filter(Boolean)
 }
 
+// Decide qual escola usar ao carregar grades oficiais. Usuario escopado
+// (mentor/coordenador com school_id) SEMPRE enxerga a propria escola —
+// nunca cai no fallback mock (grade Marista) nem em escola de terceiros
+// (incidente 2026-06-11 — mentora Dom Bosco vendo grade Marista).
+// Sem escopo (super_admin), respeita o schoolId solicitado; null permite
+// o fallback legado por turma.
+export function resolveScheduleSchoolId(
+  requestedSchoolId: string | null,
+  scopedSchoolId: string | null,
+): string | null {
+  if (scopedSchoolId) return scopedSchoolId
+  return requestedSchoolId
+}
+
 // Garante sessão válida antes de writes — verifica com o servidor (evita clock skew)
 async function assertSession(): Promise<void> {
   // getUser() faz requisição real ao servidor — detecta tokens expirados mesmo com
@@ -206,13 +220,24 @@ export function createSupabaseRepository(): DataRepository {
 
     schedules: {
       getOfficialSchedule: async (turma, schoolId, anoLetivo) => {
-        // Sem schoolId, mantem comportamento legacy (mock Marista por turma).
-        // Quando vier schoolId, le do banco school_schedules — usado por
-        // escolas que ja tiveram a grade cadastrada (ex: Dom Bosco/2026 via
-        // migration 029). Fallback no mock se a query nao retornar nada
-        // (ex: Marista, que ainda nao foi migrado).
-        if (!schoolId) {
-          logRepository('[getOfficialSchedule] schoolId vazio -> fallback mock', { turma })
+        // Usuario escopado (mentor/coordenador com school_id) sempre le a
+        // grade da PROPRIA escola — nunca o mock legado (grade Marista) nem
+        // escola de terceiros. Sem escopo e sem schoolId, mantem o
+        // comportamento legacy (mock Marista por turma).
+        const projectUser = await getCurrentProjectUser()
+        const scopedSchoolId = isSchoolScopedProjectUser(projectUser)
+          ? projectUser?.schoolId ?? null
+          : null
+        const effectiveSchoolId = resolveScheduleSchoolId(schoolId ?? null, scopedSchoolId)
+        if (scopedSchoolId && schoolId && schoolId !== scopedSchoolId) {
+          console.warn('[getOfficialSchedule] schoolId solicitado difere da escola do mentor — usando a escola do mentor', {
+            schoolIdSolicitado: schoolId,
+            scopedSchoolId,
+            turma,
+          })
+        }
+        if (!effectiveSchoolId) {
+          logRepository('[getOfficialSchedule] sem escola (usuario sem escopo) -> fallback mock', { turma })
           return getHorariosPorTurma(turma)
         }
         const ano = anoLetivo ?? DEFAULT_SCHOOL_YEAR
@@ -225,7 +250,7 @@ export function createSupabaseRepository(): DataRepository {
           let query = supabase
             .from('school_schedules')
             .select('id, school_id, turma, dia_semana, horario_inicio, horario_fim, turno, disciplina, professor')
-            .eq('school_id', schoolId)
+            .eq('school_id', effectiveSchoolId)
             .eq('turma', turmaCandidata)
             .order('dia_semana')
             .order('horario_inicio')
@@ -262,7 +287,7 @@ export function createSupabaseRepository(): DataRepository {
             if (legacyResult.data && legacyResult.data.length > 0) {
               data = legacyResult.data
               logRepository('[getOfficialSchedule] usando fallback legado sem ano_letivo', {
-                schoolId,
+                schoolId: effectiveSchoolId,
                 turma,
                 turmaCandidata,
               })
@@ -276,7 +301,7 @@ export function createSupabaseRepository(): DataRepository {
         }
         if (!data || data.length === 0) {
           logRepository('[getOfficialSchedule] school_schedules vazio (RLS bloqueou ou turma sem cadastro)', {
-            schoolId, turma, ano, turmaCandidates,
+            schoolId: effectiveSchoolId, turma, ano, turmaCandidates,
           })
           throw new Error(
             `Nenhum horário oficial cadastrado para a turma ${turma} no ano ${ano}.`,
@@ -286,20 +311,20 @@ export function createSupabaseRepository(): DataRepository {
         // garantimos que NENHUMA row de outra escola escape (incidente
         // 2026-05-04 — coord Marista vendo grade Dom Bosco). Se algo
         // escapar, descarta + log warn pra rastrear no console do user.
-        const valid = data.filter((r) => r.school_id === schoolId)
+        const valid = data.filter((r) => r.school_id === effectiveSchoolId)
         if (valid.length !== data.length) {
           const distinct = [...new Set(data.map((r) => r.school_id))]
           console.warn(
             '[getOfficialSchedule] schedules de outra escola descartados',
-            { schoolIdSolicitado: schoolId, turma, ano, total: data.length, validos: valid.length, schoolIdsRetornados: distinct },
+            { schoolIdSolicitado: effectiveSchoolId, turma, ano, total: data.length, validos: valid.length, schoolIdsRetornados: distinct },
           )
         }
         if (valid.length === 0) {
           throw new Error(
-            `Nenhum horário oficial válido para a escola solicitada (${schoolId}).`,
+            `Nenhum horário oficial válido para a escola solicitada (${effectiveSchoolId}).`,
           )
         }
-        logRepository('[getOfficialSchedule] retornando do banco', { schoolId, turma, ano, qtd: valid.length })
+        logRepository('[getOfficialSchedule] retornando do banco', { schoolId: effectiveSchoolId, turma, ano, qtd: valid.length })
         return valid.map((row): HorarioOficial => ({
           id: row.id as string,
           turma: row.turma as string,
