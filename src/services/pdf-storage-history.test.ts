@@ -48,11 +48,20 @@ vi.mock('../lib/supabase', () => ({
         },
         insert: (values: unknown) => {
           tableCalls.push({ table, op: 'insert', args: values })
-          return Promise.resolve({ error: null })
+          const result = { data: { id: 'linha-nova' }, error: null }
+          return Object.assign(Promise.resolve({ error: null }), {
+            select: () => ({ maybeSingle: () => Promise.resolve(result) }),
+          })
         },
         update: (values: unknown) => {
           tableCalls.push({ table, op: 'update', args: values })
-          return { eq: () => Promise.resolve({ error: null }) }
+          const result = { data: { id: existingHistoryIdForPath }, error: null }
+          return {
+            eq: () =>
+              Object.assign(Promise.resolve({ error: null }), {
+                select: () => ({ maybeSingle: () => Promise.resolve(result) }),
+              }),
+          }
         },
         delete: () => ({
           eq: () => {

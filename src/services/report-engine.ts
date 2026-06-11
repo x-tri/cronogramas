@@ -48,6 +48,7 @@ import type {
   SisuAnalysis,
 } from '../types/report'
 import { getConteudoDidatico } from '../constants/habilidade-conteudo'
+import { fetchDeliveredQuestionKeys } from './caderno-entregas'
 import {
   filterPdfSafeRecommendations,
   getDifficultyWindowForTri,
@@ -1178,6 +1179,7 @@ async function fetchTopicMatchedRecommendations(params: {
   readonly habilidade: number
   readonly subjectIds: ReadonlyArray<string>
   readonly provasClient: SupabaseClient
+  readonly deliveredKeys?: ReadonlySet<string>
 }): Promise<QuestaoRecomendada[]> {
   if (params.subjectIds.length === 0) {
     return []
@@ -1283,6 +1285,7 @@ async function fetchTopicMatchedRecommendations(params: {
     withRelevance.map((entry) => entry.question),
     params.triArea,
     TARGET_QUESTOES_POR_AREA,
+    params.deliveredKeys,
   )
 }
 
@@ -1295,6 +1298,12 @@ async function computeQuestoesRecomendadas(
 ): Promise<QuestoesRecomendadas> {
   const erros = mapaHabilidades.errosPorHabilidade
   const observedAreas = getObservedAreasFromWrongQuestions(result.wrongQuestions)
+
+  // Memória de cadernos anteriores: questões já entregues ao aluno vão para
+  // o fim da fila de seleção (fail-open: erro → conjunto vazio)
+  const deliveredKeys = await fetchDeliveredQuestionKeys(
+    result.studentAnswer.student_number,
+  )
   const incidencias = new Map(
     incidenciaHistorica.habilidades.map(h => [
       `${h.area}_${h.numeroHabilidade}`,
@@ -1388,6 +1397,7 @@ async function computeQuestoesRecomendadas(
           habilidade: topHab.numeroHabilidade,
           subjectIds: subjectsByArea.get(area) ?? [],
           provasClient,
+          deliveredKeys,
         })
       }
 
@@ -1484,6 +1494,7 @@ async function computeQuestoesRecomendadas(
               uniquePairs,
               triArea,
               40,
+              deliveredKeys,
             )
 
             if (sorted.length > 0) {
@@ -1554,6 +1565,7 @@ async function computeQuestoesRecomendadas(
                   recomendadasSkill,
                   triArea,
                   TARGET_QUESTOES_POR_AREA,
+                  deliveredKeys,
                 )
               }
             }
@@ -1566,6 +1578,8 @@ async function computeQuestoesRecomendadas(
         recomendadasSkill,
         triArea,
         TARGET_QUESTOES_POR_AREA,
+        TARGET_QUESTOES_POR_AREA,
+        deliveredKeys,
       )
       recomendadas = filterPdfSafeRecommendations(recomendadas)
 
@@ -1636,6 +1650,7 @@ async function computeQuestoesRecomendadas(
               triArea,
               TARGET_QUESTOES_POR_AREA,
               MAX_QUESTOES_AREA_FALLBACK_POR_AREA,
+              deliveredKeys,
             )
             recomendadas = filterPdfSafeRecommendations(recomendadas)
           }

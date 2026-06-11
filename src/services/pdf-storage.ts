@@ -145,7 +145,7 @@ export async function uploadPdf({
   turma,
   matricula,
   tipo = "cronograma",
-}: UploadPdfParams): Promise<{ url: string; path: string } | null> {
+}: UploadPdfParams): Promise<{ url: string; path: string; historyId: string | null; schoolId: string | null } | null> {
   const resolvedSchoolId = await resolveSchoolId({
     schoolId,
     schoolName,
@@ -203,12 +203,14 @@ export async function uploadPdf({
     file_size: blob.size,
   };
 
-  const { error: historyError } = existingRow?.id
+  const { data: historyRow, error: historyError } = existingRow?.id
     ? await supabase
         .from("pdf_history")
         .update({ ...historyValues, created_at: new Date().toISOString() })
         .eq("id", existingRow.id)
-    : await supabase.from("pdf_history").insert(historyValues);
+        .select("id")
+        .maybeSingle()
+    : await supabase.from("pdf_history").insert(historyValues).select("id").maybeSingle();
 
   if (historyError) {
     console.error("[pdf-storage] Falha ao registrar pdf_history:", historyError.message, {
@@ -228,7 +230,12 @@ export async function uploadPdf({
     tipo,
   });
 
-  return { url: signedUrl ?? "", path: storagePath };
+  return {
+    url: signedUrl ?? "",
+    path: storagePath,
+    historyId: (historyRow?.id as string | undefined) ?? existingRow?.id ?? null,
+    schoolId: resolvedSchoolId,
+  };
 }
 
 /**

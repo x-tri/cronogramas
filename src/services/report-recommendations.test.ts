@@ -118,6 +118,58 @@ describe('report-recommendations', () => {
     expect(picked.map((item) => item.coItem)).toEqual([2, 1])
   })
 
+  it('despriotiza questoes ja entregues em cadernos anteriores', () => {
+    // A questão já entregue (2024:10) está MAIS perto do alvo, mas o aluno
+    // já a recebeu — questões inéditas vêm primeiro
+    const delivered = new Set(['2024:10'])
+
+    const picked = pickRecommendationsForStudent(
+      [
+        { ano: 2024, dificuldade: 1.0, posicaoCaderno: 10, coItem: 1 },
+        { ano: 2023, dificuldade: 1.3, posicaoCaderno: 11, coItem: 2 },
+        { ano: 2022, dificuldade: 0.6, posicaoCaderno: 12, coItem: 3 },
+      ],
+      600,
+      2,
+      delivered,
+    )
+
+    expect(picked.map((item) => item.coItem)).toEqual([2, 3])
+  })
+
+  it('salvaguarda: entregues completam o caderno quando faltam ineditas', () => {
+    const delivered = new Set(['2024:10', '2023:11'])
+
+    const picked = pickRecommendationsForStudent(
+      [
+        { ano: 2024, dificuldade: 1.0, posicaoCaderno: 10, coItem: 1 },
+        { ano: 2023, dificuldade: 1.1, posicaoCaderno: 11, coItem: 2 },
+        { ano: 2022, dificuldade: 0.9, posicaoCaderno: 12, coItem: 3 },
+      ],
+      600,
+      3,
+      delivered,
+    )
+
+    // A inédita primeiro; as entregues completam (mais próxima do alvo antes)
+    expect(picked.map((item) => item.coItem)).toEqual([3, 1, 2])
+  })
+
+  it('merge tambem respeita as entregues', () => {
+    const delivered = new Set(['2024:10'])
+
+    const merged = mergeRecommendationsForStudent(
+      [{ ano: 2024, dificuldade: 1.0, posicaoCaderno: 10, coItem: 1 }],
+      [{ ano: 2022, dificuldade: 1.0, posicaoCaderno: 20, coItem: 2 }],
+      600,
+      1,
+      1,
+      delivered,
+    )
+
+    expect(merged.map((item) => item.coItem)).toEqual([2])
+  })
+
   it('prioriza questoes com imagem quando estao na faixa adequada do aluno', () => {
     const picked = pickRecommendationsForStudent(
       [

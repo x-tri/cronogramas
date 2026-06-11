@@ -230,9 +230,9 @@ export function RelatorioCirurgico({
     blob: Blob
     filename: string
     tipo: 'relatorio' | 'caderno_questoes'
-  }): Promise<boolean> => {
+  }): Promise<{ historyId: string | null; schoolId: string | null } | null> => {
     if (!student?.id || !student?.matricula) {
-      return false
+      return null
     }
 
     try {
@@ -247,10 +247,10 @@ export function RelatorioCirurgico({
         matricula: student.matricula,
         tipo: params.tipo,
       })
-      return result !== null
+      return result ? { historyId: result.historyId, schoolId: result.schoolId } : null
     } catch (err) {
       console.warn('[relatorio-cirurgico] Falha ao registrar PDF:', err)
-      return false
+      return null
     }
   }
 
@@ -274,7 +274,7 @@ export function RelatorioCirurgico({
       link.download = filename
       link.click()
       const saved = await saveGeneratedPdf({ blob, filename, tipo: 'relatorio' })
-      if (!saved) {
+      if (saved === null) {
         window.alert('O relatório foi baixado, mas não consegui registrar no portal do aluno. Gere novamente ou confira permissões do PDF.')
       }
       URL.revokeObjectURL(url)
@@ -314,8 +314,29 @@ export function RelatorioCirurgico({
       link.download = filename
       link.click()
       const saved = await saveGeneratedPdf({ blob, filename, tipo: 'caderno_questoes' })
-      if (!saved) {
+      if (saved === null) {
         window.alert('O caderno foi baixado, mas não consegui registrar no portal do aluno. Gere novamente ou confira permissões do PDF.')
+      }
+      // Memória pedagógica: registra as questões deste caderno para os
+      // próximos não repetirem (fail-open — falha não bloqueia o download)
+      if (student?.matricula) {
+        const { registerCadernoEntregue } = await import('../../services/caderno-entregas')
+        const questoesEntregues = pdfReadyReport.questoesRecomendadas.habilidadesCriticas
+          .flatMap((hab) => hab.questoesRecomendadas)
+          .map((q) => ({
+            ano: q.ano,
+            posicaoCaderno: q.posicaoCaderno,
+            coItem: q.coItem,
+            area: q.area,
+            habilidade: q.habilidade,
+          }))
+        void registerCadernoEntregue({
+          pdfHistoryId: saved?.historyId ?? null,
+          schoolId: saved?.schoolId ?? student.schoolId ?? null,
+          alunoId: student.id ?? student.matricula,
+          matricula: student.matricula,
+          questoes: questoesEntregues,
+        })
       }
       URL.revokeObjectURL(url)
     } catch (err) {

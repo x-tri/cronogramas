@@ -74,7 +74,7 @@ export function getDifficultyWindowForTri(
 }
 
 export function buildRecommendationKey(
-  item: RecommendationLike,
+  item: Pick<RecommendationLike, 'ano' | 'posicaoCaderno' | 'coItem'>,
 ): string {
   return `${item.ano}:${item.posicaoCaderno ?? item.coItem}`
 }
@@ -266,21 +266,27 @@ export function pickRecommendationsForStudent<T extends RecommendationLike>(
   items: ReadonlyArray<T>,
   tri: number | null | undefined,
   limit: number,
+  deliveredKeys?: ReadonlySet<string>,
 ): T[] {
   const deduped = dedupeRecommendations(items)
   const { min, max } = getDifficultyWindowForTri(tri)
 
-  const insideWindow = deduped.filter(
-    (item) => item.dificuldade >= min && item.dificuldade <= max,
-  )
-  const outsideWindow = deduped.filter(
-    (item) => item.dificuldade < min || item.dificuldade > max,
-  )
+  // Questões já entregues em cadernos anteriores vão para o FIM da fila —
+  // o aluno reconhece a questão e o treino degrada. Salvaguarda embutida:
+  // se as inéditas não bastarem para o limite, as entregues completam.
+  const isDelivered = (item: T) =>
+    Boolean(deliveredKeys?.has(buildRecommendationKey(item)))
 
-  return [
-    ...sortRecommendationsByStudentLevel(insideWindow, tri),
-    ...sortRecommendationsByStudentLevel(outsideWindow, tri),
-  ].slice(0, limit)
+  const groups: T[][] = [[], [], [], []]
+  for (const item of deduped) {
+    const inside = item.dificuldade >= min && item.dificuldade <= max
+    const groupIndex = (isDelivered(item) ? 2 : 0) + (inside ? 0 : 1)
+    groups[groupIndex].push(item)
+  }
+
+  return groups
+    .flatMap((group) => sortRecommendationsByStudentLevel(group, tri))
+    .slice(0, limit)
 }
 
 export function mergeRecommendationsForStudent<T extends RecommendationLike>(
@@ -289,16 +295,24 @@ export function mergeRecommendationsForStudent<T extends RecommendationLike>(
   tri: number | null | undefined,
   limit: number,
   fallbackLimit = limit,
+  deliveredKeys?: ReadonlySet<string>,
 ): T[] {
-  const pickedPrimary = pickRecommendationsForStudent(primary, tri, limit)
+  const pickedPrimary = pickRecommendationsForStudent(primary, tri, limit, deliveredKeys)
   const seen = new Set(pickedPrimary.map(buildRecommendationKey))
   const pickedFallback = pickRecommendationsForStudent(
     fallback,
     tri,
     Math.max(limit * 2, fallbackLimit),
+    deliveredKeys,
   )
     .filter((item) => !seen.has(buildRecommendationKey(item)))
     .slice(0, fallbackLimit)
 
-  return [...pickedPrimary, ...pickedFallback].slice(0, limit)
+  // Inéditas de qualquer origem vêm antes de repetidas: se a primária só
+  // tinha questões já entregues, o fallback inédito passa na frente.
+  const combined = [...pickedPrimary, ...pickedFallback]
+  const fresh = combined.filter((item) => !deliveredKeys?.has(buildRecommendationKey(item)))
+  const repeated = combined.filter((item) => deliveredKeys?.has(buildRecommendationKey(item)))
+
+  return [...fresh, ...repeated].slice(0, limit)
 }
