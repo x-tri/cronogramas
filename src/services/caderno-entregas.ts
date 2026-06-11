@@ -63,6 +63,10 @@ export function buildCadernoQuestaoRows(params: {
   return rows
 }
 
+// Matrículas reais: "001-008626", "202400028835". O guard evita interpolar
+// caracteres do DSL do PostgREST (ex.: ',' ou ')') no filtro.
+const MATRICULA_SEGURA = /^[A-Za-z0-9_-]{1,64}$/
+
 /**
  * Chaves (`${ano}:${posicao ?? co_item}`) de todas as questões já entregues
  * ao aluno em cadernos anteriores. Erro → conjunto vazio (fail-open).
@@ -70,16 +74,22 @@ export function buildCadernoQuestaoRows(params: {
 export async function fetchDeliveredQuestionKeys(
   matricula: string | null | undefined,
 ): Promise<ReadonlySet<string>> {
-  if (!matricula?.trim()) return new Set()
+  const trimmed = matricula?.trim()
+  if (!trimmed || !MATRICULA_SEGURA.test(trimmed)) return new Set()
 
   try {
-    const { data, error } = await supabase
-      .from('caderno_questoes')
-      .select('question_key')
-      .or(`matricula.eq.${matricula},aluno_id.eq.${matricula}`)
+    // Duas queries .eq em vez de .or(): evita injetar valor no DSL de filtro
+    const [byMatricula, byAlunoId] = await Promise.all([
+      supabase.from('caderno_questoes').select('question_key').eq('matricula', trimmed),
+      supabase.from('caderno_questoes').select('question_key').eq('aluno_id', trimmed),
+    ])
 
-    if (error || !data) return new Set()
-    return new Set(data.map((row) => row.question_key as string))
+    const keys = new Set<string>()
+    for (const result of [byMatricula, byAlunoId]) {
+      if (result.error || !result.data) continue
+      for (const row of result.data) keys.add(row.question_key as string)
+    }
+    return keys
   } catch {
     return new Set()
   }
