@@ -32,7 +32,7 @@ export function SchedulePdfDocument({
   examTitle,
   triScores,
 }: SchedulePdfDocumentProps) {
-  const slotsByTurno = getSchedulePdfSlotsByTurno(officialSchedule)
+  const slotsByTurno = getSchedulePdfSlotsByTurno(officialSchedule, blocks)
 
   const isWeekend = (dia: DiaSemana) => dia === 'sabado' || dia === 'domingo'
 
