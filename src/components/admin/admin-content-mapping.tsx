@@ -13,6 +13,7 @@ import type {
   MentorEnvironmentStatus,
 } from '../../types/mentor-intelligence'
 import type { QuestionContent } from '../../types/supabase'
+import { formatDateTimeBR as formatDate } from '../../lib/format-date'
 
 type MappingContext = {
   readonly examTitle: string | null
@@ -26,15 +27,6 @@ interface AdminContentMappingProps {
   embedded?: boolean
 }
 
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function parseQuestionNumber(item: Record<string, unknown>): number | null {
   const candidates = [item.questionNumber, item.numero, item.questao]

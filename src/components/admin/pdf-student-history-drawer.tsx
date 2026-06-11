@@ -15,6 +15,7 @@ import { getSignedPdfUrl } from '../../services/pdf-storage'
 import { copyPdfLink, downloadPdfFile, triggerBrowserDownload } from './pdf-actions'
 import { downloadAllSequential, selectStudentHistory } from './pdf-student-history'
 import { PDF_TYPE_LABELS, formatFileSize, type PdfRecord } from './pdf-types'
+import { formatDateShortBR as formatDate } from '../../lib/format-date'
 
 export interface PdfStudentHistoryDrawerProps {
   readonly open: boolean
@@ -23,13 +24,6 @@ export interface PdfStudentHistoryDrawerProps {
   readonly onClose: () => void
 }
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('pt-BR')
-  } catch {
-    return iso
-  }
-}
 
 export function PdfStudentHistoryDrawer({
   open,

@@ -23,6 +23,7 @@ import type {
   MentorPlanSummary,
   StudentPerformanceAudit,
 } from '../../types/mentor-intelligence'
+import { formatDateShortBR as formatDate } from '../../lib/format-date'
 
 type School = {
   readonly id: string
@@ -60,10 +61,6 @@ function LoadingSpinner() {
   )
 }
 
-function formatDate(date: string | null): string {
-  if (!date) return '-'
-  return new Date(date).toLocaleDateString('pt-BR')
-}
 
 function relativeDate(date: string | null): string {
   if (!date) return 'sem análise'

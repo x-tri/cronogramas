@@ -16,6 +16,7 @@ import type {
   QuestionEnrichmentAudit,
   QuestionEnrichmentRun,
 } from '../../types/mentor-intelligence'
+import { formatDateTimeBR as formatDate } from '../../lib/format-date'
 
 interface AdminGlinerOpsProps {
   onBack?: () => void
@@ -29,16 +30,6 @@ type TopicFormState = {
   canonicalLabel: string
 }
 
-function formatDate(value: string | null): string {
-  if (!value) return '—'
-  return new Date(value).toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function formatPct(value: number | null): string {
   if (value == null) return 'n/a'

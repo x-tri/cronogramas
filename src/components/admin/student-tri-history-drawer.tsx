@@ -15,6 +15,7 @@
 import { useEffect, useState, type ReactElement } from "react";
 
 import { supabase } from "../../lib/supabase";
+import { formatDateMediumBR as formatDate } from "../../lib/format-date"
 
 export interface StudentTriHistoryDrawerProps {
   readonly open: boolean;
@@ -69,17 +70,6 @@ const AREA_LABEL: Record<Area, string> = {
   mt: "MT",
 };
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 function AreaMiniTrend({
   performances,

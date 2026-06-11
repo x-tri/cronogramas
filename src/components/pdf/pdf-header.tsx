@@ -1,6 +1,7 @@
 import { View, Text } from '@react-pdf/renderer'
 import type { Aluno } from '../../types/domain'
 import { styles } from './pdf-styles'
+import { formatDayMonthBR as formatDate } from '../../lib/format-date'
 
 type PdfHeaderProps = {
   student: Aluno
@@ -15,12 +16,6 @@ type PdfHeaderProps = {
   } | null
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-  })
-}
 
 export function PdfHeader({ student, weekStart, weekEnd, examTitle, triScores }: PdfHeaderProps) {
   const weekStr = `${formatDate(weekStart)} - ${formatDate(weekEnd)}`

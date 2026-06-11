@@ -21,6 +21,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "../../lib/supabase";
+import { formatDateMediumBR as formatDate } from "../../lib/format-date"
 
 interface SimuladoEnemAnalyzerProps {
   /** Matricula do aluno selecionado. O componente resolve o students.id
@@ -58,17 +59,6 @@ interface RespostaRow {
   } | null;
 }
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 function formatScore(score: number | null): string {
   return typeof score === "number" ? score.toFixed(0) : "—";

@@ -36,6 +36,7 @@ import {
   type RankedStudent,
   type RankingResposta,
 } from "../../../services/simulado/ranking-aggregations";
+import { formatDateTimeMediumBR as formatDate } from "../../../lib/format-date"
 
 export interface SimuladoRankingProps {
   readonly open: boolean;
@@ -61,19 +62,6 @@ const AREA_LABELS = {
   MT: "Matemática",
 } as const;
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 function formatScore(n: number | null): string {
   return n == null ? "—" : n.toFixed(1);

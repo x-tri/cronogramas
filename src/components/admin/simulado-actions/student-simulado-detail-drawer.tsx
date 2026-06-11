@@ -17,6 +17,7 @@ import {
   type AreaKey,
   type RankedStudent,
 } from "../../../services/simulado/ranking-aggregations";
+import { formatDateTimeMediumBR as formatDate } from '../../../lib/format-date'
 
 export interface StudentSimuladoDetailDrawerProps {
   readonly open: boolean;
@@ -44,19 +45,6 @@ function formatScore(n: number | null): string {
   return n == null ? "—" : n.toFixed(1);
 }
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 function posicaoLabel(pos: number): string {
   if (pos === 1) return "🥇 1º";

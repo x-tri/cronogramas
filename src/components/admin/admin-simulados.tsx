@@ -22,6 +22,7 @@ import { SimuladoItemAudit } from "./simulado-actions/simulado-item-audit";
 import { SimuladoRanking } from "./simulado-actions/simulado-ranking";
 import { StudentTriHistoryDrawer } from "./student-tri-history-drawer";
 import { SimuladoWizard } from "./simulado-wizard";
+import { formatDateMediumBR as formatDate } from "../../lib/format-date"
 
 type SimuladoStatus = "draft" | "published" | "closed";
 
@@ -67,18 +68,6 @@ function countRespostas(row: SimuladoRow): number {
   return row.simulado_respostas?.[0]?.count ?? 0;
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return "—";
-  }
-}
 
 export function AdminSimulados({
   userRole = null,
