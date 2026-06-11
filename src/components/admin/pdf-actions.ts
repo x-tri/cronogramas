@@ -7,14 +7,35 @@ import { getSignedPdfUrl } from '../../services/pdf-storage'
 const LINK_ERROR_MESSAGE =
   'Não foi possível gerar o link. Verifique permissões no bucket.'
 
-export function triggerBrowserDownload(url: string, filename: string): void {
+export function saveBlobAsFile(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = filename
-  anchor.rel = 'noopener'
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
+  // Revogação adiada: revogar síncrono pode abortar o download em alguns browsers
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/**
+ * Baixa via fetch + blob same-origin em vez de âncora cross-origin.
+ * Âncora apontando para outro domínio ignora o atributo `download` e alguns
+ * navegadores nomeiam o arquivo com UUID mesmo com Content-Disposition
+ * correto (incidente 2026-06-11 — PDFs baixando como "5fab20d6-..." sem
+ * extensão). Blob é same-origin, então o `download` é sempre respeitado.
+ */
+export async function downloadFileFromUrl(url: string, filename: string): Promise<boolean> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return false
+    const blob = await response.blob()
+    saveBlobAsFile(blob, filename)
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function openPdfInNewTab(storagePath: string): Promise<void> {
@@ -45,5 +66,6 @@ export async function downloadPdfFile(
     alert(LINK_ERROR_MESSAGE)
     return
   }
-  triggerBrowserDownload(url, filename)
+  const ok = await downloadFileFromUrl(url, filename)
+  if (!ok) alert(LINK_ERROR_MESSAGE)
 }

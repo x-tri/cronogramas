@@ -16,7 +16,8 @@ export function selectStudentHistory(
 
 export interface DownloadAllDeps {
   getUrl: (storagePath: string, filename: string) => Promise<string | null>
-  triggerDownload: (url: string, filename: string) => void
+  /** Retornar false (ou Promise<false>) conta como falha; void/true conta como sucesso. */
+  triggerDownload: (url: string, filename: string) => void | boolean | Promise<void | boolean>
   onProgress?: (done: number, total: number) => void
   delayMs?: number
 }
@@ -43,8 +44,12 @@ export async function downloadAllSequential(
   for (const [index, item] of items.entries()) {
     const url = await deps.getUrl(item.storage_path, item.filename)
     if (url) {
-      deps.triggerDownload(url, item.filename)
-      ok += 1
+      const downloaded = await deps.triggerDownload(url, item.filename)
+      if (downloaded === false) {
+        failed += 1
+      } else {
+        ok += 1
+      }
     } else {
       failed += 1
     }

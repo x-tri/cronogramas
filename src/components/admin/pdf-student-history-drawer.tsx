@@ -12,7 +12,7 @@
 import { useEffect, useState, type ReactElement } from 'react'
 
 import { getSignedPdfUrl } from '../../services/pdf-storage'
-import { copyPdfLink, downloadPdfFile, triggerBrowserDownload } from './pdf-actions'
+import { copyPdfLink, downloadFileFromUrl, downloadPdfFile } from './pdf-actions'
 import { downloadAllSequential, selectStudentHistory } from './pdf-student-history'
 import { PDF_TYPE_LABELS, formatFileSize, type PdfRecord } from './pdf-types'
 import { formatDateShortBR as formatDate } from '../../lib/format-date'
@@ -62,7 +62,9 @@ export function PdfStudentHistoryDrawer({
     try {
       const { ok, failed } = await downloadAllSequential(history, {
         getUrl: (path, filename) => getSignedPdfUrl(path, undefined, { downloadAs: filename }),
-        triggerDownload: triggerBrowserDownload,
+        // fetch + blob same-origin: garante o nome do arquivo em todos os
+        // navegadores (ver downloadFileFromUrl)
+        triggerDownload: (url, filename) => downloadFileFromUrl(url, filename),
         onProgress: (done, total) => setProgress({ done, total }),
       })
       setResultMessage(

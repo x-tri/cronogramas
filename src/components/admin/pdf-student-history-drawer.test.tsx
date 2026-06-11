@@ -66,6 +66,22 @@ describe('downloadAllSequential', () => {
     expect(result).toEqual({ ok: 2, failed: 0 })
   })
 
+  it('triggerDownload assíncrono que retorna false conta como falha', async () => {
+    const items = [
+      makeRecord({ id: 'a', storage_path: 'p/a.pdf' }),
+      makeRecord({ id: 'b', storage_path: 'p/b.pdf' }),
+    ]
+
+    const result = await downloadAllSequential(items, {
+      getUrl: async (path) => `https://signed/${path}`,
+      // simula fetch+blob: primeiro falha (rede), segundo baixa
+      triggerDownload: async (url) => !url.includes('a.pdf'),
+      delayMs: 0,
+    })
+
+    expect(result).toEqual({ ok: 1, failed: 1 })
+  })
+
   it('continua quando uma URL falha e contabiliza a falha', async () => {
     const items = [
       makeRecord({ id: 'a', storage_path: 'p/a.pdf' }),
