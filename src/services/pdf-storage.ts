@@ -11,14 +11,22 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60;
 /**
  * Gera signed URL temporária para um PDF do bucket privado `cronogramas-pdf`.
  * Retorna null em caso de erro (ex.: path inexistente ou falha de RLS).
+ *
+ * `downloadAs`: nome de arquivo para forçar Content-Disposition attachment —
+ * o navegador baixa em vez de abrir (usado no histórico por aluno).
  */
 export async function getSignedPdfUrl(
   storagePath: string,
   ttlSeconds: number = SIGNED_URL_TTL_SECONDS,
+  options?: { downloadAs?: string },
 ): Promise<string | null> {
   const { data, error } = await supabase.storage
     .from(BUCKET)
-    .createSignedUrl(storagePath, ttlSeconds);
+    .createSignedUrl(
+      storagePath,
+      ttlSeconds,
+      options?.downloadAs ? { download: options.downloadAs } : undefined,
+    );
 
   if (error || !data?.signedUrl) {
     console.error("[pdf-storage] Falha ao gerar signed URL:", {

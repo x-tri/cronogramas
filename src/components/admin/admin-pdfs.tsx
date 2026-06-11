@@ -1,30 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { deletePdf, deleteAllSchoolPdfs, getSignedPdfUrl } from "../../services/pdf-storage";
-
-interface School {
-  id: string;
-  name: string;
-}
-
-interface PdfRecord {
-  id: string;
-  school_id: string;
-  aluno_id: string;
-  aluno_nome: string;
-  turma: string | null;
-  matricula: string | null;
-  tipo: string;
-  filename: string;
-  storage_path: string;
-  file_size: number | null;
-  created_at: string;
-  school?: School | null;
-  // Vindos de pdf_history_with_status (migration 025)
-  download_count: number;
-  first_downloaded_at: string | null;
-  last_downloaded_at: string | null;
-}
+import { PdfStudentHistoryDrawer } from "./pdf-student-history-drawer";
+import { PDF_TYPE_LABELS, formatFileSize, type PdfRecord, type PdfSchool as School } from "./pdf-types";
 
 type StatusFilter = "all" | "downloaded" | "not_downloaded";
 
@@ -33,19 +11,6 @@ interface AdminPdfsProps {
   embedded?: boolean;
   userRole?: string | null;
   userSchoolId?: string | null;
-}
-
-const PDF_TYPE_LABELS: Readonly<Record<string, string>> = {
-  cronograma: "Cronograma semanal",
-  relatorio: "Relatório de desempenho",
-  caderno_questoes: "Caderno de questões",
-};
-
-function formatFileSize(bytes: number | null): string {
-  if (!bytes) return "-";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdfsProps) {
@@ -57,6 +22,8 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
   const [filterStatus, setFilterStatus] = useState<StatusFilter>("all");
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  // Drawer de histórico por aluno — abre ao clicar no nome na tabela
+  const [historyAlunoId, setHistoryAlunoId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -305,7 +272,15 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
               ) : (
                 filtered.map((r) => (
                   <tr key={r.id} className="border-b border-[#f1f5f9] hover:bg-[#fafafa] transition-colors">
-                    <td className="px-4 py-2.5 text-sm font-medium text-[#1d1d1f]">{r.aluno_nome}</td>
+                    <td className="px-4 py-2.5 text-sm font-medium text-[#1d1d1f]">
+                      <button
+                        onClick={() => setHistoryAlunoId(r.aluno_id)}
+                        className="text-left transition-colors hover:text-[#2563eb] hover:underline"
+                        title="Ver histórico completo de documentos do aluno"
+                      >
+                        {r.aluno_nome}
+                      </button>
+                    </td>
                     <td className="px-4 py-2.5">
                       <span className="inline-block rounded-full bg-[#dbeafe] px-2 py-0.5 text-xs font-medium text-[#1d4ed8]">
                         {r.turma ?? "-"}
@@ -375,6 +350,15 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
           </table>
         </div>
       </main>
+
+      {/* Histórico completo de documentos do aluno — usa `records` (sem
+          filtros de turma/status) para mostrar TODOS os documentos dele */}
+      <PdfStudentHistoryDrawer
+        open={historyAlunoId !== null}
+        alunoId={historyAlunoId}
+        records={records}
+        onClose={() => setHistoryAlunoId(null)}
+      />
     </div>
   );
 }
