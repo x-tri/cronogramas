@@ -20,6 +20,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const STATUS_LABELS: Record<string, string> = {
+  verde: "✅ Indo bem",
+  amarelo: "⚠️ Atenção",
+  vermelho: "🚨 Precisa de reforço",
+  sem_dados: "📊 Primeiras análises",
+};
+
 const AREA_CONFIG: Record<string, { label: string; emoji: string; gradient: string; ring: string }> = {
   LC: { label: "Linguagens", emoji: "📝", gradient: "from-rose-400 to-rose-600", ring: "text-rose-500" },
   CH: { label: "Humanas", emoji: "🌍", gradient: "from-sky-400 to-sky-600", ring: "text-sky-500" },
@@ -97,8 +104,9 @@ export default function Desempenho() {
     const uniqueTopics = new Set(blocos.map((b) => b.titulo)).size;
     const weeksStudied = cronogramas.length;
 
-    // Weekly breakdown for chart
-    const weeklyData = cronogramas.map((c) => {
+    // Weekly breakdown for chart (limita as 12 semanas mais recentes
+    // para as barras nao ficarem ilegiveis no mobile)
+    const weeklyData = cronogramas.slice(0, 12).map((c) => {
       const weekBlocos = blocos.filter((b) => b.cronograma_id === c.id);
       const weekDone = weekBlocos.filter((b) => b.concluido).length;
       return {
@@ -196,14 +204,14 @@ export default function Desempenho() {
                 className="flex-1 flex flex-col items-center gap-1"
                 style={{ animationDelay: `${0.3 + i * 0.1}s`, animationFillMode: "both" }}
               >
-                <span className="text-[9px] font-black text-muted-foreground">{w.done}/{w.total}</span>
+                <span className="text-[10px] font-black text-muted-foreground">{w.done}/{w.total}</span>
                 <div className="w-full bg-muted rounded-full overflow-hidden relative" style={{ height: "80px" }}>
                   <div
                     className="absolute bottom-0 w-full rounded-full bg-gradient-to-t from-primary to-primary/60 transition-all duration-1000 ease-out"
                     style={{ height: `${Math.max(w.percent, 4)}%` }}
                   />
                 </div>
-                <span className="text-[8px] font-bold text-muted-foreground leading-tight text-center">{w.week}</span>
+                <span className="text-[10px] font-bold text-muted-foreground leading-tight text-center">{w.week}</span>
               </div>
             ))}
           </div>
@@ -308,7 +316,7 @@ export default function Desempenho() {
 
           <div className="rounded-xl bg-muted/50 p-3">
             <Badge className="bg-primary/15 text-primary border-0 text-[10px] font-black mb-2">
-              {latestRun.overall_status === "sem_dados" ? "📊 Primeiras análises" : latestRun.overall_status}
+              {STATUS_LABELS[latestRun.overall_status ?? ""] ?? "📊 Análise"}
             </Badge>
             <p className="text-xs font-semibold text-muted-foreground leading-relaxed">
               {latestRun.briefing}

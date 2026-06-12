@@ -3,6 +3,7 @@ import { useStudentProfile } from "@/hooks/useStudentData";
 import { useGamification } from "@/hooks/useGamification";
 import { Button } from "@/components/ui/button";
 import { LogOut, Flame, Zap } from "lucide-react";
+import { formatCompactNumber } from "@/lib/utils";
 import logoXtri from "@/assets/logo-xtri.png";
 
 function firstName(name: string | null | undefined): string {
@@ -38,7 +39,7 @@ export default function StudentHeader() {
           </div>
           <div className="flex items-center gap-0.5 rounded-full bg-primary/10 px-2 py-1" title={`${gamification?.title ?? "Calouro"} — ${gamification?.xp_total ?? 0} XP`}>
             <Zap className="h-3.5 w-3.5 text-primary" />
-            <span className="text-[11px] font-black text-primary">{gamification?.xp_total ?? 0}</span>
+            <span className="text-[11px] font-black text-primary">{formatCompactNumber(gamification?.xp_total ?? 0)}</span>
             <span className="hidden text-[9px] font-bold text-primary/70 ml-0.5 sm:inline">{gamification?.title ?? "Calouro"}</span>
           </div>
           <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sair" className="h-8 w-8 ml-1">

@@ -18,8 +18,8 @@ const DIAS_LABEL: Record<string, string> = {
 const JS_DAY_TO_KEY = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"] as const;
 const TIPO_STYLES: Record<string, { bg: string; border: string; icon: string }> = {
   estudo: { bg: "bg-primary/10", border: "border-l-primary", icon: "📖" },
-  revisão: { bg: "bg-[hsl(45,100%,92%)]", border: "border-l-[hsl(var(--secondary))]", icon: "🔄" },
-  revisao: { bg: "bg-[hsl(45,100%,92%)]", border: "border-l-[hsl(var(--secondary))]", icon: "🔄" },
+  revisão: { bg: "bg-secondary/15", border: "border-l-[hsl(var(--secondary))]", icon: "🔄" },
+  revisao: { bg: "bg-secondary/15", border: "border-l-[hsl(var(--secondary))]", icon: "🔄" },
   simulado: { bg: "bg-purple-50", border: "border-l-purple-400", icon: "🎯" },
   rotina: { bg: "bg-[hsl(145,30%,92%)]", border: "border-l-[hsl(var(--success))]", icon: "⏰" },
 };
@@ -105,6 +105,7 @@ export default function Cronograma() {
           className="rounded-xl"
           disabled={cronIndex >= (cronogramas?.length ?? 1) - 1}
           onClick={() => setCronIndex((i) => i + 1)}
+          aria-label="Semana anterior"
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
@@ -121,6 +122,7 @@ export default function Cronograma() {
           className="rounded-xl"
           disabled={cronIndex <= 0}
           onClick={() => setCronIndex((i) => i - 1)}
+          aria-label="Próxima semana"
         >
           <ChevronRight className="h-5 w-5" />
         </Button>
@@ -150,6 +152,14 @@ export default function Cronograma() {
 
       {loadingBlocos ? (
         [1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full mb-3 rounded-2xl" />)
+      ) : totalCount === 0 ? (
+        <div className="rounded-2xl border-2 bg-card p-6 text-center">
+          <div className="text-3xl mb-2">🗓️</div>
+          <p className="text-sm font-black text-foreground">Nenhum bloco nesta semana</p>
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">
+            Use as setas acima para ver outras semanas.
+          </p>
+        </div>
       ) : (
         DIAS.map((dia) => {
           const dayBlocos = blocosByDay[dia];
@@ -211,6 +221,11 @@ export default function Cronograma() {
                         </div>
                         <button
                           onClick={() => toggleConcluido(b.id, !!b.concluido)}
+                          aria-label={
+                            b.concluido
+                              ? `Desmarcar "${b.titulo}" como concluído`
+                              : `Marcar "${b.titulo}" como concluído`
+                          }
                           className={cn(
                             "flex-shrink-0 h-9 w-9 rounded-xl border-2 flex items-center justify-center transition-all active:scale-90",
                             b.concluido

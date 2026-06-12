@@ -85,7 +85,8 @@ function ReportCard({
           </div>
           {report.curso_nome && (
             <p className="text-xs font-bold text-accent truncate">
-              🎓 {report.curso_nome} — {report.curso_universidade}
+              🎓 {report.curso_nome}
+              {report.curso_universidade ? ` — ${report.curso_universidade}` : ""}
             </p>
           )}
           <p className="text-[10px] font-semibold text-muted-foreground mt-1">

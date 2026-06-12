@@ -66,9 +66,9 @@ export default function Login() {
         >
           <p className="text-sm font-semibold leading-snug text-foreground">
             <span className="mr-1">👋</span>
-            <span className="font-black text-primary">Alunos(as):</span> clique no ícone do{" "}
-            <span className="font-black">Gmail</span> e, em seguida, digite sua{" "}
-            <span className="font-black">matrícula</span>.
+            <span className="font-black text-primary">Alunos(as):</span> entre com sua conta{" "}
+            <span className="font-black">Google</span>. Se for seu primeiro acesso, vamos pedir
+            sua <span className="font-black">matrícula</span> em seguida.
           </p>
         </div>
 
