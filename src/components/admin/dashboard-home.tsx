@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase";
 // Leitura cruzada (sem juntar bancos): cronograma/atendimento vem do PRIMARY (supabase),
 // alcance/simulado vem do LEGACY de gabaritos (simuladoSupabase). Merge só na exibição, por school_id.
 import { simuladoSupabase } from "../../lib/simulado-supabase";
+import { coveragePercent, median } from "./executive-metrics";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ interface DashboardStats {
   readonly storage_bytes: number;
   readonly cronogramas_today: number;
   readonly cronogramas_week: number;
+  readonly mediana_blocos: number | null;
 }
 
 interface AuditEntry {
@@ -128,6 +130,7 @@ function emptyDashboardStats(): DashboardStats {
     storage_bytes: 0,
     cronogramas_today: 0,
     cronogramas_week: 0,
+    mediana_blocos: null,
   };
 }
 
@@ -296,10 +299,15 @@ export function DashboardHome({
             .maybeSingle()
         : simuladoSupabase.from("executive_operation_metrics").select("*").maybeSingle();
 
-    const [primaryRes, legacyRes, storageRes, todayRes, weekRes] = await Promise.all([
+    const [primaryRes, legacyRes, storageRes, primaryStorageRes, blocosDistRes, todayRes, weekRes] = await Promise.all([
       primaryQuery,
       legacyQuery,
       simuladoSupabase.from("executive_storage_metrics").select("*").maybeSingle(),
+      supabase.from("executive_storage_metrics").select("*").maybeSingle(),
+      // mediana de blocos por aluno (sem filtro de escola — só visão global)
+      isSchoolScoped
+        ? Promise.resolve({ data: null, error: null })
+        : supabase.from("executive_blocos_por_aluno").select("blocos"),
       supabase
         .from("cronogramas")
         .select("*", { count: "exact", head: true })
@@ -329,6 +337,10 @@ export function DashboardHome({
     const primary = primaryRes.data as Record<string, unknown> | null; // cronograma (PRIMARY)
     const legacy = legacyRes.data as Record<string, unknown> | null; // simulado/alcance (LEGACY)
     const storage = storageRes.data as Record<string, unknown> | null;
+    const primaryStorage = primaryStorageRes.data as Record<string, unknown> | null;
+    const blocosPorAluno = ((blocosDistRes.data ?? []) as Array<{ blocos: number }>).map(
+      (row) => row.blocos,
+    );
 
     const alunosComCronograma = toNumber(primary?.alunos_com_cronograma);
     const blocosCriados = toNumber(primary?.blocos_criados);
@@ -348,8 +360,10 @@ export function DashboardHome({
           (alunosComCronograma > 0 ? blocosCriados / alunosComCronograma : 0),
       ),
       downloads_listas: toNumber(legacy?.downloads_listas),
-      storage_objects: toNumber(storage?.storage_objects),
-      storage_bytes: toNumber(storage?.storage_bytes),
+      // storage = banco atual + histórico (antes o card só via o histórico)
+      storage_objects: toNumber(storage?.storage_objects) + toNumber(primaryStorage?.storage_objects),
+      storage_bytes: toNumber(storage?.storage_bytes) + toNumber(primaryStorage?.storage_bytes),
+      mediana_blocos: median(blocosPorAluno),
       cronogramas_today: todayRes.count ?? 0,
       cronogramas_week: weekRes.count ?? 0,
     });
@@ -531,25 +545,33 @@ export function DashboardHome({
             <KpiCard
               label="Alunos atendidos"
               value={stats.alunos_atendidos}
-              subtitle={`com cronograma gerado • ${stats.alunos_com_simulado} fizeram simulado`}
+              subtitle={`${
+                coveragePercent(stats.alunos_atendidos, stats.alunos_base_escolas_ativas)
+                  ? `cobertura: ${coveragePercent(stats.alunos_atendidos, stats.alunos_base_escolas_ativas)} da base • `
+                  : ""
+              }${stats.alunos_com_simulado} fizeram simulado (inclui histórico)`}
               icon={<IconStudent />}
             />
             <KpiCard
               label="Cronogramas gerados"
               value={stats.cronogramas_gerados}
-              subtitle={`${stats.cronogramas_today} hoje / ${stats.cronogramas_week} esta semana`}
+              subtitle={`total desde o início • ${stats.cronogramas_today} hoje / ${stats.cronogramas_week} esta semana`}
               icon={<IconCalendar />}
             />
             <KpiCard
               label="Blocos criados"
               value={stats.blocos_criados}
-              subtitle={`${stats.blocos_por_aluno_com_cronograma} blocos por aluno com cronograma`}
+              subtitle={
+                stats.mediana_blocos != null
+                  ? `mediana: ${stats.mediana_blocos} por aluno (média ${stats.blocos_por_aluno_com_cronograma})`
+                  : `${stats.blocos_por_aluno_com_cronograma} blocos por aluno com cronograma`
+              }
               icon={<IconCalendar />}
             />
             <KpiCard
               label="Downloads/listas"
               value={stats.downloads_listas}
-              subtitle="Entregas registradas pelos alunos"
+              subtitle="Entregas dos alunos • inclui histórico 2024-25"
               icon={<IconDocument />}
             />
           </div>
@@ -568,10 +590,21 @@ export function DashboardHome({
             <KpiCard
               label="Alunos na base ativa"
               value={stats.alunos_base_escolas_ativas}
+              subtitle="base de alcance (banco histórico)"
               icon={<IconUsers />}
             />
-            <KpiCard label="Objetos no storage" value={stats.storage_objects} icon={<IconStorage />} />
-            <KpiCard label="Armazenamento" value={formatBytes(stats.storage_bytes)} icon={<IconStorage />} />
+            <KpiCard
+              label="Objetos no storage"
+              value={stats.storage_objects}
+              subtitle="banco atual + histórico"
+              icon={<IconStorage />}
+            />
+            <KpiCard
+              label="Armazenamento"
+              value={formatBytes(stats.storage_bytes)}
+              subtitle="banco atual + histórico"
+              icon={<IconStorage />}
+            />
           </div>
         </div>
       </div>
