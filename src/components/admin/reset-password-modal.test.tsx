@@ -37,10 +37,21 @@ beforeEach(() => {
 })
 
 describe('generateTempPassword', () => {
-  it('gera 8 caracteres legíveis sem ambíguos', () => {
-    const senha = generateTempPassword(() => 0.5)
-    expect(senha).toHaveLength(8)
+  it('gera 10 caracteres legíveis sem ambíguos (fonte determinística)', () => {
+    const senha = generateTempPassword((buffer) => {
+      buffer.forEach((_, i) => { buffer[i] = i * 7 })
+      return buffer
+    })
+    expect(senha).toHaveLength(10)
     expect(senha).toMatch(/^[abcdefghjkmnpqrstuvwxyz23456789]+$/)
+  })
+
+  it('usa crypto.getRandomValues por padrão (CSPRNG, não Math.random)', () => {
+    const spy = vi.spyOn(crypto, 'getRandomValues')
+    const senha = generateTempPassword()
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(senha).toHaveLength(10)
+    spy.mockRestore()
   })
 })
 
