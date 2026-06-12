@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 // alcance/simulado vem do LEGACY de gabaritos (simuladoSupabase). Merge só na exibição, por school_id.
 import { simuladoSupabase } from "../../lib/simulado-supabase";
 import { coveragePercent, median } from "./executive-metrics";
+import { SchoolDetailModal } from "./school-detail-modal";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -231,6 +232,7 @@ export function DashboardHome({
   const [activityPeriod, setActivityPeriod] = useState<"24h" | "7d">("24h");
   const [chartData, setChartData] = useState<readonly DailyCronograma[]>([]);
   const [schoolHealth, setSchoolHealth] = useState<readonly SchoolHealth[]>([]);
+  const [detailSchool, setDetailSchool] = useState<SchoolHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const isSchoolScoped = userRole !== "super_admin" && Boolean(userSchoolId);
 
@@ -703,9 +705,12 @@ export function DashboardHome({
               const isBacklog = school.alunos_com_simulado > 0 && school.alunos_atendidos === 0;
 
               return (
-                <div
+                <button
                   key={school.school_id}
-                  className={`rounded-2xl border p-4 ${
+                  type="button"
+                  onClick={() => setDetailSchool(school)}
+                  title={`Ver detalhes de ${school.name}`}
+                  className={`rounded-2xl border p-4 text-left transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] ${
                     isBacklog ? "border-[#fcd34d] bg-[#fffdf5]" : "border-[#e5e7eb] bg-white"
                   }`}
                 >
@@ -724,13 +729,17 @@ export function DashboardHome({
                     <span>{school.alunos_com_simulado} fizeram simulado</span>
                     <span>{school.blocos_criados} blocos</span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
           </>
         )}
       </div>
+
+      {detailSchool && (
+        <SchoolDetailModal school={detailSchool} onClose={() => setDetailSchool(null)} />
+      )}
     </div>
   );
 }
