@@ -21,7 +21,7 @@ function formatDate(iso: string | null): string {
 }
 
 export default function Simulados() {
-  const { data: simulados, isLoading, error } = useSimuladosPendentes();
+  const { data: simulados, isLoading, error, refetch } = useSimuladosPendentes();
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -43,7 +43,16 @@ export default function Simulados() {
           className="rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-sm text-red-700"
         >
           <p className="font-bold">Não foi possível carregar os simulados.</p>
-          <p className="mt-1 text-xs">{error.message}</p>
+          <p className="mt-1 text-xs">
+            Verifique sua conexão com a internet e tente de novo.
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="mt-3 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"
+          >
+            Tentar novamente
+          </button>
         </div>
       </div>
     );

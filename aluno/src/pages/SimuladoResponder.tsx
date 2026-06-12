@@ -10,7 +10,7 @@
  *   - Submit chama useSubmitSimulado (Edge Function autoritativa).
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -24,6 +24,25 @@ import { AREA_LABELS, AREA_RANGES, type AreaKey } from "@/types/simulado";
 const AREAS: readonly AreaKey[] = ["LC", "CH", "CN", "MT"];
 const LETTERS = ["A", "B", "C", "D", "E"] as const;
 
+function draftKey(simuladoId: string): string {
+  return `simulado-draft-${simuladoId}`;
+}
+
+function loadDraft(simuladoId: string | undefined): Record<string, string> {
+  if (!simuladoId) return {};
+  try {
+    const raw = sessionStorage.getItem(draftKey(simuladoId));
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
 export default function SimuladoResponder() {
   const { id: simuladoId } = useParams();
   const navigate = useNavigate();
@@ -31,8 +50,31 @@ export default function SimuladoResponder() {
   const submit = useSubmitSimulado();
 
   const [activeArea, setActiveArea] = useState<AreaKey>("LC");
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>(() =>
+    loadDraft(simuladoId),
+  );
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Rascunho local: refresh/navegacao acidental nao perde as marcacoes.
+  useEffect(() => {
+    if (!simuladoId) return;
+    try {
+      sessionStorage.setItem(draftKey(simuladoId), JSON.stringify(answers));
+    } catch {
+      // storage cheio/indisponivel: segue sem rascunho
+    }
+  }, [answers, simuladoId]);
+
+  const answeredCount = Object.keys(answers).length;
+
+  useEffect(() => {
+    if (answeredCount === 0) return;
+    const handler = (e: BeforeUnloadEvent): void => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [answeredCount]);
 
   const progress = useMemo(() => {
     const total = 180;
@@ -74,6 +116,13 @@ export default function SimuladoResponder() {
           >
             Ver meu resultado
           </button>
+          <button
+            type="button"
+            onClick={() => navigate("/simulados")}
+            className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-xs font-bold text-muted-foreground"
+          >
+            Voltar para simulados
+          </button>
         </div>
       </div>
     );
@@ -101,10 +150,27 @@ export default function SimuladoResponder() {
       { simuladoId, answers },
       {
         onSuccess: () => {
+          try {
+            sessionStorage.removeItem(draftKey(simuladoId));
+          } catch {
+            // ignora: rascunho orfao nao causa problema
+          }
           navigate(`/simulados/${simuladoId}/resultado`);
         },
       },
     );
+  };
+
+  const handleBack = (): void => {
+    if (
+      answeredCount > 0 &&
+      !window.confirm(
+        `Você marcou ${answeredCount} resposta(s). Quer mesmo sair? Suas marcações ficam salvas neste dispositivo até você enviar.`,
+      )
+    ) {
+      return;
+    }
+    navigate("/simulados");
   };
 
   const range = AREA_RANGES[activeArea];
@@ -116,7 +182,7 @@ export default function SimuladoResponder() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate("/simulados")}
+            onClick={handleBack}
             aria-label="Voltar"
             className="rounded-full p-1.5 hover:bg-muted"
           >
@@ -166,8 +232,11 @@ export default function SimuladoResponder() {
           role="alert"
           className="mx-4 mt-3 rounded-xl border-2 border-red-200 bg-red-50 p-3 text-xs text-red-700"
         >
-          <p className="font-bold">Falha ao enviar:</p>
-          <p>{submit.error?.message ?? "Erro desconhecido"}</p>
+          <p className="font-bold">Não foi possível enviar.</p>
+          <p>
+            Verifique sua conexão e tente de novo. Suas respostas continuam
+            salvas neste aparelho.
+          </p>
         </div>
       )}
 

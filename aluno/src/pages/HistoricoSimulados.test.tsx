@@ -45,7 +45,7 @@ describe("HistoricoSimulados", () => {
     expect(container.querySelector(".animate-pulse, [class*='Skeleton']")).not.toBeNull();
   });
 
-  it("mostra mensagem de erro quando a chamada falha", () => {
+  it("mostra mensagem amigável (sem detalhe técnico) quando a chamada falha", () => {
     useStudentProfile.mockReturnValue({
       data: { id: "stu-1", matricula: "12345" },
       isLoading: false,
@@ -54,9 +54,14 @@ describe("HistoricoSimulados", () => {
       data: null,
       isLoading: false,
       error: new Error("Falha rede"),
+      refetch: vi.fn(),
     });
     wrap(<HistoricoSimulados />);
-    expect(screen.getByRole("alert")).toHaveTextContent(/Falha rede/i);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(/Não foi possível carregar seu histórico/i);
+    expect(alert).toHaveTextContent(/Tentar novamente/i);
+    // A mensagem técnica do erro não vaza para o aluno
+    expect(alert).not.toHaveTextContent(/Falha rede/i);
   });
 
   it("mostra estado vazio quando não há simulados", () => {

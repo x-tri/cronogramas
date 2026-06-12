@@ -94,7 +94,7 @@ function AreaSparkline({
       : null;
 
   return (
-    <svg width={W} height={H} className="overflow-visible">
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
       {pathD && (
         <path
           d={pathD}
@@ -172,7 +172,7 @@ function TrendBadge({ delta }: { delta: number | null }) {
 
 export default function HistoricoSimulados() {
   const { data: student, isLoading: loadingStudent } = useStudentProfile();
-  const { data, isLoading, error } = useStudentPerformance(student?.id);
+  const { data, isLoading, error, refetch } = useStudentPerformance(student?.id);
 
   if (loadingStudent || isLoading) {
     return (
@@ -196,7 +196,16 @@ export default function HistoricoSimulados() {
           className="rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-sm text-red-700"
         >
           <p className="font-bold">Não foi possível carregar seu histórico.</p>
-          <p className="mt-1 text-xs">{error.message}</p>
+          <p className="mt-1 text-xs">
+            Verifique sua conexão com a internet e tente de novo.
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="mt-3 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"
+          >
+            Tentar novamente
+          </button>
         </div>
       </div>
     );
@@ -300,17 +309,17 @@ export default function HistoricoSimulados() {
                       {" · "}
                       <span
                         className={cn(
-                          "inline-block rounded px-1 font-mono text-[9px]",
+                          "inline-block rounded px-1 text-[10px] font-semibold",
                           p.fonte === "legacy"
                             ? "bg-slate-100 text-slate-600"
                             : "bg-emerald-100 text-emerald-700",
                         )}
                       >
-                        {p.fonte}
+                        {p.fonte === "legacy" ? "anterior" : "no app"}
                       </span>
                       {p.formato === "tipo2_45" && (
-                        <span className="ml-1 inline-block rounded bg-amber-100 px-1 font-mono text-[9px] text-amber-700">
-                          45q
+                        <span className="ml-1 inline-block rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-700">
+                          45 questões
                         </span>
                       )}
                     </p>
