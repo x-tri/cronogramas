@@ -32,19 +32,33 @@ export function SectionSisu({ notaPonderadaAtual, notaCorte, gap }: Props) {
           <p className="text-[9px] font-bold text-muted-foreground">Gap</p>
         </div>
       </div>
-      <div className="mt-3 relative">
-        <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+      {notaCorte > 0 && (
+        <div className="mt-3 relative">
+          {/* Escala vai ate o maior valor (nota ou corte): acima do corte a
+              barra passa do marcador em vez de truncar em 100% */}
+          <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-1000 ease-out",
+                isPositive
+                  ? "bg-gradient-to-r from-[hsl(var(--success))] to-emerald-400"
+                  : "bg-gradient-to-r from-destructive to-rose-400"
+              )}
+              style={{
+                width: `${(notaPonderadaAtual / Math.max(notaPonderadaAtual, notaCorte)) * 100}%`,
+              }}
+            />
+          </div>
           <div
-            className={cn(
-              "h-full rounded-full transition-all duration-1000 ease-out",
-              isPositive
-                ? "bg-gradient-to-r from-[hsl(var(--success))] to-emerald-400"
-                : "bg-gradient-to-r from-destructive to-rose-400"
-            )}
-            style={{ width: `${Math.min((notaPonderadaAtual / Math.max(notaCorte, 1)) * 100, 100)}%` }}
+            aria-hidden="true"
+            title={`Nota de corte: ${notaCorte.toFixed(1)}`}
+            className="absolute top-[-2px] h-4 w-0.5 bg-foreground/60"
+            style={{
+              left: `${(notaCorte / Math.max(notaPonderadaAtual, notaCorte)) * 100}%`,
+            }}
           />
         </div>
-      </div>
+      )}
     </div>
   );
 }

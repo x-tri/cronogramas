@@ -30,6 +30,8 @@ import {
   getUniversidade,
   mediaEnemComRedacao,
   REDACAO_HARDCODED,
+  REDACAO_TIPICA,
+  SISU_CORTES_ANO,
 } from "@/services/sisu-data";
 
 const AREAS: readonly AreaKey[] = ["LC", "CH", "CN", "MT"];
@@ -185,6 +187,7 @@ function formatScore(score: number | null): string {
 
 interface HeroProps {
   readonly mediaGeral: number | null;
+  readonly mediaTipica: number | null;
   readonly mediaTier: ProficiencyTier | null;
   readonly mediaGap: { points: number; tier: ProficiencyTier } | null;
   readonly onInfo: () => void;
@@ -192,6 +195,7 @@ interface HeroProps {
 
 function Hero({
   mediaGeral,
+  mediaTipica,
   mediaTier,
   mediaGap,
   onInfo,
@@ -222,8 +226,16 @@ function Hero({
             className="text-[10px] font-semibold text-muted-foreground"
             title={`Cenário simulado = (LC + CH + CN + MT + Redação ${REDACAO_HARDCODED}) / 5`}
           >
-            cenário c/ redação {REDACAO_HARDCODED}
+            cenário otimista (redação {REDACAO_HARDCODED})
           </p>
+          {mediaTipica != null && (
+            <p className="text-[10px] font-semibold text-muted-foreground">
+              com redação {REDACAO_TIPICA} (média nacional):{" "}
+              <strong className="font-black text-foreground/80">
+                {mediaTipica.toFixed(1)}
+              </strong>
+            </p>
+          )}
 
           <button
             type="button"
@@ -265,16 +277,16 @@ interface AreaCardProps {
   readonly area: AreaKey;
   readonly score: number | null;
   readonly acertos: number;
+  readonly totalQuestoes: number;
 }
 
 const INEP_TICKS = [450, 550, 650] as const;
 
-function AreaCard({ area, score, acertos }: AreaCardProps) {
+function AreaCard({ area, score, acertos, totalQuestoes }: AreaCardProps) {
   const meta = AREA_META[area];
   const pct = triToGaugePercent(score);
   const tier = tierOf(score);
   const gap = nextLevelGap(score);
-  const extraAcertos = gap ? Math.max(1, Math.ceil(gap.points / 9)) : 0;
 
   return (
     <div
@@ -300,7 +312,7 @@ function AreaCard({ area, score, acertos }: AreaCardProps) {
             {formatScore(score)}
           </p>
           <p className="text-[9px] font-bold text-muted-foreground leading-tight">
-            {acertos}<span className="text-muted-foreground/60">/45</span>
+            {acertos}<span className="text-muted-foreground/60">/{totalQuestoes}</span>
           </p>
         </div>
       </div>
@@ -332,8 +344,8 @@ function AreaCard({ area, score, acertos }: AreaCardProps) {
           <span>{tier?.label}</span>
         </span>
         {gap && (
-          <span className="text-[9px] font-bold text-muted-foreground">
-            +<strong className={gap.tier.color}>{extraAcertos}</strong> ac ={" "}
+          <span className="text-[10px] font-bold text-muted-foreground">
+            +<strong className={gap.tier.color}>{gap.points}</strong> pts ={" "}
             {gap.tier.emoji}
           </span>
         )}
@@ -372,7 +384,8 @@ function ProficiencyInfoModal({ open, onClose }: { open: boolean; onClose: () =>
           </button>
         </div>
         <p className="text-[11px] font-semibold text-muted-foreground mb-3">
-          Baseado na metodologia INEP do ENEM.
+          Faixas pedagógicas XTRI, inspiradas na escala TRI do ENEM (os cortes
+          oficiais do INEP variam por área e edição).
         </p>
         <ul className="space-y-3">
           {PROFICIENCY_TIERS.map((t) => (
@@ -455,21 +468,51 @@ export default function SimuladoResultado() {
     );
   }
 
-  if (error || !data?.submitted || !data.resposta) {
+  if (error) {
     return (
       <div className="p-4 pb-24 max-w-lg mx-auto">
         <div
           role="alert"
           className="rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-sm text-red-700"
         >
-          <p className="font-bold">Resultado indisponível.</p>
+          <p className="font-bold">Não foi possível carregar o resultado.</p>
           <p className="mt-1 text-xs">
-            {error?.message ?? "Você ainda não submeteu este simulado."}
+            Verifique sua conexão com a internet e tente de novo.
           </p>
           <button
             type="button"
             onClick={() => navigate("/simulados")}
             className="mt-3 text-xs font-bold text-primary underline"
+          >
+            Voltar para a lista
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data?.submitted || !data.resposta) {
+    // Nao e erro: o aluno so ainda nao respondeu este simulado.
+    return (
+      <div className="p-4 pb-24 max-w-lg mx-auto">
+        <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-4 text-sm">
+          <p className="font-black text-foreground">
+            Você ainda não respondeu este simulado.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Seu resultado aparece aqui assim que você enviar o gabarito.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate(`/simulados/${simuladoId}/responder`)}
+            className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-white"
+          >
+            Responder agora
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/simulados")}
+            className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-xs font-bold text-muted-foreground"
           >
             Voltar para a lista
           </button>
@@ -504,9 +547,28 @@ export default function SimuladoResultado() {
     cn: resposta.tri_cn,
     mt: resposta.tri_mt,
   });
+  const mediaTipica = mediaEnemComRedacao(
+    {
+      lc: resposta.tri_lc,
+      ch: resposta.tri_ch,
+      cn: resposta.tri_cn,
+      mt: resposta.tri_mt,
+    },
+    REDACAO_TIPICA,
+  );
   const mediaTier = tierOf(mediaGeral);
   const mediaGap = nextLevelGap(mediaGeral);
-  const muitosEmBranco = totais.branco > 30;
+
+  // Total real de questoes do simulado (deriva dos contadores; nao assume 180)
+  const totalQuestoes = totais.acertos + totais.erros + totais.branco;
+  const questoesPorArea: Record<AreaKey, number> = {
+    LC: resposta.acertos_lc + resposta.erros_lc + resposta.branco_lc,
+    CH: resposta.acertos_ch + resposta.erros_ch + resposta.branco_ch,
+    CN: resposta.acertos_cn + resposta.erros_cn + resposta.branco_cn,
+    MT: resposta.acertos_mt + resposta.erros_mt + resposta.branco_mt,
+  };
+  // Alerta quando mais de 1/6 das questoes ficou em branco (30 de 180)
+  const muitosEmBranco = totais.branco > totalQuestoes / 6;
 
   // Dados do termometro SISU (se aluno tem meta cadastrada e universidade reconhecida)
   const sisuUni = getUniversidade(
@@ -550,6 +612,7 @@ export default function SimuladoResultado() {
         {/* Hero — score + tier + gap (sem mascote, conforme feedback) */}
         <Hero
           mediaGeral={mediaGeral}
+          mediaTipica={mediaTipica}
           mediaTier={mediaTier}
           mediaGap={mediaGap}
           onInfo={() => setTierInfoOpen(true)}
@@ -606,6 +669,7 @@ export default function SimuladoResultado() {
                         ? resposta.acertos_cn
                         : resposta.acertos_mt
                 }
+                totalQuestoes={questoesPorArea[area]}
               />
             ))}
           </div>
@@ -614,7 +678,7 @@ export default function SimuladoResultado() {
         {/* Totais com barra visual */}
         <div className="rounded-2xl border-2 bg-card p-4">
           <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3">
-            Resumo das 180 respostas
+            Resumo das {totalQuestoes} respostas
           </p>
           {/* Barra de distribuicao */}
           <div className="flex h-4 overflow-hidden rounded-full">
@@ -670,6 +734,26 @@ export default function SimuladoResultado() {
             metaCurso={sisuGoal.sisu_curso_nome}
             metaNotaCorte={Number(sisuGoal.sisu_nota_corte)}
           />
+        )}
+
+        {/* Meta cadastrada mas universidade fora da base de cortes */}
+        {!thermometer && sisuGoal?.sisu_curso_nome && sisuGoal?.sisu_universidade && (
+          <div className="rounded-2xl border-2 bg-card p-4">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+              🎯 Sua meta SISU
+            </p>
+            <p className="mt-0.5 text-sm font-black leading-tight">
+              {sisuGoal.sisu_curso_nome}{" "}
+              <span className="text-primary">
+                · {sisuGoal.sisu_universidade}
+              </span>
+            </p>
+            <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+              Ainda não temos os cortes dessa universidade na nossa base, então
+              a comparação detalhada não aparece aqui. Fale com seu coordenador
+              para conferir a nota de corte do seu curso.
+            </p>
+          </div>
         )}
 
         {/* Top topico errado por AREA (1 card por area) */}

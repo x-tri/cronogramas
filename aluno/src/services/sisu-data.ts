@@ -101,6 +101,15 @@ export function buildThermometerData(
 export const REDACAO_HARDCODED = 900;
 
 /**
+ * Redacao tipica (mediana nacional historica ~600). Usada como segundo
+ * cenario para o aluno enxergar a faixa realista, ja que 900 e otimista.
+ */
+export const REDACAO_TIPICA = 600;
+
+/** Edicao do SISU de onde vieram as notas de corte hardcoded acima. */
+export const SISU_CORTES_ANO = 2024;
+
+/**
  * Retorna a media ENEM SOMENTE quando as 4 areas estao preenchidas.
  * Com TRI parcial (ex: edge function timeout em uma area), retornar uma
  * "media" menor com denominador reduzido enganaria o aluno mostrando-o

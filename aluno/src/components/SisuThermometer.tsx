@@ -8,6 +8,7 @@
  */
 
 import { cn } from "@/lib/utils";
+import { SISU_CORTES_ANO } from "@/services/sisu-data";
 import type { ThermometerData, SisuCurso } from "@/services/sisu-data";
 
 export interface SisuThermometerProps {
@@ -71,7 +72,7 @@ function CursoRow({
                     : "text-muted-foreground",
               )}
             >
-              {curso.notaCorte}
+              {curso.notaCorte} pts
             </span>
             {!reached && !isMeta && (
               <span className="text-[9px] font-bold text-muted-foreground">
@@ -220,6 +221,17 @@ export function SisuThermometer({
           </div>
         )}
       </div>
+
+      {/* Legenda + aviso de defasagem dos cortes */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-muted-foreground">
+        <span>🎯 sua meta</span>
+        <span>✓ você já alcança</span>
+        <span>+N pts faltando</span>
+      </div>
+      <p className="mt-1.5 text-[10px] font-semibold text-muted-foreground">
+        ⚠️ Cortes de referência SISU {SISU_CORTES_ANO} (ampla concorrência) —
+        os valores mudam a cada edição.
+      </p>
     </div>
   );
 }
