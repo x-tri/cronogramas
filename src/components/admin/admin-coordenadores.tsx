@@ -3,6 +3,12 @@ import { useSchools, type SchoolOption } from "../../hooks/use-schools";
 import { supabase } from "../../lib/supabase";
 import { logAudit } from "../../services/audit";
 import { generateTempPassword } from "./temp-password";
+import { formatDateShortBR } from "../../lib/format-date";
+import {
+  daysSinceLogin,
+  engagementStatus,
+  type MentorEngagementRow,
+} from "./mentor-engagement";
 
 interface School {
   id: string;
@@ -33,6 +39,7 @@ interface AdminCoordinadoresProps {
 export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps) {
   const [users, setUsers] = useState<ProjectUser[]>([]);
   const [pendingInvites, setPendingInvites] = useState<ProjectUser[]>([]);
+  const [engagement, setEngagement] = useState<MentorEngagementRow[]>([]);
   const { schools } = useSchools();
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -40,14 +47,21 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
   const [filterSchool, setFilterSchool] = useState("");
 
   const loadData = useCallback(async () => {
-    const usersRes = await supabase
-      .from("project_users")
-      .select("*, school:schools(id, name, slug)")
-      .eq("is_active", true)
-      .in("role", ["super_admin", "coordinator", "viewer"])
-      .order("role")
-      .order("name");
+    const [usersRes, engagementRes] = await Promise.all([
+      supabase
+        .from("project_users")
+        .select("*, school:schools(id, name, slug)")
+        .eq("is_active", true)
+        .in("role", ["super_admin", "coordinator", "viewer"])
+        .order("role")
+        .order("name"),
+      supabase
+        .from("mentor_engagement")
+        .select("*")
+        .order("last_login_at", { ascending: false, nullsFirst: false }),
+    ]);
 
+    setEngagement((engagementRes.data ?? []) as MentorEngagementRow[]);
     const allUsers = (usersRes.data ?? []) as ProjectUser[];
     // Usuarios com auth_uid = linked (ja logaram)
     setUsers(allUsers.filter((u) => u.auth_uid !== null));
@@ -71,6 +85,10 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
   const filteredInvites = filterSchool
     ? pendingInvites.filter((i) => i.school_id === filterSchool)
     : pendingInvites;
+
+  const filteredEngagement = filterSchool
+    ? engagement.filter((m) => m.school_id === filterSchool)
+    : engagement;
 
   async function handleRemove(email: string) {
     if (!confirm(`Remover ${email} do projeto?`)) return;
@@ -169,6 +187,72 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
             ))}
           </select>
         </div>
+
+        {/* Engajamento (Fase 1 do painel de mentores) */}
+        {filteredEngagement.length > 0 && (
+          <div>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#64748b]">
+              Engajamento dos mentores
+            </h2>
+            <div className="rounded-2xl border border-[#e5e7eb] bg-white overflow-x-auto">
+              <table className="w-full min-w-[640px]">
+                <thead>
+                  <tr className="border-b border-[#e5e7eb] bg-[#fafafa]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b]">Mentor</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b]">Escola</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#64748b]">Último acesso</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[#64748b]" title="Logins nos últimos 7 dias">Logins 7d</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[#64748b]" title="PDFs gerados nos últimos 30 dias">PDFs 30d</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[#64748b]" title="Alunos distintos atendidos nos últimos 30 dias">Alunos 30d</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[#64748b]" title="Planos de mentoria criados/enviados nos últimos 30 dias">Planos 30d</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#64748b]">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEngagement.map((m) => {
+                    const status = engagementStatus(m.last_login_at);
+                    return (
+                      <tr key={m.email} className="border-b border-[#f1f5f9] hover:bg-[#fafafa] transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-[#1d1d1f]">{m.name || m.email.split("@")[0]}</p>
+                          <p className="text-xs font-mono text-[#94a3b8]">{m.email}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-block rounded-full bg-[#dbeafe] px-2.5 py-0.5 text-xs font-medium text-[#1d4ed8]">
+                            {m.school_name ?? "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[#64748b]">
+                          {m.last_login_at ? formatDateShortBR(m.last_login_at) : "nunca"}
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-[#1d1d1f]">{m.logins_7d}</td>
+                        <td className="px-4 py-3 text-center text-sm text-[#1d1d1f]">{m.pdfs_30d}</td>
+                        <td className="px-4 py-3 text-center text-sm text-[#1d1d1f]">{m.alunos_30d}</td>
+                        <td className="px-4 py-3 text-center text-sm text-[#1d1d1f]">{m.planos_30d}</td>
+                        <td className="px-4 py-3 text-right">
+                          {status === "ativo" ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#f0fdf4] px-2 py-0.5 text-xs font-medium text-[#15803d]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+                              Ativo
+                            </span>
+                          ) : status === "inativo" ? (
+                            <span className="inline-flex items-center rounded-full bg-[#fef3c7] px-2 py-0.5 text-xs font-medium text-[#92400e]">
+                              {m.last_login_at ? `Inativo há ${daysSinceLogin(m.last_login_at)}d` : "Inativo"}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-[#fef2f2] px-2 py-0.5 text-xs font-medium text-[#b91c1c]">
+                              Nunca acessou
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Table */}
         <div className="rounded-2xl border border-[#e5e7eb] bg-white overflow-hidden">
