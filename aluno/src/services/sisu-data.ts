@@ -46,6 +46,86 @@ const UNIVERSIDADES: ReadonlyArray<SisuUniversidade> = [
   { sigla: "UFRN", nome: "Universidade Federal do Rio Grande do Norte", uf: "RN", cursos: UFRN_CURSOS },
 ];
 
+/** Linha da tabela sisu_cortes (importada do projeto sisu2025). */
+export interface SisuCorteRow {
+  readonly sigla: string;
+  readonly nome: string;
+  readonly uf: string;
+  readonly curso: string;
+  readonly nota_corte: number;
+  readonly ano: number;
+}
+
+const CURSO_EMOJIS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/medicina veterin/i, "🐾"],
+  [/medicina/i, "🩺"],
+  [/odontolog/i, "🦷"],
+  [/direito/i, "⚖️"],
+  [/psicolog/i, "🧠"],
+  [/engenharia/i, "⚙️"],
+  [/enfermagem/i, "💊"],
+  [/fisioterap/i, "🤸"],
+  [/arquitetura/i, "📐"],
+  [/computa|informática|sistemas|software|redes/i, "💻"],
+  [/biomedicina|biolog|biotec/i, "🔬"],
+  [/nutri/i, "🥗"],
+  [/administra|gestão/i, "📈"],
+  [/contábeis|economia|econômic|finanças/i, "📊"],
+  [/jornalismo|comunicação|publicidade/i, "📰"],
+  [/serviço social/i, "🤝"],
+  [/pedagog/i, "📚"],
+  [/letras/i, "✍️"],
+  [/educação física/i, "⚽"],
+  [/farmácia/i, "💊"],
+  [/matemátic|estatístic|física$|^física|química/i, "🧮"],
+];
+
+function emojiDoCurso(curso: string): string {
+  for (const [re, emoji] of CURSO_EMOJIS) {
+    if (re.test(curso)) return emoji;
+  }
+  return "🎓";
+}
+
+export interface UniversidadeComAno {
+  readonly universidade: SisuUniversidade;
+  readonly ano: number;
+}
+
+/**
+ * Monta a universidade a partir das linhas de sisu_cortes. Para cada curso,
+ * usa o ano mais recente disponivel (2026 ainda tem captura parcial); o `ano`
+ * retornado e o mais recente entre os cursos usados.
+ */
+export function buildUniversidadeFromCortes(
+  rows: ReadonlyArray<SisuCorteRow>,
+): UniversidadeComAno | null {
+  if (rows.length === 0) return null;
+  const porCurso = new Map<string, SisuCorteRow>();
+  for (const row of rows) {
+    const prev = porCurso.get(row.curso);
+    if (!prev || row.ano > prev.ano) porCurso.set(row.curso, row);
+  }
+  const cursos: SisuCurso[] = [...porCurso.values()]
+    .map((r) => ({
+      curso: r.curso,
+      notaCorte: Math.round(Number(r.nota_corte)),
+      emoji: emojiDoCurso(r.curso),
+    }))
+    .sort((a, b) => b.notaCorte - a.notaCorte);
+  const first = rows[0];
+  const ano = Math.max(...[...porCurso.values()].map((r) => r.ano));
+  return {
+    universidade: {
+      sigla: first.sigla,
+      nome: first.nome,
+      uf: first.uf,
+      cursos,
+    },
+    ano,
+  };
+}
+
 /**
  * Retorna a universidade (com lista de cursos) pelo par sigla+uf,
  * case-insensitive. Null se nao esta na lista hardcoded.

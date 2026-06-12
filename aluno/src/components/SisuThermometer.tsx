@@ -16,6 +16,8 @@ export interface SisuThermometerProps {
   readonly mediaEnem: number;
   readonly metaCurso: string;
   readonly metaNotaCorte: number;
+  /** Edicao do SISU de onde vieram os cortes exibidos. */
+  readonly anoCortes?: number;
 }
 
 function CursoRow({
@@ -105,6 +107,7 @@ export function SisuThermometer({
   mediaEnem,
   metaCurso,
   metaNotaCorte,
+  anoCortes = SISU_CORTES_ANO,
 }: SisuThermometerProps) {
   const gap = Math.max(0, Math.round(metaNotaCorte - mediaEnem));
   const uni = data.universidade;
@@ -114,9 +117,28 @@ export function SisuThermometer({
     ...data.cursosRanked.map((c) => c.notaCorte),
   );
 
-  // Divide cursos em acima/abaixo da nota atual
-  const acima = data.cursosRanked.filter((c) => c.notaCorte > mediaEnem);
-  const abaixo = data.cursosRanked.filter((c) => c.notaCorte <= mediaEnem);
+  // Divide cursos em acima/abaixo da nota atual. Com a base completa de
+  // cortes a lista pode ter dezenas de cursos: mostra so os 5 mais proximos
+  // de cada lado (a meta do aluno sempre aparece).
+  const acimaAll = data.cursosRanked.filter((c) => c.notaCorte > mediaEnem);
+  const abaixoAll = data.cursosRanked.filter((c) => c.notaCorte <= mediaEnem);
+  const VIZINHOS = 5;
+  const acima = acimaAll
+    .slice(-VIZINHOS)
+    .concat(
+      acimaAll
+        .slice(0, -VIZINHOS)
+        .filter((c) => c.curso === metaCurso),
+    )
+    .sort((a, b) => b.notaCorte - a.notaCorte);
+  const abaixo = abaixoAll
+    .slice(0, VIZINHOS)
+    .concat(
+      abaixoAll.slice(VIZINHOS).filter((c) => c.curso === metaCurso),
+    )
+    .sort((a, b) => b.notaCorte - a.notaCorte);
+  const acimaOcultos = acimaAll.length - acima.length;
+  const abaixoOcultos = abaixoAll.length - abaixo.length;
 
   return (
     <div className="rounded-3xl border-2 bg-card p-4">
@@ -153,6 +175,12 @@ export function SisuThermometer({
       </div>
 
       {/* Lista cursos acima da nota */}
+      {acimaOcultos > 0 && (
+        <p className="mb-1.5 text-center text-[10px] font-semibold text-muted-foreground">
+          + {acimaOcultos} curso{acimaOcultos === 1 ? "" : "s"} mais
+          concorrido{acimaOcultos === 1 ? "" : "s"} acima
+        </p>
+      )}
       {acima.length > 0 && (
         <div className="space-y-1.5">
           {acima.map((c) => (
@@ -196,6 +224,12 @@ export function SisuThermometer({
           ))}
         </div>
       )}
+      {abaixoOcultos > 0 && (
+        <p className="mt-1.5 text-center text-[10px] font-semibold text-muted-foreground">
+          + {abaixoOcultos} outro{abaixoOcultos === 1 ? "" : "s"} curso
+          {abaixoOcultos === 1 ? "" : "s"} que você já alcança
+        </p>
+      )}
 
       {/* Footer — resumo */}
       <div className="mt-4 grid gap-2">
@@ -229,7 +263,7 @@ export function SisuThermometer({
         <span>+N pts faltando</span>
       </div>
       <p className="mt-1.5 text-[10px] font-semibold text-muted-foreground">
-        ⚠️ Cortes de referência SISU {SISU_CORTES_ANO} (ampla concorrência) —
+        ⚠️ Cortes de referência SISU {anoCortes} (ampla concorrência) —
         os valores mudam a cada edição.
       </p>
     </div>

@@ -16,6 +16,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useSimuladoResultado } from "@/hooks/useSimulados";
 import { useStudentProfile } from "@/hooks/useStudentData";
 import { useSisuGoal } from "@/hooks/useSisuGoal";
+import { useSisuCortes } from "@/hooks/useSisuCortes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SisuThermometer } from "@/components/SisuThermometer";
 import { ArrowLeft, XCircle, Info, Target, TrendingUp } from "lucide-react";
@@ -27,10 +28,12 @@ import {
 } from "@/types/simulado";
 import {
   buildThermometerData,
+  buildUniversidadeFromCortes,
   getUniversidade,
   mediaEnemComRedacao,
   REDACAO_HARDCODED,
   REDACAO_TIPICA,
+  SISU_CORTES_ANO,
 } from "@/services/sisu-data";
 
 const AREAS: readonly AreaKey[] = ["LC", "CH", "CN", "MT"];
@@ -422,6 +425,10 @@ export default function SimuladoResultado() {
   const { data, isLoading, error } = useSimuladoResultado(simuladoId);
   const { data: student } = useStudentProfile();
   const { data: sisuGoal } = useSisuGoal(student?.id);
+  const { data: cortesRows } = useSisuCortes(
+    sisuGoal?.sisu_universidade,
+    sisuGoal?.sisu_uf,
+  );
 
   const [tierInfoOpen, setTierInfoOpen] = useState(false);
 
@@ -569,11 +576,17 @@ export default function SimuladoResultado() {
   // Alerta quando mais de 1/6 das questoes ficou em branco (30 de 180)
   const muitosEmBranco = totais.branco > totalQuestoes / 6;
 
-  // Dados do termometro SISU (se aluno tem meta cadastrada e universidade reconhecida)
-  const sisuUni = getUniversidade(
-    sisuGoal?.sisu_universidade ?? null,
-    sisuGoal?.sisu_uf ?? null,
-  );
+  // Dados do termometro SISU (se aluno tem meta cadastrada e universidade
+  // reconhecida): preferimos os cortes importados do banco (sisu_cortes,
+  // anos 2025/2026); a lista hardcoded fica como fallback.
+  const uniFromDb = buildUniversidadeFromCortes(cortesRows ?? []);
+  const sisuUni =
+    uniFromDb?.universidade ??
+    getUniversidade(
+      sisuGoal?.sisu_universidade ?? null,
+      sisuGoal?.sisu_uf ?? null,
+    );
+  const anoCortes = uniFromDb?.ano ?? SISU_CORTES_ANO;
   const thermometer =
     sisuUni && sisuGoal?.sisu_curso_nome && sisuGoal.sisu_nota_corte && mediaGeral != null
       ? buildThermometerData(sisuUni, mediaGeral)
@@ -723,6 +736,50 @@ export default function SimuladoResultado() {
               </p>
             </div>
           </div>
+
+          {/* Erros por área */}
+          {totais.erros > 0 && (
+            <div className="mt-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">
+                De onde vieram os {totais.erros} erros
+              </p>
+              <ul className="space-y-1.5">
+                {AREAS.map((area) => {
+                  const erros =
+                    area === "LC"
+                      ? resposta.erros_lc
+                      : area === "CH"
+                        ? resposta.erros_ch
+                        : area === "CN"
+                          ? resposta.erros_cn
+                          : resposta.erros_mt;
+                  const meta = AREA_META[area];
+                  const pct = (erros / Math.max(1, totais.erros)) * 100;
+                  return (
+                    <li key={area} className="flex items-center gap-2">
+                      <span className="text-base leading-none flex-shrink-0">
+                        {meta.emoji}
+                      </span>
+                      <span
+                        className={`w-24 flex-shrink-0 text-[10px] font-black ${meta.accentClass}`}
+                      >
+                        {area} · {meta.short}
+                      </span>
+                      <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-red-400"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="w-12 flex-shrink-0 text-right text-[10px] font-black text-red-600">
+                        {erros} erro{erros === 1 ? "" : "s"}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Termometro SISU — meta do aluno (se cadastrada) */}
@@ -732,6 +789,7 @@ export default function SimuladoResultado() {
             mediaEnem={mediaGeral ?? 0}
             metaCurso={sisuGoal.sisu_curso_nome}
             metaNotaCorte={Number(sisuGoal.sisu_nota_corte)}
+            anoCortes={anoCortes}
           />
         )}
 
