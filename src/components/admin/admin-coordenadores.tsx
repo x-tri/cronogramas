@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSchools, type SchoolOption } from "../../hooks/use-schools";
 import { supabase } from "../../lib/supabase";
 import { logAudit } from "../../services/audit";
+import { generateTempPassword } from "./temp-password";
 
 interface School {
   id: string;
@@ -35,6 +36,7 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
   const { schools } = useSchools();
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [resetUser, setResetUser] = useState<ProjectUser | null>(null);
   const [filterSchool, setFilterSchool] = useState("");
 
   const loadData = useCallback(async () => {
@@ -230,12 +232,21 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleRemove(u.email)}
-                        className="rounded-lg border border-[#fecaca] px-2.5 py-1 text-xs text-[#dc2626] transition-colors hover:bg-[#fef2f2]"
-                      >
-                        Remover
-                      </button>
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          onClick={() => setResetUser(u)}
+                          className="rounded-lg border border-[#dbeafe] px-2.5 py-1 text-xs text-[#2563eb] transition-colors hover:bg-[#eff6ff]"
+                          title="Definir nova senha temporária para este mentor"
+                        >
+                          Resetar senha
+                        </button>
+                        <button
+                          onClick={() => handleRemove(u.email)}
+                          className="rounded-lg border border-[#fecaca] px-2.5 py-1 text-xs text-[#dc2626] transition-colors hover:bg-[#fef2f2]"
+                        >
+                          Remover
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -326,6 +337,14 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
         )}
       </main>
 
+      {/* Modal de reset de senha */}
+      {resetUser && (
+        <ResetPasswordModal
+          user={resetUser}
+          onClose={() => setResetUser(null)}
+        />
+      )}
+
       {/* Modal */}
       {showModal && (
         <AddUserModal
@@ -342,6 +361,135 @@ export function AdminCoordinadores({ onBack, embedded }: AdminCoordinadoresProps
 }
 
 // ------- Add User Modal -------
+
+/**
+ * Reset de senha do mentor — reusa a RPC add_project_user, que para email
+ * existente atualiza a senha no auth e liga must_change_password (o mentor
+ * é obrigado a trocar no próximo login). Papel/escola/séries atuais são
+ * passados explicitamente para o reset não alterar o cadastro.
+ */
+export function ResetPasswordModal({
+  user,
+  onClose,
+}: {
+  user: ProjectUser;
+  onClose: () => void;
+}) {
+  const [password, setPassword] = useState(() => generateTempPassword());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password.length < 6) {
+      setError("A senha precisa de pelo menos 6 caracteres");
+      return;
+    }
+    setSaving(true);
+    setError("");
+
+    const { error: sessionErr } = await supabase.auth.getUser();
+    if (sessionErr) {
+      setError("Sessão expirada. Faça login novamente.");
+      setSaving(false);
+      return;
+    }
+
+    const { data, error: rpcError } = await supabase.rpc("add_project_user", {
+      p_email: user.email,
+      p_password: password,
+      p_name: user.name,
+      p_role: user.role,
+      p_school_id: user.school_id,
+      p_allowed_series: user.allowed_series ?? undefined,
+    });
+
+    setSaving(false);
+
+    const result = data as { success?: boolean; message?: string } | null;
+    if (rpcError || result?.success === false) {
+      setError(rpcError?.message ?? result?.message ?? "Falha ao resetar a senha.");
+      return;
+    }
+
+    logAudit("reset_password", "coordinator", user.email);
+    setDone(true);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl border border-[#e5e7eb] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[#e5e7eb] px-6 py-4">
+          <h2 className="text-base font-semibold text-[#1d1d1f]">Resetar senha</h2>
+          <button onClick={onClose} className="text-[#94a3b8] hover:text-[#1d1d1f] text-xl">&times;</button>
+        </div>
+
+        {done ? (
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-[#1d1d1f]">
+              Senha temporária definida para <span className="font-semibold">{user.name || user.email}</span>:
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(password);
+              }}
+              className="w-full rounded-lg border border-[#dbeafe] bg-[#eff6ff] px-3 py-2 text-center font-mono text-base font-bold text-[#2563eb] hover:bg-[#dbeafe]"
+              title="Clique para copiar"
+            >
+              {password}
+            </button>
+            <p className="text-xs text-[#64748b]">
+              Envie esta senha ao mentor. No próximo login ele será obrigado a criar uma senha pessoal.
+            </p>
+            <div className="flex justify-end">
+              <button onClick={onClose} className="rounded-lg bg-[#2563eb] px-5 py-2 text-sm font-medium text-white hover:bg-[#1d4ed8]">
+                Concluir
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <p className="text-sm text-[#374151]">
+              Definir nova senha temporária para{" "}
+              <span className="font-semibold">{user.name || user.email}</span>{" "}
+              <span className="font-mono text-xs text-[#64748b]">({user.email})</span>.
+            </p>
+
+            <div className="space-y-1">
+              <label htmlFor="reset-password-input" className="text-xs font-medium text-[#374151]">Senha temporária</label>
+              <input
+                id="reset-password-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 font-mono text-sm text-[#1d1d1f] outline-none focus:border-[#93c5fd] focus:ring-2 focus:ring-[#bfdbfe]"
+              />
+              <p className="text-xs text-[#94a3b8]">
+                Gerada automaticamente — pode editar. O mentor trocará no primeiro login.
+              </p>
+            </div>
+
+            {error && (
+              <div className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c]">{error}</div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={onClose} className="rounded-lg border border-[#e5e7eb] px-4 py-2 text-sm text-[#64748b] hover:bg-[#f1f5f9]">
+                Cancelar
+              </button>
+              <button type="submit" disabled={saving} className="rounded-lg bg-[#2563eb] px-5 py-2 text-sm font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-60">
+                {saving ? "Salvando..." : "Resetar senha"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AddUserModal({
   schools,

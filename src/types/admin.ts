@@ -11,6 +11,7 @@ export type AuditAction =
   | "delete_pdf"
   | "add_coordinator"
   | "remove_coordinator"
+  | "reset_password"
   | "create_schedule"
   | "update_schedule"
   | "delete_schedule"
