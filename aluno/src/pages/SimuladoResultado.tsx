@@ -31,7 +31,6 @@ import {
   mediaEnemComRedacao,
   REDACAO_HARDCODED,
   REDACAO_TIPICA,
-  SISU_CORTES_ANO,
 } from "@/services/sisu-data";
 
 const AREAS: readonly AreaKey[] = ["LC", "CH", "CN", "MT"];
