@@ -1,7 +1,8 @@
 /**
  * Hooks do aluno para simulados (Fase 4).
  *
- * - useSimuladosPendentes: lista simulados published da escola/turma do aluno
+ * - useSimuladosPendentes: lista simulados da escola/turma do aluno — os published
+ *   (pendentes/abertos) e os closed que o aluno já respondeu (para ver resultado) —
  *   com flag ja_respondeu.
  * - useSimuladoResultado: payload completo de um simulado submetido
  *   (ou metadados se ainda nao submetido).
