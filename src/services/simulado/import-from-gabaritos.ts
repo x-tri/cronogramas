@@ -35,8 +35,11 @@ export function validateExam(exam: GabaritosExam): { ok: boolean; reasons: strin
   if (!Array.isArray(exam.answer_key) || exam.answer_key.length !== TOTAL) {
     reasons.push(`answer_key deve ter 180 itens (tem ${exam.answer_key?.length ?? 0})`)
   } else {
-    const bad = exam.answer_key.findIndex((k) => !LETTERS.has(String(k).toUpperCase().trim()))
-    if (bad >= 0) reasons.push(`letra inválida no item ${bad + 1}: "${exam.answer_key[bad]}"`)
+    const bad: number[] = []
+    exam.answer_key.forEach((k, i) => {
+      if (!LETTERS.has(String(k).toUpperCase().trim())) bad.push(i + 1)
+    })
+    if (bad.length > 0) reasons.push(`letra inválida nos itens: ${bad.join(', ')}`)
   }
   return { ok: reasons.length === 0, reasons }
 }

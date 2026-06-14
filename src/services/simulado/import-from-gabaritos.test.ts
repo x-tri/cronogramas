@@ -130,6 +130,23 @@ describe('buildResposta', () => {
     expect(r.branco_lc).toBe(45)
     expect(r.areas_realizadas).toEqual([])
   })
+
+  it('answers mais curto que 180 trata posições ausentes como branco', () => {
+    const r = buildResposta(saFixture({ answers: ['A'] }), itens, 's')
+    expect(r.branco_lc + r.branco_ch + r.branco_cn + r.branco_mt).toBe(179)
+    expect(r.acertos_lc).toBe(1) // posição 1 de LC, gabarito[0] == 'A' na validKey
+  })
+
+  it('respostas minúsculas são normalizadas', () => {
+    const r = buildResposta(saFixture({ answers: validKey().map((l) => l.toLowerCase()) }), itens, 's')
+    expect(r.acertos_lc).toBe(45)
+  })
+
+  it('TRI NaN / Infinity vira null', () => {
+    const r = buildResposta(saFixture({ tri_lc: NaN, tri_ch: Infinity }), itens, 's')
+    expect(r.tri_lc).toBeNull()
+    expect(r.tri_ch).toBeNull()
+  })
 })
 
 // ---------------------------------------------------------------------------
