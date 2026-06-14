@@ -7,6 +7,7 @@
  * Cada linha: emoji + nome + corte + barra horizontal + status.
  */
 
+import { Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SISU_CORTES_ANO } from "@/services/sisu-data";
 import type { ThermometerData, SisuCurso } from "@/services/sisu-data";
@@ -18,6 +19,8 @@ export interface SisuThermometerProps {
   readonly metaNotaCorte: number;
   /** Edicao do SISU de onde vieram os cortes exibidos. */
   readonly anoCortes?: number;
+  /** Se fornecido, mostra um botao de editar a meta no header. */
+  readonly onEdit?: () => void;
 }
 
 function CursoRow({
@@ -108,6 +111,7 @@ export function SisuThermometer({
   metaCurso,
   metaNotaCorte,
   anoCortes = SISU_CORTES_ANO,
+  onEdit,
 }: SisuThermometerProps) {
   const gap = Math.max(0, Math.round(metaNotaCorte - mediaEnem));
   const uni = data.universidade;
@@ -145,8 +149,18 @@ export function SisuThermometer({
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1">
             🎯 Sua meta SISU
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                aria-label="Editar meta"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
           </p>
           <p className="mt-0.5 text-sm font-black leading-tight">
             {metaCurso} <span className="text-muted-foreground">·</span>{" "}

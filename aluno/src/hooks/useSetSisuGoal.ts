@@ -16,7 +16,9 @@ export function useSetSisuGoal(studentId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ sigla, uf, curso }: SetSisuGoalArgs) => {
-      const { data, error } = await supabase.rpc("set_my_sisu_goal", {
+      // typegen não inclui esta RPC nova → cast na boundary (padrão do projeto)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc("set_my_sisu_goal", {
         p_sigla: sigla,
         p_uf: uf,
         p_curso: curso,

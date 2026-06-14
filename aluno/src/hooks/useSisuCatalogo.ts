@@ -8,7 +8,9 @@ export function useSisuUniversidades() {
   return useQuery({
     queryKey: ["sisu-universidades"],
     queryFn: async (): Promise<SisuUniversidade[]> => {
-      const { data, error } = await supabase.rpc("get_sisu_universidades");
+      // typegen não inclui esta RPC nova → cast na boundary (padrão do projeto)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc("get_sisu_universidades");
       if (error) throw new Error(error.message);
       return (data ?? []) as SisuUniversidade[];
     },

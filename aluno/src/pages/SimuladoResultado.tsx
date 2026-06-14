@@ -19,6 +19,8 @@ import { useSisuGoal } from "@/hooks/useSisuGoal";
 import { useSisuCortes } from "@/hooks/useSisuCortes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SisuThermometer } from "@/components/SisuThermometer";
+import { SisuGoalCTA } from "@/components/SisuGoalCTA";
+import { SisuGoalPicker } from "@/components/SisuGoalPicker";
 import { ArrowLeft, XCircle, Info, Target, TrendingUp } from "lucide-react";
 import {
   AREA_LABELS,
@@ -431,6 +433,7 @@ export default function SimuladoResultado() {
   );
 
   const [tierInfoOpen, setTierInfoOpen] = useState(false);
+  const [editMeta, setEditMeta] = useState(false);
 
   // Top topico errado POR area (1 por area em vez de global)
   const topPorArea = useMemo<
@@ -790,6 +793,7 @@ export default function SimuladoResultado() {
             metaCurso={sisuGoal.sisu_curso_nome}
             metaNotaCorte={Number(sisuGoal.sisu_nota_corte)}
             anoCortes={anoCortes}
+            onEdit={() => setEditMeta(true)}
           />
         )}
 
@@ -812,6 +816,19 @@ export default function SimuladoResultado() {
             </p>
           </div>
         )}
+
+        {/* Sem meta cadastrada → CTA para definir */}
+        {!sisuGoal?.sisu_curso_nome && (
+          <SisuGoalCTA studentId={student?.id} onSaved={() => undefined} />
+        )}
+
+        {/* Editar meta (reusa o mesmo seletor) */}
+        <SisuGoalPicker
+          open={editMeta}
+          onOpenChange={setEditMeta}
+          studentId={student?.id}
+          onSaved={() => setEditMeta(false)}
+        />
 
         {/* Top topico errado por AREA (1 card por area) */}
         {topPorArea.length > 0 && (
