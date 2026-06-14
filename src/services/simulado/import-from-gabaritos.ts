@@ -147,3 +147,13 @@ export function buildResposta(
     tri_version: '1',
   }
 }
+
+export function matchByMatricula(
+  studentNumber: string,
+  byMatricula: ReadonlyMap<string, string>,
+): string | null {
+  const raw = String(studentNumber ?? '').trim()
+  if (byMatricula.has(raw)) return byMatricula.get(raw)!
+  const norm = raw.replace(/^0+/, '') || '0'
+  return byMatricula.get(norm) ?? null
+}

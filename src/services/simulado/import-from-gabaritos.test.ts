@@ -5,6 +5,7 @@ import {
   validateExam,
   buildItens,
   buildResposta,
+  matchByMatricula,
   type GabaritosExam,
   type SimuladoItemInsert,
   type GabaritosStudentAnswer,
@@ -127,5 +128,22 @@ describe('buildResposta', () => {
     const r = buildResposta(saFixture({ answers: ALL_BLANK }), itens, 's')
     expect(r.branco_lc).toBe(45)
     expect(r.areas_realizadas).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 4
+// ---------------------------------------------------------------------------
+
+describe('matchByMatricula', () => {
+  const byMat = new Map<string, string>([['214140291', 'uuid-nicole'], ['123', 'uuid-123']])
+  it('casa exato', () => {
+    expect(matchByMatricula('214140291', byMat)).toBe('uuid-nicole')
+  })
+  it('casa removendo zeros à esquerda', () => {
+    expect(matchByMatricula('00123', byMat)).toBe('uuid-123')
+  })
+  it('retorna null sem match', () => {
+    expect(matchByMatricula('999', byMat)).toBeNull()
   })
 })
