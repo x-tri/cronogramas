@@ -37,3 +37,32 @@ export function validateExam(exam: GabaritosExam): { ok: boolean; reasons: strin
   }
   return { ok: reasons.length === 0, reasons }
 }
+
+export interface SimuladoItemInsert {
+  readonly numero: number
+  readonly area: AreaKey
+  readonly gabarito: string
+  readonly dificuldade: number
+  readonly topico: string | null
+  readonly habilidade: null
+}
+
+const DEFAULT_DIFICULDADE = 3 // placeholder NOT NULL (1-5); não afeta nota (TRI importado)
+
+export function buildItens(exam: GabaritosExam): SimuladoItemInsert[] {
+  const topicos = new Map<number, string>()
+  for (const q of exam.question_contents ?? []) {
+    if (typeof q?.content === 'string') topicos.set(q.questionNumber, q.content)
+  }
+  return Array.from({ length: TOTAL }, (_, i) => {
+    const numero = i + 1
+    return {
+      numero,
+      area: areaForNumero(numero),
+      gabarito: String(exam.answer_key[i]).toUpperCase().trim(),
+      dificuldade: DEFAULT_DIFICULDADE,
+      topico: topicos.get(numero) ?? null,
+      habilidade: null,
+    }
+  })
+}

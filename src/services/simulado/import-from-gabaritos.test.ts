@@ -3,7 +3,9 @@ import { describe, it, expect } from 'vitest'
 import {
   areaForNumero,
   validateExam,
+  buildItens,
   type GabaritosExam,
+  type SimuladoItemInsert,
 } from './import-from-gabaritos.ts'
 
 // ---------------------------------------------------------------------------
@@ -52,5 +54,30 @@ describe('validateExam', () => {
     const r = validateExam(examFixture({ answer_key: key }))
     expect(r.ok).toBe(false)
     expect(r.reasons.join(' ')).toContain('letra')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 2
+// ---------------------------------------------------------------------------
+
+describe('buildItens', () => {
+  it('gera 180 itens com área por posição e gabarito da chave', () => {
+    const key = validKey()
+    const qc = Array.from({ length: 180 }, (_, i) => ({
+      answer: key[i], content: `topico ${i + 1}`, questionNumber: i + 1,
+    }))
+    const itens: SimuladoItemInsert[] = buildItens(examFixture({ answer_key: key, question_contents: qc }))
+    expect(itens).toHaveLength(180)
+    expect(itens[0]).toEqual({
+      numero: 1, area: 'LC', gabarito: key[0], dificuldade: 3, topico: 'topico 1', habilidade: null,
+    })
+    expect(itens[45].area).toBe('CH')
+    expect(itens[179].area).toBe('MT')
+    expect(itens.every((it) => it.dificuldade === 3)).toBe(true)
+  })
+  it('topico = null quando não há question_contents', () => {
+    const itens = buildItens(examFixture({ question_contents: null }))
+    expect(itens[0].topico).toBeNull()
   })
 })
