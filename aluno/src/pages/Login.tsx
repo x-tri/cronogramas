@@ -36,7 +36,7 @@ export default function Login() {
     setGoogleLoading(true);
     const { error } = await signInWithGoogle();
     if (error) {
-      setError("Erro ao conectar com Google. Tente novamente.");
+      setError(error.message || "Erro ao conectar com Google. Tente novamente.");
       setGoogleLoading(false);
     }
   };
@@ -97,7 +97,10 @@ export default function Login() {
               setError("");
               setAppleLoading(true);
               const { error } = await signInWithApple();
-              if (error) { setError("Erro ao conectar com Apple."); setAppleLoading(false); }
+              if (error) {
+                setError(error.message || "Erro ao conectar com Apple.");
+                setAppleLoading(false);
+              }
             }}
             disabled={appleLoading || googleLoading}
             className="w-full h-14 flex items-center justify-center gap-3 rounded-2xl border-2 bg-foreground text-base font-black text-background shadow-[0_4px_0_0_hsl(var(--border))] hover:shadow-[0_2px_0_0_hsl(var(--border))] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50"

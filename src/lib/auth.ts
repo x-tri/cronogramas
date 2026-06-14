@@ -22,6 +22,12 @@ const AUTH_USERNAME_COLUMN = import.meta.env.VITE_AUTH_USERNAME_COLUMN;
 const AUTH_EMAIL_COLUMN = import.meta.env.VITE_AUTH_EMAIL_COLUMN ?? "email";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
+const GOOGLE_AUTH_OVERRIDE = import.meta.env.VITE_ENABLE_GOOGLE_AUTH;
+
+export const GOOGLE_AUTH_DISABLED_MESSAGE =
+  "Login com Google não está habilitado neste ambiente. Use email e senha ou habilite o provider Google no Supabase.";
+
+const providerStatusCache = new Map<string, boolean>();
 
 function toStringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
@@ -154,7 +160,54 @@ export function login(_user: User): void {
   void _user;
 }
 
+async function isOAuthProviderEnabled(provider: "google"): Promise<boolean> {
+  if (provider === "google" && GOOGLE_AUTH_OVERRIDE === "false") {
+    return false;
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return false;
+  }
+
+  const cachedStatus = providerStatusCache.get(provider);
+  if (cachedStatus !== undefined) {
+    return cachedStatus;
+  }
+
+  try {
+    const response = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/settings`, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+
+    if (!response.ok) {
+      providerStatusCache.set(provider, false);
+      return false;
+    }
+
+    const settings = (await response.json()) as {
+      external?: Partial<Record<"google", boolean>>;
+    };
+    const enabled = settings.external?.[provider] === true;
+    providerStatusCache.set(provider, enabled);
+    return enabled;
+  } catch {
+    providerStatusCache.set(provider, false);
+    return false;
+  }
+}
+
+export async function isGoogleAuthEnabled(): Promise<boolean> {
+  return isOAuthProviderEnabled("google");
+}
+
 export async function signInWithGoogle(): Promise<{ error: Error | null }> {
+  if (!(await isGoogleAuthEnabled())) {
+    return { error: new Error(GOOGLE_AUTH_DISABLED_MESSAGE) };
+  }
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: window.location.origin },
