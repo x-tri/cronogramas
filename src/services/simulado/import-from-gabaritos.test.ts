@@ -6,6 +6,7 @@ import {
   buildItens,
   buildResposta,
   matchByMatricula,
+  buildImportPlan,
   type GabaritosExam,
   type SimuladoItemInsert,
   type GabaritosStudentAnswer,
@@ -145,5 +146,35 @@ describe('matchByMatricula', () => {
   })
   it('retorna null sem match', () => {
     expect(matchByMatricula('999', byMat)).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 5
+// ---------------------------------------------------------------------------
+
+describe('buildImportPlan', () => {
+  const key = validKey()
+  const exam = examFixture({ answer_key: key,
+    question_contents: Array.from({ length: 180 }, (_, i) => ({ answer: key[i], content: `t${i+1}`, questionNumber: i+1 })) })
+  const portal = [{ id: 'uuid-nicole', matricula: '214140291' }, { id: 'uuid-123', matricula: '123' }]
+
+  it('separa importáveis e sem-match', () => {
+    const sas = [
+      saFixture({ student_number: '214140291', answers: key.slice() }),
+      saFixture({ student_number: '999', answers: key.slice() }), // sem match
+    ]
+    const plan = buildImportPlan(exam, sas, portal)
+    expect(plan.ok).toBe(true)
+    expect(plan.itens).toHaveLength(180)
+    expect(plan.respostas).toHaveLength(1)
+    expect(plan.respostas[0].student_id).toBe('uuid-nicole')
+    expect(plan.unmatched).toEqual(['999'])
+  })
+
+  it('exame inválido → ok=false, sem respostas', () => {
+    const plan = buildImportPlan(examFixture({ answer_key: ['A'] }), [], portal)
+    expect(plan.ok).toBe(false)
+    expect(plan.respostas).toHaveLength(0)
   })
 })

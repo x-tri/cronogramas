@@ -157,3 +157,34 @@ export function matchByMatricula(
   const norm = raw.replace(/^0+/, '') || '0'
   return byMatricula.get(norm) ?? null
 }
+
+export interface PortalStudent { readonly id: string; readonly matricula: string }
+
+export interface ImportPlan {
+  readonly ok: boolean
+  readonly reasons: string[]
+  readonly itens: SimuladoItemInsert[]
+  readonly respostas: SimuladoRespostaInsert[]
+  readonly unmatched: string[]
+}
+
+export function buildImportPlan(
+  exam: GabaritosExam,
+  studentAnswers: readonly GabaritosStudentAnswer[],
+  portalStudents: readonly PortalStudent[],
+): ImportPlan {
+  const v = validateExam(exam)
+  if (!v.ok) return { ok: false, reasons: v.reasons, itens: [], respostas: [], unmatched: [] }
+
+  const itens = buildItens(exam)
+  const byMat = new Map(portalStudents.map((s) => [s.matricula.trim(), s.id]))
+  const respostas: SimuladoRespostaInsert[] = []
+  const unmatched: string[] = []
+
+  for (const sa of studentAnswers) {
+    const id = matchByMatricula(sa.student_number, byMat)
+    if (!id) { unmatched.push(sa.student_number); continue }
+    respostas.push(buildResposta(sa, itens, id))
+  }
+  return { ok: true, reasons: [], itens, respostas, unmatched }
+}
