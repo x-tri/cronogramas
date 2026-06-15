@@ -28,6 +28,8 @@ export function useSetSisuGoal(studentId: string | undefined) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["sisu-goal", studentId] });
+      void queryClient.invalidateQueries({ queryKey: ["sisu-goal"] });
+      void queryClient.invalidateQueries({ queryKey: ["student-profile"] });
     },
   });
 }

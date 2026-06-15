@@ -2,10 +2,15 @@
  * Pagina de listagem de simulados disponiveis para o aluno (Fase 4).
  */
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSimuladosPendentes } from "@/hooks/useSimulados";
+import { useStudentProfile } from "@/hooks/useStudentData";
+import { useSisuGoal, type SisuGoal } from "@/hooks/useSisuGoal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SisuGoalCTA } from "@/components/SisuGoalCTA";
+import { SisuGoalPicker } from "@/components/SisuGoalPicker";
 import {
   ArrowRight,
   CheckCircle2,
@@ -13,6 +18,7 @@ import {
   FileText,
   History,
   PencilLine,
+  Target,
 } from "lucide-react";
 import type { SimuladoPendenteRow } from "@/types/simulado";
 
@@ -140,9 +146,85 @@ function SimuladoCard({
   );
 }
 
+function SisuGoalSummary({
+  goal,
+  isLoading,
+  studentId,
+  onSaved,
+}: {
+  readonly goal: SisuGoal | null | undefined;
+  readonly isLoading: boolean;
+  readonly studentId: string | undefined;
+  readonly onSaved: () => void;
+}) {
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const notaCorte =
+    typeof goal?.sisu_nota_corte === "number" && Number.isFinite(goal.sisu_nota_corte)
+      ? Math.round(goal.sisu_nota_corte)
+      : null;
+
+  if (isLoading) {
+    return <Skeleton className="h-32 w-full rounded-2xl" />;
+  }
+
+  if (!goal?.sisu_curso_nome) {
+    return <SisuGoalCTA studentId={studentId} onSaved={onSaved} />;
+  }
+
+  return (
+    <section className="rounded-2xl border-2 border-primary/25 bg-primary/5 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+          <Target className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-black uppercase tracking-wider text-primary">
+            Meta SISU
+          </p>
+          <p className="mt-1 text-sm font-black leading-tight text-foreground">
+            {goal.sisu_curso_nome}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">
+            {[goal.sisu_universidade, goal.sisu_uf].filter(Boolean).join(" · ")}
+          </p>
+          <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+            {notaCorte
+              ? `Nota de corte: ${notaCorte} pts`
+              : "Nota de corte em atualização."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsPickerOpen(true)}
+          className="flex flex-shrink-0 items-center gap-1 rounded-xl border-2 border-primary/30 px-3 py-2 text-[11px] font-black text-primary hover:bg-primary/10"
+        >
+          <PencilLine className="h-3.5 w-3.5" />
+          Editar
+        </button>
+      </div>
+      <SisuGoalPicker
+        open={isPickerOpen}
+        onOpenChange={setIsPickerOpen}
+        studentId={studentId}
+        onSaved={() => {
+          onSaved();
+          setIsPickerOpen(false);
+        }}
+      />
+    </section>
+  );
+}
+
 export default function Simulados() {
   const { data: simulados, isLoading, error, refetch } = useSimuladosPendentes();
+  const { data: student, isLoading: isLoadingStudent } = useStudentProfile();
+  const { data: sisuGoal, isLoading: isLoadingSisuGoal } = useSisuGoal(student?.id);
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const handleSisuGoalSaved = () => {
+    void queryClient.invalidateQueries({ queryKey: ["sisu-goal", student?.id] });
+    void queryClient.invalidateQueries({ queryKey: ["student-profile"] });
+  };
 
   if (isLoading) {
     return (
@@ -203,6 +285,13 @@ export default function Simulados() {
           Histórico TRI
         </button>
       </header>
+
+      <SisuGoalSummary
+        goal={sisuGoal}
+        isLoading={isLoadingStudent || isLoadingSisuGoal}
+        studentId={student?.id}
+        onSaved={handleSisuGoalSaved}
+      />
 
       {list.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-bounce-in">
