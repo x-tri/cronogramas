@@ -18,6 +18,16 @@ vi.mock('../lib/simulado-supabase', () => ({
   isDedicatedSimuladoSupabaseConfigured: () => false,
 }))
 
+vi.mock('../lib/project-user', () => ({
+  getCurrentProjectUser: vi.fn(async () => null),
+  isSchoolScopedProjectUser: vi.fn(() => false),
+}))
+
+vi.mock('./simulado/mentoria', () => ({
+  listMentoriaSimulados: vi.fn(async () => []),
+  getMentoriaSimuladoResult: vi.fn(async () => null),
+}))
+
 type QueryResponse = {
   data: unknown
   error: { message: string } | null

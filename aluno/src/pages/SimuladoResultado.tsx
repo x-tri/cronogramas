@@ -19,6 +19,8 @@ import { useSisuGoal } from "@/hooks/useSisuGoal";
 import { useSisuCortes } from "@/hooks/useSisuCortes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SisuThermometer } from "@/components/SisuThermometer";
+import { SisuGoalCTA } from "@/components/SisuGoalCTA";
+import { SisuGoalPicker } from "@/components/SisuGoalPicker";
 import { ArrowLeft, XCircle, Info, Target, TrendingUp } from "lucide-react";
 import {
   AREA_LABELS,
@@ -423,14 +425,15 @@ export default function SimuladoResultado() {
   const { id: simuladoId } = useParams();
   const navigate = useNavigate();
   const { data, isLoading, error } = useSimuladoResultado(simuladoId);
-  const { data: student } = useStudentProfile();
-  const { data: sisuGoal } = useSisuGoal(student?.id);
+  const { data: student, isLoading: isLoadingStudent } = useStudentProfile();
+  const { data: sisuGoal, isLoading: isLoadingSisuGoal } = useSisuGoal(student?.id);
   const { data: cortesRows } = useSisuCortes(
     sisuGoal?.sisu_universidade,
     sisuGoal?.sisu_uf,
   );
 
   const [tierInfoOpen, setTierInfoOpen] = useState(false);
+  const [editMeta, setEditMeta] = useState(false);
 
   // Top topico errado POR area (1 por area em vez de global)
   const topPorArea = useMemo<
@@ -591,6 +594,7 @@ export default function SimuladoResultado() {
     sisuUni && sisuGoal?.sisu_curso_nome && sisuGoal.sisu_nota_corte && mediaGeral != null
       ? buildThermometerData(sisuUni, mediaGeral)
       : null;
+  const isSisuGoalLoading = isLoadingStudent || isLoadingSisuGoal;
 
   // Math.max(1, ...) evita division-by-zero em respostas corrompidas/vazias
   // — NaN%% no CSS e silenciosamente ignorado, mas quebra o visual.
@@ -628,6 +632,50 @@ export default function SimuladoResultado() {
           mediaTier={mediaTier}
           mediaGap={mediaGap}
           onInfo={() => setTierInfoOpen(true)}
+        />
+
+        {/* Meta SISU — ponto de entrada visivel logo no resultado */}
+        {isSisuGoalLoading && <Skeleton className="h-32 w-full rounded-2xl" />}
+
+        {!isSisuGoalLoading && thermometer && sisuGoal?.sisu_curso_nome && sisuGoal.sisu_nota_corte && (
+          <SisuThermometer
+            data={thermometer}
+            mediaEnem={mediaGeral ?? 0}
+            metaCurso={sisuGoal.sisu_curso_nome}
+            metaNotaCorte={Number(sisuGoal.sisu_nota_corte)}
+            anoCortes={anoCortes}
+            onEdit={() => setEditMeta(true)}
+          />
+        )}
+
+        {!isSisuGoalLoading && !thermometer && sisuGoal?.sisu_curso_nome && sisuGoal?.sisu_universidade && (
+          <div className="rounded-2xl border-2 bg-card p-4">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+              🎯 Sua meta SISU
+            </p>
+            <p className="mt-0.5 text-sm font-black leading-tight">
+              {sisuGoal.sisu_curso_nome}{" "}
+              <span className="text-primary">
+                · {sisuGoal.sisu_universidade}
+              </span>
+            </p>
+            <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+              Ainda não temos os cortes dessa universidade na nossa base, então
+              a comparação detalhada não aparece aqui. Fale com seu coordenador
+              para conferir a nota de corte do seu curso.
+            </p>
+          </div>
+        )}
+
+        {!isSisuGoalLoading && !sisuGoal?.sisu_curso_nome && (
+          <SisuGoalCTA studentId={student?.id} onSaved={() => undefined} />
+        )}
+
+        <SisuGoalPicker
+          open={editMeta}
+          onOpenChange={setEditMeta}
+          studentId={student?.id}
+          onSaved={() => setEditMeta(false)}
         />
 
         {/* Alerta branco */}
@@ -781,37 +829,6 @@ export default function SimuladoResultado() {
             </div>
           )}
         </div>
-
-        {/* Termometro SISU — meta do aluno (se cadastrada) */}
-        {thermometer && sisuGoal?.sisu_curso_nome && sisuGoal.sisu_nota_corte && (
-          <SisuThermometer
-            data={thermometer}
-            mediaEnem={mediaGeral ?? 0}
-            metaCurso={sisuGoal.sisu_curso_nome}
-            metaNotaCorte={Number(sisuGoal.sisu_nota_corte)}
-            anoCortes={anoCortes}
-          />
-        )}
-
-        {/* Meta cadastrada mas universidade fora da base de cortes */}
-        {!thermometer && sisuGoal?.sisu_curso_nome && sisuGoal?.sisu_universidade && (
-          <div className="rounded-2xl border-2 bg-card p-4">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-              🎯 Sua meta SISU
-            </p>
-            <p className="mt-0.5 text-sm font-black leading-tight">
-              {sisuGoal.sisu_curso_nome}{" "}
-              <span className="text-primary">
-                · {sisuGoal.sisu_universidade}
-              </span>
-            </p>
-            <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
-              Ainda não temos os cortes dessa universidade na nossa base, então
-              a comparação detalhada não aparece aqui. Fale com seu coordenador
-              para conferir a nota de corte do seu curso.
-            </p>
-          </div>
-        )}
 
         {/* Top topico errado por AREA (1 card por area) */}
         {topPorArea.length > 0 && (

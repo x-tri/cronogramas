@@ -2,10 +2,25 @@
  * Pagina de listagem de simulados disponiveis para o aluno (Fase 4).
  */
 
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSimuladosPendentes } from "@/hooks/useSimulados";
+import { useStudentProfile } from "@/hooks/useStudentData";
+import { useSisuGoal, type SisuGoal } from "@/hooks/useSisuGoal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowRight, CheckCircle2, Download, FileText, History } from "lucide-react";
+import { SisuGoalCTA } from "@/components/SisuGoalCTA";
+import { SisuGoalPicker } from "@/components/SisuGoalPicker";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Download,
+  FileText,
+  History,
+  PencilLine,
+  Target,
+} from "lucide-react";
+import type { SimuladoPendenteRow } from "@/types/simulado";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -20,9 +35,196 @@ function formatDate(iso: string | null): string {
   }
 }
 
+function getDraftCount(simuladoId: string): number {
+  try {
+    const raw = sessionStorage.getItem(`simulado-draft-${simuladoId}`);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return 0;
+    return Object.values(parsed).filter((value) =>
+      value === "A" || value === "B" || value === "C" || value === "D" || value === "E",
+    ).length;
+  } catch {
+    return 0;
+  }
+}
+
+function SimuladoCard({
+  sim,
+  index,
+  draftCount,
+  onOpen,
+}: {
+  readonly sim: SimuladoPendenteRow;
+  readonly index: number;
+  readonly draftCount: number;
+  readonly onOpen: () => void;
+}) {
+  const isDone = sim.ja_respondeu;
+  const isDraft = !isDone && draftCount > 0;
+  const label = isDone
+    ? "Resultado TRI"
+    : isDraft
+      ? `Continuar (${draftCount}/180)`
+      : "Preencher gabarito";
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={
+          isDone
+            ? `Ver resultado de ${sim.title}`
+            : isDraft
+              ? `Continuar rascunho de ${sim.title}`
+              : `Responder ${sim.title}`
+        }
+        className={`w-full rounded-2xl border-2 p-4 text-left transition-all active:scale-[0.98] animate-fade-in ${
+          isDone
+            ? "border-emerald-500/40 bg-emerald-500/5"
+            : isDraft
+              ? "border-accent/50 bg-accent/10"
+              : "border-primary bg-primary/5 hover:bg-primary/10"
+        }`}
+        style={{
+          animationDelay: `${index * 0.08}s`,
+          animationFillMode: "both",
+        }}
+      >
+        <div className="flex items-start gap-3">
+          <span className="text-2xl flex-shrink-0">
+            {isDone ? (
+              <CheckCircle2 className="h-7 w-7 text-emerald-600" />
+            ) : isDraft ? (
+              <PencilLine className="h-7 w-7 text-accent" />
+            ) : (
+              <FileText className="h-7 w-7 text-primary" />
+            )}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-black text-foreground leading-tight">
+              {sim.title}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
+              {isDone
+                ? `Enviado em ${formatDate(sim.submitted_at)}`
+                : `Publicado em ${formatDate(sim.published_at)}`}
+            </p>
+            {sim.turmas.length > 0 && (
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                Turmas: {sim.turmas.join(", ")}
+              </p>
+            )}
+          </div>
+          <ArrowRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+        </div>
+        <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2">
+          <span
+            className={`text-[10px] font-black uppercase tracking-wider ${
+              isDone ? "text-emerald-600" : isDraft ? "text-accent" : "text-primary"
+            }`}
+          >
+            {label}
+          </span>
+          {sim.caderno_url && (
+            <a
+              href={sim.caderno_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 rounded-lg border border-primary/30 px-2.5 py-1 text-[10px] font-black text-primary hover:bg-primary/5 transition-colors"
+              aria-label={`Baixar caderno de ${sim.title}`}
+            >
+              <Download className="h-3 w-3" />
+              Baixar Caderno
+            </a>
+          )}
+        </div>
+      </button>
+    </li>
+  );
+}
+
+function SisuGoalSummary({
+  goal,
+  isLoading,
+  studentId,
+  onSaved,
+}: {
+  readonly goal: SisuGoal | null | undefined;
+  readonly isLoading: boolean;
+  readonly studentId: string | undefined;
+  readonly onSaved: () => void;
+}) {
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const notaCorte =
+    typeof goal?.sisu_nota_corte === "number" && Number.isFinite(goal.sisu_nota_corte)
+      ? Math.round(goal.sisu_nota_corte)
+      : null;
+
+  if (isLoading) {
+    return <Skeleton className="h-32 w-full rounded-2xl" />;
+  }
+
+  if (!goal?.sisu_curso_nome) {
+    return <SisuGoalCTA studentId={studentId} onSaved={onSaved} />;
+  }
+
+  return (
+    <section className="rounded-2xl border-2 border-primary/25 bg-primary/5 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+          <Target className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-black uppercase tracking-wider text-primary">
+            Meta SISU
+          </p>
+          <p className="mt-1 text-sm font-black leading-tight text-foreground">
+            {goal.sisu_curso_nome}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">
+            {[goal.sisu_universidade, goal.sisu_uf].filter(Boolean).join(" · ")}
+          </p>
+          <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+            {notaCorte
+              ? `Nota de corte: ${notaCorte} pts`
+              : "Nota de corte em atualização."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsPickerOpen(true)}
+          className="flex flex-shrink-0 items-center gap-1 rounded-xl border-2 border-primary/30 px-3 py-2 text-[11px] font-black text-primary hover:bg-primary/10"
+        >
+          <PencilLine className="h-3.5 w-3.5" />
+          Editar
+        </button>
+      </div>
+      <SisuGoalPicker
+        open={isPickerOpen}
+        onOpenChange={setIsPickerOpen}
+        studentId={studentId}
+        onSaved={() => {
+          onSaved();
+          setIsPickerOpen(false);
+        }}
+      />
+    </section>
+  );
+}
+
 export default function Simulados() {
   const { data: simulados, isLoading, error, refetch } = useSimuladosPendentes();
+  const { data: student, isLoading: isLoadingStudent } = useStudentProfile();
+  const { data: sisuGoal, isLoading: isLoadingSisuGoal } = useSisuGoal(student?.id);
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const handleSisuGoalSaved = () => {
+    void queryClient.invalidateQueries({ queryKey: ["sisu-goal", student?.id] });
+    void queryClient.invalidateQueries({ queryKey: ["student-profile"] });
+  };
 
   if (isLoading) {
     return (
@@ -59,6 +261,10 @@ export default function Simulados() {
   }
 
   const list = simulados ?? [];
+  const draftsById = Object.fromEntries(list.map((sim) => [sim.id, getDraftCount(sim.id)]));
+  const draftList = list.filter((sim) => !sim.ja_respondeu && draftsById[sim.id] > 0);
+  const pendingList = list.filter((sim) => !sim.ja_respondeu && draftsById[sim.id] === 0);
+  const doneList = list.filter((sim) => sim.ja_respondeu);
 
   return (
     <div className="p-4 pb-24 max-w-lg mx-auto space-y-4">
@@ -80,6 +286,13 @@ export default function Simulados() {
         </button>
       </header>
 
+      <SisuGoalSummary
+        goal={sisuGoal}
+        isLoading={isLoadingStudent || isLoadingSisuGoal}
+        studentId={student?.id}
+        onSaved={handleSisuGoalSaved}
+      />
+
       {list.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-bounce-in">
           <div className="text-5xl mb-3 animate-float">📋</div>
@@ -91,85 +304,74 @@ export default function Simulados() {
           </p>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {list.map((sim, idx) => (
-            <li key={sim.id}>
-              <button
-                type="button"
-                onClick={() =>
-                  navigate(
-                    sim.ja_respondeu
-                      ? `/simulados/${sim.id}/resultado`
-                      : `/simulados/${sim.id}/responder`,
-                  )
-                }
-                aria-label={
-                  sim.ja_respondeu
-                    ? `Ver resultado de ${sim.title}`
-                    : `Responder ${sim.title}`
-                }
-                className={`w-full rounded-2xl border-2 p-4 text-left transition-all active:scale-[0.98] animate-fade-in ${
-                  sim.ja_respondeu
-                    ? "border-emerald-500/40 bg-emerald-500/5"
-                    : "border-primary bg-primary/5 hover:bg-primary/10"
-                }`}
-                style={{
-                  animationDelay: `${idx * 0.08}s`,
-                  animationFillMode: "both",
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl flex-shrink-0">
-                    {sim.ja_respondeu ? (
-                      <CheckCircle2 className="h-7 w-7 text-emerald-600" />
-                    ) : (
-                      <FileText className="h-7 w-7 text-primary" />
-                    )}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-foreground leading-tight">
-                      {sim.title}
-                    </p>
-                    <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
-                      {sim.ja_respondeu
-                        ? `Enviado em ${formatDate(sim.submitted_at)}`
-                        : `Publicado em ${formatDate(sim.published_at)}`}
-                    </p>
-                    {sim.turmas.length > 0 && (
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        Turmas: {sim.turmas.join(", ")}
-                      </p>
-                    )}
-                  </div>
-                  <ArrowRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                </div>
-                <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2">
-                  <span
-                    className={`text-[10px] font-black uppercase tracking-wider ${
-                      sim.ja_respondeu ? "text-emerald-600" : "text-primary"
-                    }`}
-                  >
-                    {sim.ja_respondeu ? "Ver meu resultado" : "Preencher gabarito"}
-                  </span>
-                  {sim.caderno_url && (
-                    <a
-                      href={sim.caderno_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 rounded-lg border border-primary/30 px-2.5 py-1 text-[10px] font-black text-primary hover:bg-primary/5 transition-colors"
-                      aria-label={`Baixar caderno de ${sim.title}`}
-                    >
-                      <Download className="h-3 w-3" />
-                      Baixar Caderno
-                    </a>
-                  )}
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-5">
+          {draftList.length > 0 && (
+            <SimuladoSection title="Continuar rascunho" count={draftList.length}>
+              {draftList.map((sim, idx) => (
+                <SimuladoCard
+                  key={sim.id}
+                  sim={sim}
+                  index={idx}
+                  draftCount={draftsById[sim.id]}
+                  onOpen={() => navigate(`/simulados/${sim.id}/responder`)}
+                />
+              ))}
+            </SimuladoSection>
+          )}
+
+          {pendingList.length > 0 && (
+            <SimuladoSection title="Para responder" count={pendingList.length}>
+              {pendingList.map((sim, idx) => (
+                <SimuladoCard
+                  key={sim.id}
+                  sim={sim}
+                  index={idx}
+                  draftCount={0}
+                  onOpen={() => navigate(`/simulados/${sim.id}/responder`)}
+                />
+              ))}
+            </SimuladoSection>
+          )}
+
+          {doneList.length > 0 && (
+            <SimuladoSection title="Resultados disponíveis" count={doneList.length}>
+              {doneList.map((sim, idx) => (
+                <SimuladoCard
+                  key={sim.id}
+                  sim={sim}
+                  index={idx}
+                  draftCount={0}
+                  onOpen={() => navigate(`/simulados/${sim.id}/resultado`)}
+                />
+              ))}
+            </SimuladoSection>
+          )}
+        </div>
       )}
     </div>
+  );
+}
+
+function SimuladoSection({
+  title,
+  count,
+  children,
+}: {
+  readonly title: string;
+  readonly count: number;
+  readonly children: ReactNode;
+}) {
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+          {title}
+        </h2>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-black text-muted-foreground">
+          {count}
+        </span>
+      </div>
+      <ul className="space-y-3">{children}</ul>
+    </section>
   );
 }

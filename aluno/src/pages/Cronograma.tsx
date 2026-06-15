@@ -1,11 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useStudentProfile, useCronogramas, useBlocos } from "@/hooks/useStudentData";
+import { useSimuladosPendentes } from "@/hooks/useSimulados";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronLeft, ChevronRight, Check, Star, Trophy } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Clock3,
+  Star,
+  Target,
+  Trophy,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ActivityHeatmapCard } from "@/components/ActivityHeatmapCard";
 
@@ -27,6 +40,8 @@ const TIPO_STYLES: Record<string, { bg: string; border: string; icon: string }> 
 export default function Cronograma() {
   const { data: student, isLoading: loadingStudent } = useStudentProfile();
   const { data: cronogramas, isLoading: loadingCron } = useCronogramas(student?.id, student?.matricula);
+  const { data: simulados } = useSimuladosPendentes();
+  const navigate = useNavigate();
   const [cronIndex, setCronIndex] = useState(0);
 
   const activeCron = cronogramas?.[cronIndex];
@@ -46,10 +61,17 @@ export default function Cronograma() {
   const completedCount = blocos?.filter((b) => b.concluido).length ?? 0;
   const totalCount = blocos?.length ?? 0;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const todayKey = JS_DAY_TO_KEY[new Date().getDay()];
+  const todayBlocos = blocosByDay[todayKey] ?? [];
+  const todayPending = todayBlocos.filter((b) => !b.concluido);
+  const nextPendingBlock =
+    todayPending[0] ??
+    DIAS.flatMap((dia) => blocosByDay[dia] ?? []).find((b) => !b.concluido) ??
+    null;
+  const pendingSimulados = simulados?.filter((simulado) => !simulado.ja_respondeu) ?? [];
 
   const focusDay = useMemo(() => {
     if (!blocos?.length) return null;
-    const todayKey = JS_DAY_TO_KEY[new Date().getDay()];
     if (blocosByDay[todayKey]?.length) return todayKey;
 
     const firstPending = DIAS.find((dia) =>
@@ -58,7 +80,7 @@ export default function Cronograma() {
     if (firstPending) return firstPending;
 
     return DIAS.find((dia) => blocosByDay[dia]?.length) ?? null;
-  }, [blocos, blocosByDay]);
+  }, [blocos, blocosByDay, todayKey]);
 
   useEffect(() => {
     setExpandedDay(focusDay);
@@ -96,6 +118,70 @@ export default function Cronograma() {
   return (
     <div className="p-4 pb-24 max-w-lg mx-auto">
       <ActivityHeatmapCard student={student} />
+
+      <section className="mb-4 overflow-hidden rounded-2xl border-2 border-primary/30 bg-gradient-to-br from-primary/15 via-card to-accent/10 p-4 shadow-[0_6px_0_0_hsl(var(--border))]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary">
+              Prioridade de hoje
+            </p>
+            <h2 className="mt-1 text-lg font-black leading-tight text-foreground">
+              {nextPendingBlock ? nextPendingBlock.titulo : "Semana em dia"}
+            </h2>
+            <p className="mt-1 text-xs font-bold text-muted-foreground">
+              {nextPendingBlock
+                ? `${DIAS_LABEL[nextPendingBlock.dia_semana] ?? "Hoje"} • ${nextPendingBlock.horario_inicio} – ${nextPendingBlock.horario_fim}`
+                : "Nenhum bloco pendente neste cronograma."}
+            </p>
+          </div>
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_4px_0_0_hsl(199,80%,45%)]">
+            {nextPendingBlock ? <Target className="h-6 w-6" /> : <Check className="h-6 w-6" />}
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-primary/20 bg-white/70 px-3 py-2">
+            <p className="flex items-center gap-1 text-[10px] font-black uppercase text-muted-foreground">
+              <Clock3 className="h-3 w-3" />
+              Hoje
+            </p>
+            <p className="mt-0.5 text-sm font-black text-foreground">
+              {todayPending.length}/{todayBlocos.length || 0} pendente(s)
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/simulados")}
+            className={cn(
+              "rounded-xl border px-3 py-2 text-left transition-all active:scale-[0.98]",
+              pendingSimulados.length > 0
+                ? "border-accent/40 bg-accent/15"
+                : "border-border bg-white/70",
+            )}
+          >
+            <p className="flex items-center gap-1 text-[10px] font-black uppercase text-muted-foreground">
+              <ClipboardList className="h-3 w-3" />
+              Simulados
+            </p>
+            <p className="mt-0.5 text-sm font-black text-foreground">
+              {pendingSimulados.length > 0
+                ? `${pendingSimulados.length} para responder`
+                : "Nada pendente"}
+            </p>
+          </button>
+        </div>
+
+        {nextPendingBlock && (
+          <button
+            type="button"
+            onClick={() => setExpandedDay(nextPendingBlock.dia_semana)}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-xs font-black text-background shadow-[0_4px_0_0_hsl(var(--border))] active:translate-y-[2px] active:shadow-none"
+          >
+            Abrir bloco no plano
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
+      </section>
 
       {/* Week nav */}
       <div className="flex items-center justify-between mb-3">

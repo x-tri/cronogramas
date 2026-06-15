@@ -9,8 +9,8 @@ export default defineConfig(({ mode }) => ({
   // base: './' garante paths relativos no bundle — funciona tanto em root
   // quanto em subdir quando o build e subido via Hostinger file manager.
   base: './',
-  // Carrega .env do diretório pai (onde ficam as chaves compartilhadas)
-  envDir: '..',
+  // Carrega .env da raiz do projeto, evitando herdar chaves de outros apps.
+  envDir: '.',
   server: {
     port: 5173,
     strictPort: false, // Se 5173 ocupada, usa outra

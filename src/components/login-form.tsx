@@ -61,7 +61,7 @@ export function LoginForm({ onLoginSuccess, sessionExpired = false }: LoginFormP
       );
 
       if (googleError) {
-        setError("Erro ao conectar com Google. Tente novamente.");
+        setError(googleError.message || "Erro ao conectar com Google. Tente novamente.");
         setIsGoogleLoading(false);
       }
     } catch (err) {
