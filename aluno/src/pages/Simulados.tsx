@@ -206,6 +206,7 @@ function SisuGoalSummary({
         open={isPickerOpen}
         onOpenChange={setIsPickerOpen}
         studentId={studentId}
+        initialGoal={goal}
         onSaved={() => {
           onSaved();
           setIsPickerOpen(false);

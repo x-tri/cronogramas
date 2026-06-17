@@ -40,7 +40,7 @@ export function useSisuCursos(sigla: string | undefined, uf: string | undefined)
       }
       return [...byCurso.entries()]
         .map(([curso, v]) => ({ curso, nota_corte: v.nota_corte }))
-        .sort((a, b) => a.curso.localeCompare(b.curso));
+        .sort((a, b) => b.nota_corte - a.nota_corte || a.curso.localeCompare(b.curso));
     },
     enabled: Boolean(sigla && uf),
     staleTime: 60 * 60 * 1000,

@@ -675,6 +675,7 @@ export default function SimuladoResultado() {
           open={editMeta}
           onOpenChange={setEditMeta}
           studentId={student?.id}
+          initialGoal={sisuGoal}
           onSaved={() => setEditMeta(false)}
         />
 
