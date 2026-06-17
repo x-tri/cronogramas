@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,15 +25,12 @@ function normalizeKey(value: string | null | undefined): string {
 
 export function SisuGoalPicker({ open, onOpenChange, studentId, onSaved, initialGoal }: Props) {
   const [busca, setBusca] = useState("");
-  const [uni, setUni] = useState<{ sigla: string; uf: string; nome: string } | null>(null);
-  const [curso, setCurso] = useState<{ curso: string; nota_corte: number } | null>(null);
+  const [manualUni, setManualUni] = useState<{ sigla: string; uf: string; nome: string } | null>(null);
+  const [manualCurso, setManualCurso] = useState<{ curso: string; nota_corte: number } | null>(null);
+  const [isChangingUniversity, setIsChangingUniversity] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [needsGoalHydration, setNeedsGoalHydration] = useState(false);
-  const [pendingCursoNome, setPendingCursoNome] = useState<string | null>(null);
-  const openedRef = useRef(false);
 
   const { data: unis = [] } = useSisuUniversidades();
-  const { data: cursos = [] } = useSisuCursos(uni?.sigla, uni?.uf);
   const { mutateAsync, isPending } = useSetSisuGoal(studentId);
 
   const unisFiltradas = useMemo(
@@ -41,79 +38,65 @@ export function SisuGoalPicker({ open, onOpenChange, studentId, onSaved, initial
     [unis, busca],
   );
 
-  useEffect(() => {
-    if (!open) {
-      openedRef.current = false;
-      return;
-    }
-
-    if (openedRef.current) return;
-    openedRef.current = true;
-
-    const hasInitialGoal = Boolean(
-      initialGoal?.sisu_curso_nome &&
-      initialGoal.sisu_universidade &&
-      initialGoal.sisu_uf,
-    );
-
-    setErro(null);
-    setBusca("");
-    setCurso(null);
-    setPendingCursoNome(hasInitialGoal ? initialGoal?.sisu_curso_nome ?? null : null);
-    setNeedsGoalHydration(hasInitialGoal);
-    if (!hasInitialGoal) setUni(null);
-  }, [
-    initialGoal?.sisu_curso_nome,
-    initialGoal?.sisu_uf,
-    initialGoal?.sisu_universidade,
-    open,
-  ]);
-
-  useEffect(() => {
-    if (!open || !needsGoalHydration) return;
-
+  const initialUni = useMemo(() => {
     const goalUni = normalizeKey(initialGoal?.sisu_universidade);
     const goalUf = normalizeKey(initialGoal?.sisu_uf);
-    const hydratedUni = unis.find(
+    if (!goalUni || !goalUf) return null;
+
+    return unis.find(
       (u) =>
         normalizeKey(u.uf) === goalUf &&
         (normalizeKey(u.sigla) === goalUni || normalizeKey(u.nome) === goalUni),
-    );
-
-    if (!hydratedUni) return;
-    setUni(hydratedUni);
-    setNeedsGoalHydration(false);
+    ) ?? null;
   }, [
     initialGoal?.sisu_uf,
     initialGoal?.sisu_universidade,
-    needsGoalHydration,
-    open,
     unis,
   ]);
 
-  useEffect(() => {
-    if (!open || !pendingCursoNome || curso || cursos.length === 0) return;
+  const uni = isChangingUniversity ? manualUni : manualUni ?? initialUni;
+  const { data: cursos = [] } = useSisuCursos(uni?.sigla, uni?.uf);
 
-    const selectedCurso = cursos.find(
-      (c) => normalizeKey(c.curso) === normalizeKey(pendingCursoNome),
-    );
+  const initialCurso = useMemo(() => {
+    const goalCurso = normalizeKey(initialGoal?.sisu_curso_nome);
+    if (!goalCurso || isChangingUniversity) return null;
 
-    if (selectedCurso) setCurso(selectedCurso);
-    setPendingCursoNome(null);
-  }, [curso, cursos, open, pendingCursoNome]);
+    return cursos.find((c) => normalizeKey(c.curso) === goalCurso) ?? null;
+  }, [cursos, initialGoal?.sisu_curso_nome, isChangingUniversity]);
+
+  const curso = manualCurso ?? initialCurso;
+
+  function resetTransientState() {
+    setBusca("");
+    setManualUni(null);
+    setManualCurso(null);
+    setIsChangingUniversity(false);
+    setErro(null);
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) resetTransientState();
+    onOpenChange(nextOpen);
+  }
 
   function trocarUniversidade() {
-    setUni(null);
-    setCurso(null);
-    setPendingCursoNome(null);
-    setNeedsGoalHydration(false);
+    setBusca("");
+    setManualUni(null);
+    setManualCurso(null);
+    setIsChangingUniversity(true);
+    setErro(null);
   }
 
   function selecionarUniversidade(nextUni: { sigla: string; uf: string; nome: string }) {
-    setUni(nextUni);
-    setCurso(null);
-    setPendingCursoNome(null);
-    setNeedsGoalHydration(false);
+    setManualUni(nextUni);
+    setManualCurso(null);
+    setIsChangingUniversity(true);
+    setErro(null);
+  }
+
+  function selecionarCurso(nextCurso: { curso: string; nota_corte: number }) {
+    setManualCurso(nextCurso);
+    setErro(null);
   }
 
   async function salvar() {
@@ -122,14 +105,14 @@ export function SisuGoalPicker({ open, onOpenChange, studentId, onSaved, initial
     try {
       await mutateAsync({ sigla: uni.sigla, uf: uni.uf, curso: curso.curso });
       onSaved();
-      onOpenChange(false);
+      handleOpenChange(false);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao salvar.");
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>🎯 Defina sua meta SISU</DialogTitle></DialogHeader>
         <DialogDescription className="sr-only">Escolha sua universidade e curso para definir sua meta SISU.</DialogDescription>
@@ -165,7 +148,7 @@ export function SisuGoalPicker({ open, onOpenChange, studentId, onSaved, initial
                 return (
                   <li key={c.curso}>
                     <button type="button" data-testid={`pick-curso-${c.curso}`}
-                      onClick={() => setCurso(c)}
+                      onClick={() => selecionarCurso(c)}
                       className={`flex w-full items-center justify-between rounded-lg border p-2 text-left text-sm transition-colors ${
                         selected
                           ? "border-primary bg-primary/10 text-primary"
