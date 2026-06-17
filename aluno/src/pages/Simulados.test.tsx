@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 
@@ -16,6 +16,14 @@ vi.mock("@/hooks/useStudentData", () => ({
 
 vi.mock("@/hooks/useSisuGoal", () => ({
   useSisuGoal: vi.fn(),
+}));
+
+vi.mock("@/hooks/useSisuCatalogo", () => ({
+  useSisuCursos: vi.fn(),
+}));
+
+vi.mock("@/hooks/useSetSisuGoal", () => ({
+  useSetSisuGoal: vi.fn(),
 }));
 
 vi.mock("@/components/SisuGoalCTA", () => ({
@@ -35,6 +43,11 @@ const { useSimuladosPendentes } = (await import("@/hooks/useSimulados")) as any;
 const { useStudentProfile } = (await import("@/hooks/useStudentData")) as any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const { useSisuGoal } = (await import("@/hooks/useSisuGoal")) as any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const { useSisuCursos } = (await import("@/hooks/useSisuCatalogo")) as any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const { useSetSisuGoal } = (await import("@/hooks/useSetSisuGoal")) as any;
+const setSisuGoal = vi.fn();
 
 function renderPage(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -60,6 +73,15 @@ describe("Simulados", () => {
     useStudentProfile.mockReturnValue({
       data: { id: "stu-1", profile_id: "profile-1" },
       isLoading: false,
+    });
+    useSisuCursos.mockReturnValue({
+      data: [],
+      isLoading: false,
+    });
+    setSisuGoal.mockResolvedValue(undefined);
+    useSetSisuGoal.mockReturnValue({
+      mutateAsync: setSisuGoal,
+      isPending: false,
     });
   });
 
@@ -88,8 +110,65 @@ describe("Simulados", () => {
 
     expect(screen.getByText("Meta SISU")).toBeInTheDocument();
     expect(screen.getByText("Curso Sintetico")).toBeInTheDocument();
-    expect(screen.getByText("UNI · TS")).toBeInTheDocument();
+    expect(screen.getAllByText("UNI · TS")).toHaveLength(2);
     expect(screen.getByText("Nota de corte: 700 pts")).toBeInTheDocument();
+  });
+
+  it("mostra o ranking de cursos da universidade na propria aba de simulados", () => {
+    useSisuGoal.mockReturnValue({
+      data: {
+        sisu_curso_nome: "Direito",
+        sisu_universidade: "UFRN",
+        sisu_uf: "RN",
+        sisu_nota_corte: 710,
+      },
+      isLoading: false,
+    });
+    useSisuCursos.mockReturnValue({
+      data: [
+        { curso: "Medicina", nota_corte: 784 },
+        { curso: "Direito", nota_corte: 710 },
+      ],
+      isLoading: false,
+    });
+
+    renderPage(<Simulados />);
+
+    expect(screen.getByText("Ranking de cursos")).toBeInTheDocument();
+    expect(screen.getAllByText("UFRN · RN")).toHaveLength(2);
+    expect(screen.getByText("Medicina")).toBeInTheDocument();
+    expect(screen.getByText("784 pts")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Direito, meta atual" })).toBeDisabled();
+  });
+
+  it("salva outro curso direto pelo ranking da aba de simulados", async () => {
+    useSisuGoal.mockReturnValue({
+      data: {
+        sisu_curso_nome: "Direito",
+        sisu_universidade: "UFRN",
+        sisu_uf: "RN",
+        sisu_nota_corte: 710,
+      },
+      isLoading: false,
+    });
+    useSisuCursos.mockReturnValue({
+      data: [
+        { curso: "Medicina", nota_corte: 784 },
+        { curso: "Direito", nota_corte: 710 },
+      ],
+      isLoading: false,
+    });
+
+    renderPage(<Simulados />);
+    fireEvent.click(screen.getByRole("button", { name: /escolher medicina/i }));
+
+    await waitFor(() => {
+      expect(setSisuGoal).toHaveBeenCalledWith({
+        sigla: "UFRN",
+        uf: "RN",
+        curso: "Medicina",
+      });
+    });
   });
 
   it("abre o seletor ao editar a meta SISU existente", () => {
