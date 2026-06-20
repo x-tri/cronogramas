@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildAtendimentos } from './school-detail'
+import { buildAtendimentos, buildMentorByStudent } from './school-detail'
 
 describe('buildAtendimentos', () => {
   const students = [
@@ -41,6 +41,71 @@ describe('buildAtendimentos', () => {
       nome: 'Bia',
       ultimoCronograma: '2026-06-13T08:00:00Z',
     })
+  })
+
+  it('inclui mentor real quando existe autoria vinculada ao aluno', () => {
+    const mentorByStudent = buildMentorByStudent(
+      [
+        {
+          studentKey: '001',
+          mentorUserId: 'mentor-antigo',
+          createdAt: '2026-06-01T08:00:00Z',
+        },
+        {
+          studentKey: '001',
+          mentorUserId: 'mentor-recente',
+          createdAt: '2026-06-15T08:00:00Z',
+        },
+        {
+          studentKey: 'uuid-003',
+          mentorUserId: 'mentor-email',
+          createdAt: '2026-06-14T08:00:00Z',
+        },
+      ],
+      [
+        { auth_uid: 'mentor-antigo', name: 'Mentora Antiga', email: 'antiga@xtri.com' },
+        { auth_uid: 'mentor-recente', name: 'Mentora Recente', email: 'recente@xtri.com' },
+        { auth_uid: 'mentor-email', name: null, email: 'mentor.sem.nome@xtri.com' },
+      ],
+    )
+
+    const atendimentos = buildAtendimentos(
+      students,
+      [
+        { aluno_id: '001', updated_at: '2026-06-10T10:00:00Z' },
+        { aluno_id: 'uuid-003', updated_at: '2026-06-12T08:00:00Z' },
+      ],
+      mentorByStudent,
+    )
+
+    expect(atendimentos.find((a) => a.matricula === '001')?.mentorNome).toBe(
+      'Mentora Recente',
+    )
+    expect(atendimentos.find((a) => a.matricula === '003')?.mentorNome).toBe(
+      'mentor.sem.nome',
+    )
+  })
+
+  it('aceita nome de mentor vindo de auditoria quando não há usuário para join', () => {
+    const mentorByStudent = buildMentorByStudent(
+      [
+        {
+          studentKey: '002',
+          mentorUserId: null,
+          mentorNome: 'Mentora por Audit Log',
+          createdAt: '2026-06-16T08:00:00Z',
+        },
+      ],
+      [],
+    )
+
+    const atendimentos = buildAtendimentos(
+      students,
+      [{ aluno_id: '002', updated_at: '2026-06-16T09:00:00Z' }],
+      mentorByStudent,
+    )
+
+    expect(atendimentos[0].mentorNome).toBe('Mentora por Audit Log')
   })
 
   it('sem cronogramas retorna vazio', () => {

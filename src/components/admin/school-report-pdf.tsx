@@ -93,6 +93,7 @@ const styles = StyleSheet.create({
   colMentor: { flexGrow: 1, flexBasis: 160 },
   colSmall: { width: 70, textAlign: 'right' },
   muted: { color: '#64748b' },
+  mentorLine: { color: '#334155', marginTop: 2 },
   empty: {
     color: '#94a3b8',
     fontSize: 9,
@@ -236,6 +237,10 @@ export function SchoolReportPDF({
                     {aluno.nome}
                     {'\n'}
                     <Text style={styles.muted}>{aluno.matricula}</Text>
+                    {'\n'}
+                    <Text style={styles.mentorLine}>
+                      Mentor: {aluno.mentorNome ?? 'não registrado'}
+                    </Text>
                   </Text>
                   <Text style={styles.colTurma}>{aluno.turma}</Text>
                   <Text style={styles.colData}>{formatDateShortBR(aluno.ultimoCronograma)}</Text>

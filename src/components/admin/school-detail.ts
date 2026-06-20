@@ -12,11 +12,73 @@ export interface CronogramaRow {
   readonly updated_at: string
 }
 
+export interface MentorAttributionRow {
+  readonly studentKey: string
+  readonly mentorUserId: string | null
+  readonly createdAt: string
+  readonly mentorNome?: string | null
+}
+
+export interface MentorUserRow {
+  readonly auth_uid: string | null
+  readonly email: string | null
+  readonly name: string | null
+}
+
 export interface Atendimento {
   readonly matricula: string
   readonly nome: string
   readonly turma: string
   readonly ultimoCronograma: string
+  readonly mentorNome: string | null
+}
+
+function mentorDisplayName(user: MentorUserRow): string | null {
+  const name = user.name?.trim()
+  if (name) return name
+
+  const email = user.email?.trim()
+  if (!email) return null
+  return email.split('@')[0] || email
+}
+
+export function buildMentorByStudent(
+  attributions: ReadonlyArray<MentorAttributionRow>,
+  mentorUsers: ReadonlyArray<MentorUserRow>,
+): Map<string, string> {
+  const mentorByUserId = new Map<string, string>()
+  for (const user of mentorUsers) {
+    if (!user.auth_uid) continue
+    const displayName = mentorDisplayName(user)
+    if (displayName) {
+      mentorByUserId.set(user.auth_uid, displayName)
+    }
+  }
+
+  const latestByStudent = new Map<string, { createdAt: string; mentorNome: string }>()
+  for (const attribution of attributions) {
+    const studentKey = attribution.studentKey.trim()
+    const directName = attribution.mentorNome?.trim()
+    const mentorNome =
+      directName ||
+      (attribution.mentorUserId ? mentorByUserId.get(attribution.mentorUserId) : null)
+    if (!studentKey || !mentorNome) continue
+
+    const current = latestByStudent.get(studentKey)
+    if (!current || attribution.createdAt > current.createdAt) {
+      latestByStudent.set(studentKey, {
+        createdAt: attribution.createdAt,
+        mentorNome,
+      })
+    }
+  }
+
+  return new Map(
+    Array.from(latestByStudent.entries()).map(([studentKey, value]) => [
+      studentKey,
+      value.mentorNome,
+    ]),
+  )
 }
 
 /**
@@ -27,6 +89,7 @@ export interface Atendimento {
 export function buildAtendimentos(
   students: ReadonlyArray<SchoolStudentRow>,
   cronogramas: ReadonlyArray<CronogramaRow>,
+  mentorByStudent: ReadonlyMap<string, string> = new Map(),
 ): Atendimento[] {
   const latestByAluno = new Map<string, string>()
   for (const c of cronogramas) {
@@ -46,6 +109,7 @@ export function buildAtendimentos(
         nome: s.name ?? s.matricula,
         turma: s.turma ?? '-',
         ultimoCronograma,
+        mentorNome: mentorByStudent.get(s.id) ?? mentorByStudent.get(s.matricula) ?? null,
       }
     })
     .filter((atendimento): atendimento is Atendimento => atendimento !== null)

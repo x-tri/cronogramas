@@ -17,7 +17,12 @@ import {
   engagementStatus,
   type MentorEngagementRow,
 } from './mentor-engagement'
-import { buildAtendimentos, type Atendimento } from './school-detail'
+import {
+  buildAtendimentos,
+  buildMentorByStudent,
+  type Atendimento,
+  type MentorAttributionRow,
+} from './school-detail'
 
 export interface SchoolDetailModalProps {
   readonly school: {
@@ -35,6 +40,29 @@ export interface SchoolDetailModalProps {
 
 const MAX_ATENDIMENTOS_VISIVEIS = 60
 
+type PdfHistoryMentorRow = {
+  readonly tipo: string
+  readonly aluno_id: string | null
+  readonly matricula: string | null
+  readonly created_by: string | null
+  readonly created_at: string | null
+}
+
+type MentorPlanAttributionRow = {
+  readonly student_key: string | null
+  readonly mentor_user_id: string | null
+  readonly created_at: string | null
+  readonly updated_at: string | null
+}
+
+type AuditMentorRow = {
+  readonly user_id: string | null
+  readonly user_name: string | null
+  readonly user_email: string | null
+  readonly metadata: Record<string, unknown> | null
+  readonly created_at: string | null
+}
+
 function safeFilename(value: string): string {
   return value
     .normalize('NFD')
@@ -43,6 +71,24 @@ function safeFilename(value: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+function normalizeLookup(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+function auditMentorName(row: AuditMentorRow): string | null {
+  const name = row.user_name?.trim()
+  if (name) return name
+
+  const email = row.user_email?.trim()
+  if (!email) return null
+  return email.split('@')[0] || email
 }
 
 export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): ReactElement {
@@ -88,7 +134,10 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
           .select('*')
           .eq('school_id', primarySchoolId)
           .order('last_login_at', { ascending: false, nullsFirst: false }),
-        supabase.from('pdf_history').select('tipo').eq('school_id', primarySchoolId),
+        supabase
+          .from('pdf_history')
+          .select('tipo, aluno_id, matricula, created_by, created_at')
+          .eq('school_id', primarySchoolId),
       ])
 
       const students = (studentsRes.data ?? []) as Array<{
@@ -108,12 +157,97 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
             .in('aluno_id', alunoRefs)
         : { data: [] }
 
+      const mentorPlansRes = alunoRefs.length
+        ? await supabase
+            .from('mentor_plans')
+            .select('student_key, mentor_user_id, created_at, updated_at')
+            .eq('school_id', primarySchoolId)
+            .in('student_key', alunoRefs)
+        : { data: [] }
+      const auditRes = await supabase
+        .from('audit_log')
+        .select('user_id, user_name, user_email, metadata, created_at')
+        .eq('school_id', primarySchoolId)
+        .eq('action', 'generate_pdf')
+
+      const studentRefSet = new Set(alunoRefs)
+      const studentKeysByName = new Map<string, string[]>()
+      for (const student of students) {
+        const nameKey = normalizeLookup(student.name ?? student.matricula)
+        const keys = studentKeysByName.get(nameKey) ?? []
+        studentKeysByName.set(nameKey, [...keys, student.id, student.matricula])
+      }
+
+      const mentorAttributions: MentorAttributionRow[] = []
+      for (const row of (pdfsRes.data ?? []) as PdfHistoryMentorRow[]) {
+        if (!row.created_by || !row.created_at) continue
+        const keys = [row.aluno_id, row.matricula].filter(
+          (key): key is string => Boolean(key && studentRefSet.has(key)),
+        )
+        for (const key of new Set(keys)) {
+          mentorAttributions.push({
+            studentKey: key,
+            mentorUserId: row.created_by,
+            createdAt: row.created_at,
+          })
+        }
+      }
+      for (const row of (mentorPlansRes.data ?? []) as MentorPlanAttributionRow[]) {
+        if (!row.student_key || !row.mentor_user_id) continue
+        mentorAttributions.push({
+          studentKey: row.student_key,
+          mentorUserId: row.mentor_user_id,
+          createdAt: row.updated_at ?? row.created_at ?? '',
+        })
+      }
+      for (const row of (auditRes.data ?? []) as AuditMentorRow[]) {
+        const aluno = row.metadata?.aluno
+        const mentorNome = auditMentorName(row)
+        if (typeof aluno !== 'string' || !row.created_at || !mentorNome) continue
+
+        const keys = studentKeysByName.get(normalizeLookup(aluno)) ?? []
+        const uniqueKeys = Array.from(new Set(keys)).filter((key) => studentRefSet.has(key))
+        if (uniqueKeys.length !== 2) continue
+
+        for (const key of uniqueKeys) {
+          mentorAttributions.push({
+            studentKey: key,
+            mentorUserId: row.user_id,
+            mentorNome,
+            createdAt: row.created_at,
+          })
+        }
+      }
+
+      const mentorUserIds = Array.from(
+        new Set(
+          mentorAttributions
+            .map((row) => row.mentorUserId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      )
+      const mentorUsersRes = mentorUserIds.length
+        ? await supabase
+            .from('project_users')
+            .select('auth_uid, name, email')
+            .in('auth_uid', mentorUserIds)
+        : { data: [] }
+      const mentorByStudent = buildMentorByStudent(
+        mentorAttributions,
+        (mentorUsersRes.data ?? []) as Array<{
+          auth_uid: string | null
+          name: string | null
+          email: string | null
+        }>,
+      )
+
       if (cancelled) return
 
       setAtendimentos(
         buildAtendimentos(
           students,
           (cronogramasRes.data ?? []) as Array<{ aluno_id: string; updated_at: string }>,
+          mentorByStudent,
         ),
       )
       setMentores((mentoresRes.data ?? []) as MentorEngagementRow[])
@@ -346,6 +480,9 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
                         <td className="px-4 py-2">
                           <p className="text-sm text-[#1d1d1f]">{a.nome}</p>
                           <p className="text-xs font-mono text-[#94a3b8]">{a.matricula}</p>
+                          <p className="mt-0.5 text-xs text-[#64748b]">
+                            Mentor: {a.mentorNome ?? 'não registrado'}
+                          </p>
                         </td>
                         <td className="px-4 py-2 text-xs text-[#64748b]">{a.turma}</td>
                         <td className="px-4 py-2 text-right text-xs text-[#64748b]">
