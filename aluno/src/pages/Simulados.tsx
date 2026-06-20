@@ -8,6 +8,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSimuladosPendentes } from "@/hooks/useSimulados";
 import { useStudentProfile } from "@/hooks/useStudentData";
 import { useSisuGoal, type SisuGoal } from "@/hooks/useSisuGoal";
+import { useSisuCursos } from "@/hooks/useSisuCatalogo";
+import { useSetSisuGoal } from "@/hooks/useSetSisuGoal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SisuGoalCTA } from "@/components/SisuGoalCTA";
 import { SisuGoalPicker } from "@/components/SisuGoalPicker";
@@ -21,6 +23,10 @@ import {
   Target,
 } from "lucide-react";
 import type { SimuladoPendenteRow } from "@/types/simulado";
+
+function normalizeSisuText(value: string | null | undefined): string {
+  return value?.trim().toUpperCase() ?? "";
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -162,6 +168,11 @@ function SisuGoalSummary({
     typeof goal?.sisu_nota_corte === "number" && Number.isFinite(goal.sisu_nota_corte)
       ? Math.round(goal.sisu_nota_corte)
       : null;
+  const sigla = goal?.sisu_universidade ?? undefined;
+  const uf = goal?.sisu_uf ?? undefined;
+  const { data: cursos = [], isLoading: isLoadingCursos } = useSisuCursos(sigla, uf);
+  const { mutateAsync, isPending } = useSetSisuGoal(studentId);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
 
   if (isLoading) {
     return <Skeleton className="h-32 w-full rounded-2xl" />;
@@ -169,6 +180,20 @@ function SisuGoalSummary({
 
   if (!goal?.sisu_curso_nome) {
     return <SisuGoalCTA studentId={studentId} onSaved={onSaved} />;
+  }
+
+  async function selecionarCurso(curso: string) {
+    if (!sigla || !uf || normalizeSisuText(curso) === normalizeSisuText(goal?.sisu_curso_nome)) {
+      return;
+    }
+
+    setSelectionError(null);
+    try {
+      await mutateAsync({ sigla, uf, curso });
+      onSaved();
+    } catch (error) {
+      setSelectionError(error instanceof Error ? error.message : "Falha ao salvar o curso.");
+    }
   }
 
   return (
@@ -202,10 +227,80 @@ function SisuGoalSummary({
           Editar
         </button>
       </div>
+
+      <div className="mt-4 border-t border-primary/15 pt-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-primary">
+              Ranking de cursos
+            </p>
+            <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
+              {sigla && uf ? `${sigla} · ${uf}` : "Universidade em atualização"}
+            </p>
+          </div>
+          {isLoadingCursos && (
+            <span className="text-[10px] font-bold text-muted-foreground">
+              Carregando...
+            </span>
+          )}
+        </div>
+
+        {!isLoadingCursos && cursos.length > 0 && (
+          <ul className="mt-3 max-h-56 space-y-1 overflow-auto pr-1">
+            {cursos.map((curso, index) => {
+              const selected =
+                normalizeSisuText(curso.curso) === normalizeSisuText(goal.sisu_curso_nome);
+              return (
+                <li key={curso.curso}>
+                  <button
+                    type="button"
+                    onClick={() => selecionarCurso(curso.curso)}
+                    disabled={isPending || selected}
+                    className={`grid w-full grid-cols-[2rem_1fr_auto] items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-[11px] transition-colors ${
+                      selected
+                        ? "border-primary bg-primary/12 text-primary"
+                        : "border-primary/15 bg-background/70 text-foreground hover:bg-primary/10"
+                    }`}
+                    aria-label={
+                      selected
+                        ? `${curso.curso}, meta atual`
+                        : `Escolher ${curso.curso} como meta SISU`
+                    }
+                  >
+                    <span className="font-mono font-black text-muted-foreground">
+                      #{index + 1}
+                    </span>
+                    <span className="min-w-0 font-black leading-tight">
+                      {curso.curso}
+                    </span>
+                    <span className="font-mono text-[11px] font-black text-muted-foreground">
+                      {Math.round(curso.nota_corte)} pts
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {!isLoadingCursos && cursos.length === 0 && (
+          <p className="mt-3 rounded-xl border border-primary/15 bg-background/60 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
+            Lista de cursos indisponível para esta universidade.
+          </p>
+        )}
+
+        {selectionError && (
+          <p role="alert" className="mt-2 text-[11px] font-semibold text-red-600">
+            {selectionError}
+          </p>
+        )}
+      </div>
+
       <SisuGoalPicker
         open={isPickerOpen}
         onOpenChange={setIsPickerOpen}
         studentId={studentId}
+        initialGoal={goal}
         onSaved={() => {
           onSaved();
           setIsPickerOpen(false);

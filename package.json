@@ -54,6 +54,7 @@
     "jsdom": "^27.4.0",
     "playwright": "^1.58.1",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.22.4",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",

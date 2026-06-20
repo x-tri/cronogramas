@@ -50,6 +50,12 @@ describe("useSisuCursos", () => {
     expect(result.current.data).toHaveLength(2);
   });
 
+  it("ordena os cursos como ranking por nota de corte decrescente", async () => {
+    const { result } = renderHook(() => useSisuCursos("UFRN", "RN"), { wrapper });
+    await waitFor(() => expect(result.current.data).toBeDefined());
+    expect(result.current.data?.map((c) => c.curso)).toEqual(["Medicina", "Direito"]);
+  });
+
   it("desabilitado sem sigla/uf", () => {
     const { result } = renderHook(() => useSisuCursos(undefined, undefined), { wrapper });
     expect(result.current.fetchStatus).toBe("idle");

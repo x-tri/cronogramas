@@ -1,6 +1,7 @@
 // Lógica pura do modal de detalhes da escola (Saúde das Escolas).
 
 export interface SchoolStudentRow {
+  readonly id: string
   readonly matricula: string
   readonly name: string | null
   readonly turma: string | null
@@ -36,12 +37,17 @@ export function buildAtendimentos(
   }
 
   return students
-    .filter((s) => latestByAluno.has(s.matricula))
-    .map((s) => ({
-      matricula: s.matricula,
-      nome: s.name ?? s.matricula,
-      turma: s.turma ?? '-',
-      ultimoCronograma: latestByAluno.get(s.matricula)!,
-    }))
+    .map((s) => {
+      const ultimoCronograma = latestByAluno.get(s.id) ?? latestByAluno.get(s.matricula)
+      if (!ultimoCronograma) return null
+
+      return {
+        matricula: s.matricula,
+        nome: s.name ?? s.matricula,
+        turma: s.turma ?? '-',
+        ultimoCronograma,
+      }
+    })
+    .filter((atendimento): atendimento is Atendimento => atendimento !== null)
     .sort((a, b) => b.ultimoCronograma.localeCompare(a.ultimoCronograma))
 }

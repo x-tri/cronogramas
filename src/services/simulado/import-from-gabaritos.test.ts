@@ -66,6 +66,10 @@ describe('validateExam', () => {
     expect(r.ok).toBe(false)
     expect(r.reasons.join(' ')).toContain('letra')
   })
+  it('aceita questão anulada (string vazia no answer_key)', () => {
+    const key = validKey(); key[177] = '' // item 178 anulado (gabarito vazio)
+    expect(validateExam(examFixture({ answer_key: key })).ok).toBe(true)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -142,6 +146,15 @@ describe('buildResposta', () => {
     expect(r.acertos_lc).toBe(45)
   })
 
+  it('questão anulada (gabarito vazio) nunca conta como acerto', () => {
+    const k = validKey(); k[177] = '' // item 178 (MT) anulado
+    const itensAnulada = buildItens(examFixture({ answer_key: k,
+      question_contents: Array.from({ length: 180 }, (_, i) => ({ answer: k[i], content: `t${i+1}`, questionNumber: i+1 })) }))
+    const r = buildResposta(saFixture({ answers: validKey() }), itensAnulada, 's')
+    expect(r.acertos_mt).toBe(44) // 45 itens em MT, mas o anulado não pode ser acerto
+    expect(r.acertos_mt + r.erros_mt + r.branco_mt).toBe(45)
+  })
+
   it('TRI NaN / Infinity vira null', () => {
     const r = buildResposta(saFixture({ tri_lc: NaN, tri_ch: Infinity }), itens, 's')
     expect(r.tri_lc).toBeNull()
@@ -193,5 +206,16 @@ describe('buildImportPlan', () => {
     const plan = buildImportPlan(examFixture({ answer_key: ['A'] }), [], portal)
     expect(plan.ok).toBe(false)
     expect(plan.respostas).toHaveLength(0)
+  })
+
+  it('exame com questão anulada é importável (não bloqueia o plano)', () => {
+    const k = validKey(); k[177] = '' // item 178 anulado
+    const examAnulada = examFixture({ answer_key: k,
+      question_contents: Array.from({ length: 180 }, (_, i) => ({ answer: k[i], content: `t${i+1}`, questionNumber: i+1 })) })
+    const sas = [saFixture({ student_number: '214140291', answers: validKey() })]
+    const plan = buildImportPlan(examAnulada, sas, portal)
+    expect(plan.ok).toBe(true)
+    expect(plan.respostas).toHaveLength(1)
+    expect(plan.respostas[0].acertos_mt).toBe(44)
   })
 })

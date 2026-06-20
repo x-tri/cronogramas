@@ -2,6 +2,80 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { useCronogramaStore } from './cronograma-store'
 import { resetRepository, forceMockRepository } from '../data/factory'
 import { resetMockRepository } from '../data/mock-repository'
+import type {
+  Aluno,
+  BlocoCronograma,
+  Cronograma,
+  HorarioOficial,
+} from '../types/domain'
+import type { SimuladoHistoryItem } from '../types/supabase'
+
+function makeStudent(id: string, nome = 'Test Student'): Aluno {
+  return {
+    id,
+    matricula: id,
+    nome,
+    turma: '2A',
+    email: null,
+    fotoFilename: null,
+    escola: 'MARISTA',
+    createdAt: new Date(),
+  }
+}
+
+const mockSchedule: HorarioOficial[] = [
+  {
+    id: 'schedule-1',
+    turma: '2A',
+    diaSemana: 'segunda',
+    horarioInicio: '07:15',
+    horarioFim: '08:05',
+    disciplina: 'Matemática',
+    professor: 'Prof. Test',
+    turno: 'manha',
+  },
+]
+
+const mockCronograma: Cronograma = {
+  id: 'cronograma-1',
+  alunoId: '214150129',
+  semanaInicio: new Date('2024-01-01'),
+  semanaFim: new Date('2024-01-07'),
+  observacoes: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  status: 'ativo',
+}
+
+const mockBlock: BlocoCronograma = {
+  id: 'block-1',
+  cronogramaId: mockCronograma.id,
+  diaSemana: 'segunda',
+  horarioInicio: '07:15',
+  horarioFim: '08:05',
+  turno: 'manha',
+  tipo: 'estudo',
+  titulo: 'Matemática',
+  descricao: null,
+  disciplinaCodigo: null,
+  cor: null,
+  prioridade: 0,
+  concluido: false,
+  createdAt: new Date(),
+}
+
+const mockHistory: SimuladoHistoryItem[] = [
+  {
+    id: 'simulado-1',
+    source: 'mentoria',
+    title: 'Simulado Teste',
+    date: '2024-01-01',
+    isLatest: true,
+    simuladoId: 'simulado-1',
+    respostaId: 'resposta-1',
+    studentId: '214150129',
+  },
+]
 
 describe('useCronogramaStore', () => {
   beforeEach(() => {
@@ -34,16 +108,7 @@ describe('useCronogramaStore', () => {
   describe('student actions', () => {
     it('should set student', () => {
       const store = useCronogramaStore.getState()
-      const mockStudent = {
-        id: '1',
-        matricula: '214150129',
-        nome: 'Test Student',
-        turma: '2A',
-        email: null,
-        fotoFilename: null,
-        escola: 'MARISTA' as const,
-        createdAt: new Date(),
-      }
+      const mockStudent = makeStudent('214150129')
 
       store.setStudent(mockStudent)
 
@@ -53,20 +118,70 @@ describe('useCronogramaStore', () => {
       expect(useCronogramaStore.getState().selectedSimuladoResult).toBeNull()
     })
 
+    it('should clear stale student data when changing student', () => {
+      const store = useCronogramaStore.getState()
+
+      store.setStudent(makeStudent('214150129', 'Nicole'))
+      store.setOfficialSchedule(mockSchedule)
+      store.setSlotsOverride({
+        manha: [{ inicio: '07:20', fim: '08:05' }],
+        tarde: [],
+        noite: [],
+      })
+      store.setCronograma(mockCronograma)
+      store.setBlocks([mockBlock])
+      store.setSimuladoHistory(mockHistory)
+
+      const nextStudent = makeStudent('999999999', 'Outro aluno')
+      store.setStudent(nextStudent)
+
+      const state = useCronogramaStore.getState()
+      expect(state.currentStudent).toEqual(nextStudent)
+      expect(state.officialSchedule).toEqual([])
+      expect(state.slotsOverride).toBeNull()
+      expect(state.cronograma).toBeNull()
+      expect(state.blocks).toEqual([])
+      expect(state.cronogramaVersions).toEqual([])
+      expect(state.simuladoHistory).toEqual([])
+      expect(state.selectedSimuladoHistoryItem).toBeNull()
+      expect(state.selectedSimuladoResult).toBeNull()
+      expect(state.error).toBeNull()
+    })
+
+    it('should clear the mentor workspace student context', () => {
+      const store = useCronogramaStore.getState()
+
+      store.setStudent(makeStudent('214150129', 'Nicole'))
+      store.setOfficialSchedule(mockSchedule)
+      store.setSlotsOverride({
+        manha: [{ inicio: '07:20', fim: '08:05' }],
+        tarde: [],
+        noite: [],
+      })
+      store.setCronograma(mockCronograma)
+      store.setBlocks([mockBlock])
+      store.setSimuladoHistory(mockHistory)
+      store.setLoadingStudent(true)
+      store.setLoadingSchedule(true)
+      store.setSaving(true)
+
+      store.clearStudentContext()
+
+      const state = useCronogramaStore.getState()
+      expect(state.currentStudent).toBeNull()
+      expect(state.officialSchedule).toEqual([])
+      expect(state.slotsOverride).toBeNull()
+      expect(state.cronograma).toBeNull()
+      expect(state.blocks).toEqual([])
+      expect(state.cronogramaVersions).toEqual([])
+      expect(state.simuladoHistory).toEqual([])
+      expect(state.isLoadingStudent).toBe(false)
+      expect(state.isLoadingSchedule).toBe(false)
+      expect(state.isSaving).toBe(false)
+    })
+
     it('should set official schedule', () => {
       const store = useCronogramaStore.getState()
-      const mockSchedule = [
-        {
-          id: '1',
-          turma: '2A',
-          diaSemana: 'segunda' as const,
-          horarioInicio: '07:15',
-          horarioFim: '08:05',
-          disciplina: 'Matemática',
-          professor: 'Prof. Test',
-          turno: 'manha' as const,
-        },
-      ]
 
       store.setOfficialSchedule(mockSchedule)
 

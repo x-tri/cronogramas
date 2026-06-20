@@ -38,8 +38,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
 
-      # Cria .env na raiz do repo (envDir='.' no admin e envDir='..' no aluno)
-      # e tambem na pasta pai para compatibilidade com builds antigos.
+      # Cria .env na raiz do repo (admin envDir='.', aluno envDir='..').
+      # Mantém uma cópia na pasta pai por compatibilidade com jobs antigos.
       # Usa secret DOTENV_CI único com todos os VITE_* do projeto.
       # Também exporta as vars pro GITHUB_ENV pra ficarem disponíveis como
       # process.env nos próximos steps (Vitest não lê .env automaticamente).
@@ -129,8 +129,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
 
-      # Cria .env na raiz do repo (envDir='.' no admin e envDir='..' no aluno)
-      # e tambem na pasta pai para compatibilidade com builds antigos.
+      # Cria .env na raiz do repo (admin envDir='.', aluno envDir='..').
+      # Mantém uma cópia na pasta pai por compatibilidade com jobs antigos.
       - name: Restore .env from secret
         run: |
           printf '%s\n' "${{ secrets.DOTENV_CI }}" > "${{ github.workspace }}/.env"

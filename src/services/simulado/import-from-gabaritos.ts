@@ -37,7 +37,11 @@ export function validateExam(exam: GabaritosExam): { ok: boolean; reasons: strin
   } else {
     const bad: number[] = []
     exam.answer_key.forEach((k, i) => {
-      if (!LETTERS.has(String(k).toUpperCase().trim())) bad.push(i + 1)
+      // string vazia = questão ANULADA (gabarito vazio): permitida. Ela nunca
+      // conta como acerto (computeAreaBreakdown trata gabarito '' como não-match),
+      // ficando consistente com o `correct_answers` do gabaritos.
+      const v = String(k).toUpperCase().trim()
+      if (v !== '' && !LETTERS.has(v)) bad.push(i + 1)
     })
     if (bad.length > 0) reasons.push(`letra inválida nos itens: ${bad.join(', ')}`)
   }
