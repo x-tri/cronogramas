@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StudentSearch } from "./components/student/student-search";
 import { AlunoAvulsoForm } from "./components/student/aluno-avulso-form";
 import { KanbanBoard } from "./components/kanban/kanban-board";
@@ -64,6 +64,9 @@ type SlotSelection = {
 function AppContent() {
   const currentStudent = useCronogramaStore((state) => state.currentStudent);
   const selectedWeek = useCronogramaStore((state) => state.selectedWeek);
+  const clearStudentContext = useCronogramaStore(
+    (state) => state.clearStudentContext,
+  );
 
   const dayDates = useMemo(() => {
     const { start } = getWeekBounds(selectedWeek);
@@ -87,6 +90,14 @@ function AppContent() {
   // Coord toggle: alterna entre painel de mentoria (kanban/timeline)
   // e gestao de Simulados ENEM (lista + wizard + respostas).
   const [coordView, setCoordView] = useState<"mentor" | "simulados" | "materiais">("mentor");
+
+  const resetMentorWorkspace = useCallback(() => {
+    clearStudentContext();
+    setShowSearch(false);
+    setSelectedSlot(null);
+    setEditingBlock(null);
+    setCoordView("mentor");
+  }, [clearStudentContext]);
 
   const handleSlotClick = (
     dia: DiaSemana,
@@ -125,23 +136,28 @@ function AppContent() {
   const [sessionExpired, setSessionExpired] = useState(false);
   // Ref marcado ANTES de chamar logout() explícito para distinguir de expiração
   const isExplicitLogoutRef = useRef(false);
+  const authContextKeyRef = useRef<string | null>(null);
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
         const currentUser = await getCurrentUser();
         if (!isMounted) return;
+        if (!currentUser) {
+          resetMentorWorkspace();
+          setUser(null);
+          return;
+        }
         setUser(currentUser);
-        if (currentUser) {
-          const projectUser = await getCurrentProjectUser(true);
-          if (isMounted) {
-            setUserRole(projectUser?.role ?? null);
-            setUserSchoolId(projectUser?.schoolId ?? null);
-            setMustChangePassword(projectUser?.mustChangePassword ?? false);
-          }
+        const projectUser = await getCurrentProjectUser(true);
+        if (isMounted) {
+          setUserRole(projectUser?.role ?? null);
+          setUserSchoolId(projectUser?.schoolId ?? null);
+          setMustChangePassword(projectUser?.mustChangePassword ?? false);
         }
       } catch {
         if (!isMounted) return;
+        resetMentorWorkspace();
         setUser(null);
       } finally {
         if (isMounted) setIsChecking(false);
@@ -150,7 +166,7 @@ function AppContent() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [resetMentorWorkspace]);
 
   // Detecta expiração/invalidação de sessão e força re-login
   useEffect(() => {
@@ -164,6 +180,8 @@ function AppContent() {
 
       if (sessionLost) {
         clearCurrentProjectUserCache();
+        authContextKeyRef.current = null;
+        resetMentorWorkspace();
         setUser(null);
         setUserRole(null);
         setUserSchoolId(null);
@@ -178,7 +196,29 @@ function AppContent() {
       }
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [resetMentorWorkspace]);
+
+  useEffect(() => {
+    if (!user) {
+      authContextKeyRef.current = null;
+      return;
+    }
+
+    const authContextKey = [
+      user.id,
+      userRole ?? "sem-role",
+      userSchoolId ?? "sem-escola",
+    ].join(":");
+
+    if (
+      authContextKeyRef.current &&
+      authContextKeyRef.current !== authContextKey
+    ) {
+      resetMentorWorkspace();
+    }
+
+    authContextKeyRef.current = authContextKey;
+  }, [resetMentorWorkspace, user, userRole, userSchoolId]);
 
   useEffect(() => {
     if (currentStudent) {
@@ -188,6 +228,7 @@ function AppContent() {
 
   async function handleLoginSuccess() {
     setSessionExpired(false);
+    resetMentorWorkspace();
     try {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
@@ -208,6 +249,8 @@ function AppContent() {
       await logout();
     } finally {
       clearCurrentProjectUserCache();
+      authContextKeyRef.current = null;
+      resetMentorWorkspace();
       setUser(null);
       setUserRole(null);
       setUserSchoolId(null);

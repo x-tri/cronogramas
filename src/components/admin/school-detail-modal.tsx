@@ -22,6 +22,7 @@ import { buildAtendimentos, type Atendimento } from './school-detail'
 export interface SchoolDetailModalProps {
   readonly school: {
     readonly school_id: string
+    readonly primary_school_id?: string | null
     readonly name: string
     readonly alunos_base: number
     readonly alunos_com_simulado: number
@@ -34,8 +35,19 @@ export interface SchoolDetailModalProps {
 
 const MAX_ATENDIMENTOS_VISIVEIS = 60
 
+function safeFilename(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): ReactElement {
   const [loading, setLoading] = useState(true)
+  const [generatingReport, setGeneratingReport] = useState(false)
   const [atendimentos, setAtendimentos] = useState<Atendimento[]>([])
   const [mentores, setMentores] = useState<MentorEngagementRow[]>([])
   const [pdfsPorTipo, setPdfsPorTipo] = useState<Record<string, number>>({})
@@ -52,31 +64,47 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
     let cancelled = false
     void (async () => {
       setLoading(true)
+      const primarySchoolId =
+        school.primary_school_id === undefined ? school.school_id : school.primary_school_id
+
+      if (!primarySchoolId) {
+        if (!cancelled) {
+          setAtendimentos([])
+          setMentores([])
+          setPdfsPorTipo({})
+          setLoading(false)
+        }
+        return
+      }
+
       const [studentsRes, mentoresRes, pdfsRes] = await Promise.all([
         supabase
           .from('students')
-          .select('matricula, name, turma')
-          .eq('school_id', school.school_id),
+          .select('id, matricula, name, turma')
+          .eq('school_id', primarySchoolId),
         supabase
           .from('mentor_engagement')
           .select('*')
-          .eq('school_id', school.school_id)
+          .eq('school_id', primarySchoolId)
           .order('last_login_at', { ascending: false, nullsFirst: false }),
-        supabase.from('pdf_history').select('tipo').eq('school_id', school.school_id),
+        supabase.from('pdf_history').select('tipo').eq('school_id', primarySchoolId),
       ])
 
       const students = (studentsRes.data ?? []) as Array<{
+        id: string
         matricula: string
         name: string | null
         turma: string | null
       }>
 
-      const matriculas = students.map((s) => s.matricula).filter(Boolean)
-      const cronogramasRes = matriculas.length
+      const alunoRefs = Array.from(
+        new Set(students.flatMap((s) => [s.id, s.matricula]).filter(Boolean)),
+      )
+      const cronogramasRes = alunoRefs.length
         ? await supabase
             .from('cronogramas')
             .select('aluno_id, updated_at')
-            .in('aluno_id', matriculas)
+            .in('aluno_id', alunoRefs)
         : { data: [] }
 
       if (cancelled) return
@@ -99,7 +127,7 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
     return () => {
       cancelled = true
     }
-  }, [school.school_id])
+  }, [school.primary_school_id, school.school_id])
 
   const coverage =
     school.alunos_base > 0
@@ -107,6 +135,38 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
       : 0
   const visiveis = atendimentos.slice(0, MAX_ATENDIMENTOS_VISIVEIS)
   const ocultos = atendimentos.length - visiveis.length
+
+  const handleDownloadReport = async () => {
+    setGeneratingReport(true)
+    try {
+      const { createElement } = await import('react')
+      const { pdf } = await import('@react-pdf/renderer')
+      const { SchoolReportPDF } = await import('./school-report-pdf')
+      const generatedAt = new Date()
+      const doc = createElement(SchoolReportPDF, {
+        school,
+        atendimentos,
+        mentores,
+        pdfsPorTipo,
+        generatedAt,
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blob = await pdf(doc as any).toBlob()
+      const url = URL.createObjectURL(blob)
+      const date = generatedAt.toISOString().slice(0, 10)
+      const filename = `relatorio-escola-${safeFilename(school.name)}-${date}.pdf`
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('[SchoolDetailModal] Falha ao gerar relatório da escola:', error)
+      window.alert('Não consegui gerar o PDF agora. Tente novamente em instantes.')
+    } finally {
+      setGeneratingReport(false)
+    }
+  }
 
   return (
     <div
@@ -127,20 +187,33 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
             </p>
             <h2 className="mt-1 text-base font-semibold text-[#1d1d1f]">{school.name}</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded p-1.5 text-[#94a3b8] transition-colors hover:bg-[#f1f5f9] hover:text-[#1d1d1f]"
-            title="Fechar"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadReport}
+              disabled={loading || generatingReport}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#bfdbfe] px-3 py-1.5 text-xs font-semibold text-[#2563eb] transition-colors hover:bg-[#eff6ff] disabled:cursor-not-allowed disabled:opacity-50"
+              title="Gerar PDF do relatório da escola"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16V4m0 12 4-4m-4 4-4-4M4 20h16" />
+              </svg>
+              {generatingReport ? 'Gerando...' : 'PDF'}
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded p-1.5 text-[#94a3b8] transition-colors hover:bg-[#f1f5f9] hover:text-[#1d1d1f]"
+              title="Fechar"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
           {/* Funil */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <div className="rounded-xl border border-[#e5e7eb] p-3">
               <p className="text-lg font-semibold text-[#1d1d1f]">{school.alunos_base}</p>
               <p className="text-xs text-[#64748b]">alunos na base</p>
@@ -155,6 +228,10 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
                 <span className="ml-1 text-xs font-normal text-[#94a3b8]">({coverage}%)</span>
               </p>
               <p className="text-xs text-[#64748b]">atendidos (cronograma)</p>
+            </div>
+            <div className="rounded-xl border border-[#e5e7eb] p-3">
+              <p className="text-lg font-semibold text-[#1d1d1f]">{school.cronogramas_gerados}</p>
+              <p className="text-xs text-[#64748b]">cronogramas gerados</p>
             </div>
             <div className="rounded-xl border border-[#e5e7eb] p-3">
               <p className="text-lg font-semibold text-[#1d1d1f]">{school.blocos_criados}</p>

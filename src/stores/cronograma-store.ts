@@ -55,6 +55,7 @@ type CronogramaState = {
 
   // Actions
   setStudent: (student: Aluno | null) => void
+  clearStudentContext: () => void
   setOfficialSchedule: (schedule: HorarioOficial[]) => void
   /** Define override manualmente (uso em testes / casos especiais). */
   setSlotsOverride: (override: TimeSlotsByTurno | null) => void
@@ -132,6 +133,18 @@ const initialState = {
   error: null,
 }
 
+const emptyStudentDataState = {
+  officialSchedule: [] as HorarioOficial[],
+  slotsOverride: null as TimeSlotsByTurno | null,
+  cronograma: null as Cronograma | null,
+  blocks: [] as BlocoCronograma[],
+  cronogramaVersions: [] as Cronograma[],
+  simuladoHistory: [] as SimuladoHistoryItem[],
+  selectedSimuladoHistoryItem: null as SimuladoHistoryItem | null,
+  selectedSimuladoResult: null as SimuladoResult | null,
+  error: null,
+}
+
 export const useCronogramaStore = create<CronogramaState>()(
   devtools(
     (set, get) => ({
@@ -139,10 +152,17 @@ export const useCronogramaStore = create<CronogramaState>()(
 
       setStudent: (student) =>
         set({
+          ...emptyStudentDataState,
           currentStudent: student,
-          simuladoHistory: [],
-          selectedSimuladoHistoryItem: null,
-          selectedSimuladoResult: null,
+        }),
+      clearStudentContext: () =>
+        set({
+          ...emptyStudentDataState,
+          currentStudent: null,
+          isLoadingStudent: false,
+          isLoadingSchedule: false,
+          isLoadingVersions: false,
+          isSaving: false,
         }),
       setOfficialSchedule: (schedule) => set({ officialSchedule: schedule }),
 

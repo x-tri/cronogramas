@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { coveragePercent, median } from './executive-metrics'
+import { coveragePercent, median, normalizeSchoolKey } from './executive-metrics'
 
 describe('coveragePercent', () => {
   it('calcula a cobertura atendidos/base em % pt-BR', () => {
@@ -26,5 +26,17 @@ describe('median', () => {
 
   it('lista vazia retorna null', () => {
     expect(median([])).toBeNull()
+  })
+})
+
+describe('normalizeSchoolKey', () => {
+  it('gera chave comparável entre nome e slug de escolas', () => {
+    expect(normalizeSchoolKey('Química Fácil')).toBe('quimica-facil')
+    expect(normalizeSchoolKey('  QUIMICA facil  ')).toBe('quimica-facil')
+  })
+
+  it('retorna null para valores sem chave útil', () => {
+    expect(normalizeSchoolKey('')).toBeNull()
+    expect(normalizeSchoolKey(null)).toBeNull()
   })
 })

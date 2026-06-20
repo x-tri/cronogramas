@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 // Leitura cruzada (sem juntar bancos): cronograma/atendimento vem do PRIMARY (supabase),
-// alcance/simulado vem do LEGACY de gabaritos (simuladoSupabase). Merge só na exibição, por school_id.
-import { simuladoSupabase } from "../../lib/simulado-supabase";
-import { coveragePercent, median } from "./executive-metrics";
+// alcance/simulado vem do LEGACY de gabaritos via Edge Function autenticada.
+// Merge só na exibição, por UUID quando bater e por slug/nome quando os bancos divergirem.
+import { coveragePercent, median, normalizeSchoolKey } from "./executive-metrics";
 import { SchoolDetailModal } from "./school-detail-modal";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -44,6 +44,7 @@ interface DailyCronograma {
 
 interface SchoolHealth {
   readonly school_id: string;
+  readonly primary_school_id: string | null;
   readonly name: string;
   readonly alunos_base: number;
   readonly alunos_com_simulado: number;
@@ -53,6 +54,33 @@ interface SchoolHealth {
   readonly blocos_criados: number;
   readonly downloads_listas: number;
   readonly escola_ativa: boolean;
+}
+
+interface SchoolActivityRow {
+  readonly school_id: string | null;
+  readonly escola: string | null;
+  readonly slug?: string | null;
+  readonly alunos_base?: number | null;
+  readonly alunos_com_simulado?: number | null;
+  readonly alunos_com_cronograma?: number | null;
+  readonly cronogramas_gerados?: number | null;
+  readonly blocos_criados?: number | null;
+  readonly downloads_listas?: number | null;
+  readonly escola_ativa?: boolean | null;
+}
+
+interface PrimarySchoolMetrics {
+  readonly primary_school_id: string | null;
+  readonly cronograma: number;
+  readonly cronogramas_gerados: number;
+  readonly blocos: number;
+}
+
+interface LegacyExecutivePayload {
+  readonly metrics: Record<string, unknown> | null;
+  readonly storage: Record<string, unknown> | null;
+  readonly schools: SchoolActivityRow[];
+  readonly source: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -138,6 +166,35 @@ function emptyDashboardStats(): DashboardStats {
 function toNumber(value: unknown): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function uniqueTextRefs(values: ReadonlyArray<unknown>): string[] {
+  return Array.from(
+    new Set(
+      values
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function schoolLookupKeys(row: {
+  readonly school_id?: unknown;
+  readonly escola?: unknown;
+  readonly slug?: unknown;
+}): string[] {
+  const keys: string[] = [];
+  if (typeof row.school_id === "string" && row.school_id.trim()) {
+    keys.push(`id:${row.school_id.trim()}`);
+  }
+
+  for (const value of [row.slug, row.escola]) {
+    const normalized = normalizeSchoolKey(value);
+    if (normalized) keys.push(`key:${normalized}`);
+  }
+
+  return Array.from(new Set(keys));
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
@@ -236,46 +293,83 @@ export function DashboardHome({
   const [loading, setLoading] = useState(true);
   const isSchoolScoped = userRole !== "super_admin" && Boolean(userSchoolId);
 
-  const loadScopedStudentIds = useCallback(async (): Promise<string[]> => {
+  const loadLegacyExecutiveMetrics = useCallback(async (params: {
+    schoolId?: string | null;
+    includeSchoolHealth?: boolean;
+  }): Promise<LegacyExecutivePayload> => {
+    try {
+      const { data, error } = await supabase.functions.invoke("get-executive-legacy-metrics", {
+        body: {
+          school_id: params.schoolId ?? null,
+          include_school_health: params.includeSchoolHealth ?? false,
+        },
+      });
+
+      if (error) {
+        console.error("[DashboardHome] Falha ao carregar métricas históricas do LEGACY", error);
+        return { metrics: null, storage: null, schools: [], source: "fallback" };
+      }
+
+      if (!data || typeof data !== "object") {
+        return { metrics: null, storage: null, schools: [], source: "fallback" };
+      }
+
+      const payload = data as {
+        readonly metrics?: Record<string, unknown> | null;
+        readonly storage?: Record<string, unknown> | null;
+        readonly schools?: SchoolActivityRow[];
+        readonly source?: string;
+      };
+
+      return {
+        metrics: payload.metrics ?? null,
+        storage: payload.storage ?? null,
+        schools: Array.isArray(payload.schools) ? payload.schools : [],
+        source: payload.source ?? "legacy",
+      };
+    } catch (error) {
+      console.error("[DashboardHome] Falha ao carregar métricas históricas do LEGACY", error);
+      return { metrics: null, storage: null, schools: [], source: "fallback" };
+    }
+  }, []);
+
+  const loadScopedStudentRefs = useCallback(async (): Promise<string[]> => {
     if (!userSchoolId) {
       return [];
     }
 
     const { data } = await supabase
       .from("students")
-      .select("matricula")
+      .select("id, matricula")
       .eq("school_id", userSchoolId);
 
-    return (data ?? [])
-      .map((student) => student.matricula)
-      .filter(
-        (matricula): matricula is string =>
-          typeof matricula === "string" && matricula.trim().length > 0,
-      );
+    return uniqueTextRefs((data ?? []).flatMap((student) => [student.id, student.matricula]));
   }, [userSchoolId]);
 
   const countScopedCronogramas = useCallback(async (params?: {
-    studentIds?: string[];
+    studentRefs?: string[];
     since?: string;
     until?: string;
+    dateColumn?: "created_at" | "updated_at";
   }): Promise<number> => {
-    const studentIds = params?.studentIds ?? [];
+    const studentRefs = params?.studentRefs ?? [];
+    const dateColumn = params?.dateColumn ?? "updated_at";
 
-    if (studentIds.length === 0) {
+    if (studentRefs.length === 0) {
       return 0;
     }
 
     let query = supabase
       .from("cronogramas")
-      .select("id", { count: "exact" })
-      .in("aluno_id", studentIds);
+      .select("id", { count: "exact", head: true })
+      .in("aluno_id", studentRefs);
 
     if (params?.since) {
-      query = query.gte("updated_at", params.since);
+      query = query.gte(dateColumn, params.since);
     }
 
     if (params?.until) {
-      query = query.lt("updated_at", params.until);
+      query = query.lt(dateColumn, params.until);
     }
 
     const { count } = await query;
@@ -284,61 +378,76 @@ export function DashboardHome({
 
   const loadStats = useCallback(async () => {
     // PRIMARY = produção real (cronograma, blocos). LEGACY = alcance (simulado, base, downloads).
+    const scopedStudentRefs =
+      isSchoolScoped && userSchoolId ? await loadScopedStudentRefs() : [];
+
     const primaryQuery =
       isSchoolScoped && userSchoolId
         ? supabase
-            .from("executive_school_activity")
-            .select("*")
-            .eq("school_id", userSchoolId)
+            .rpc("get_executive_school_activity", {
+              p_school_id: userSchoolId,
+              p_only_active: false,
+            })
             .maybeSingle()
-        : supabase.from("executive_operation_metrics").select("*").maybeSingle();
-    const legacyQuery =
-      isSchoolScoped && userSchoolId
-        ? simuladoSupabase
-            .from("executive_school_activity")
-            .select("*")
-            .eq("school_id", userSchoolId)
-            .maybeSingle()
-        : simuladoSupabase.from("executive_operation_metrics").select("*").maybeSingle();
+        : supabase.rpc("get_executive_operation_metrics").maybeSingle();
+    const legacyQuery = loadLegacyExecutiveMetrics({
+      schoolId: isSchoolScoped && userSchoolId ? userSchoolId : null,
+      includeSchoolHealth: false,
+    });
 
-    const [primaryRes, legacyRes, storageRes, primaryStorageRes, blocosDistRes, todayRes, weekRes] = await Promise.all([
+    const [primaryRes, legacyPayload, primaryStorageRes, blocosDistRes] = await Promise.all([
       primaryQuery,
       legacyQuery,
-      simuladoSupabase.from("executive_storage_metrics").select("*").maybeSingle(),
-      supabase.from("executive_storage_metrics").select("*").maybeSingle(),
-      // mediana de blocos por aluno (sem filtro de escola — só visão global)
+      supabase.rpc("get_executive_storage_metrics").maybeSingle(),
+      // Mediana global sem expor aluno_id; o RPC valida super_admin no banco.
       isSchoolScoped
         ? Promise.resolve({ data: null, error: null })
-        : supabase.from("executive_blocos_por_aluno").select("blocos"),
-      supabase
+        : supabase.rpc("get_executive_blocos_distribution"),
+    ]);
+
+    const countGlobalCronogramas = async (since: string, label: string): Promise<number> => {
+      const { count, error } = await supabase
         .from("cronogramas")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", startOfDay(0)),
-      supabase
-        .from("cronogramas")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", startOfDay(7)),
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", since);
+
+      if (error) {
+        console.error(`[DashboardHome] Falha ao contar cronogramas ${label}`, error);
+      }
+
+      return count ?? 0;
+    };
+
+    const [cronogramasToday, cronogramasWeek] = await Promise.all([
+      isSchoolScoped
+        ? countScopedCronogramas({
+            studentRefs: scopedStudentRefs,
+            since: startOfDay(0),
+            dateColumn: "created_at",
+          })
+        : countGlobalCronogramas(startOfDay(0), "de hoje"),
+      isSchoolScoped
+        ? countScopedCronogramas({
+            studentRefs: scopedStudentRefs,
+            since: startOfDay(7),
+            dateColumn: "created_at",
+          })
+        : countGlobalCronogramas(startOfDay(7), "da semana"),
     ]);
 
     if (primaryRes.error) {
       console.error("[DashboardHome] Falha ao carregar métricas de cronograma (PRIMARY)", primaryRes.error);
     }
-    if (legacyRes.error) {
-      console.error("[DashboardHome] Falha ao carregar métricas de simulado/alcance (LEGACY)", legacyRes.error);
+    if (primaryStorageRes.error) {
+      console.error("[DashboardHome] Falha ao carregar storage do PRIMARY", primaryStorageRes.error);
     }
-    if (storageRes.error) {
-      console.error("[DashboardHome] Falha ao carregar métricas de storage", storageRes.error);
-    }
-    if (todayRes.error) {
-      console.error("[DashboardHome] Falha ao contar cronogramas de hoje", todayRes.error);
-    }
-    if (weekRes.error) {
-      console.error("[DashboardHome] Falha ao contar cronogramas da semana", weekRes.error);
+    if (blocosDistRes.error) {
+      console.error("[DashboardHome] Falha ao carregar distribuição de blocos", blocosDistRes.error);
     }
 
     const primary = primaryRes.data as Record<string, unknown> | null; // cronograma (PRIMARY)
-    const legacy = legacyRes.data as Record<string, unknown> | null; // simulado/alcance (LEGACY)
-    const storage = storageRes.data as Record<string, unknown> | null;
+    const legacy = legacyPayload.metrics ?? primary; // simulado/alcance (LEGACY; PRIMARY só fallback)
+    const storage = legacyPayload.storage;
     const primaryStorage = primaryStorageRes.data as Record<string, unknown> | null;
     const blocosPorAluno = ((blocosDistRes.data ?? []) as Array<{ blocos: number }>).map(
       (row) => row.blocos,
@@ -366,10 +475,16 @@ export function DashboardHome({
       storage_objects: toNumber(storage?.storage_objects) + toNumber(primaryStorage?.storage_objects),
       storage_bytes: toNumber(storage?.storage_bytes) + toNumber(primaryStorage?.storage_bytes),
       mediana_blocos: median(blocosPorAluno),
-      cronogramas_today: todayRes.count ?? 0,
-      cronogramas_week: weekRes.count ?? 0,
+      cronogramas_today: cronogramasToday,
+      cronogramas_week: cronogramasWeek,
     });
-  }, [isSchoolScoped, userSchoolId]);
+  }, [
+    countScopedCronogramas,
+    isSchoolScoped,
+    loadLegacyExecutiveMetrics,
+    loadScopedStudentRefs,
+    userSchoolId,
+  ]);
 
   const loadActivities = useCallback(async () => {
     const since = activityPeriod === "24h" ? startOfDay(1) : startOfDay(7);
@@ -389,8 +504,8 @@ export function DashboardHome({
   }, [activityPeriod, isSchoolScoped, userSchoolId]);
 
   const loadChartData = useCallback(async () => {
-    const scopedStudentIds =
-      isSchoolScoped && userSchoolId ? await loadScopedStudentIds() : [];
+    const scopedStudentRefs =
+      isSchoolScoped && userSchoolId ? await loadScopedStudentRefs() : [];
 
     const days: DailyCronograma[] = [];
     for (let i = 6; i >= 0; i--) {
@@ -400,7 +515,7 @@ export function DashboardHome({
       const count =
         isSchoolScoped && userSchoolId
           ? await countScopedCronogramas({
-              studentIds: scopedStudentIds,
+              studentRefs: scopedStudentRefs,
               since: dayStart,
               until: dayEnd,
             })
@@ -418,69 +533,70 @@ export function DashboardHome({
       days.push({ date: d.toISOString(), count });
     }
     setChartData(days);
-  }, [countScopedCronogramas, isSchoolScoped, loadScopedStudentIds, userSchoolId]);
+  }, [countScopedCronogramas, isSchoolScoped, loadScopedStudentRefs, userSchoolId]);
 
   const loadSchoolHealth = useCallback(async () => {
     // LEGACY: alcance por escola (base, simulado, downloads, nome) — mantém TODAS as escolas
     // que fizeram simulado, mesmo sem cronograma. PRIMARY: cronograma/blocos reais, sobrepostos.
-    let legacyQuery = simuladoSupabase
-      .from("executive_school_activity")
-      .select("school_id, escola, alunos_base, alunos_com_simulado, downloads_listas, escola_ativa");
-    let primaryQuery = supabase
-      .from("executive_school_activity")
-      .select("school_id, alunos_com_cronograma, cronogramas_gerados, blocos_criados");
+    const legacyQuery = loadLegacyExecutiveMetrics({
+      schoolId: isSchoolScoped && userSchoolId ? userSchoolId : null,
+      includeSchoolHealth: true,
+    });
+    const primaryQuery = supabase.rpc("get_executive_school_activity", {
+      p_school_id: isSchoolScoped && userSchoolId ? userSchoolId : null,
+      p_only_active: false,
+    });
 
-    if (isSchoolScoped && userSchoolId) {
-      legacyQuery = legacyQuery.eq("school_id", userSchoolId);
-      primaryQuery = primaryQuery.eq("school_id", userSchoolId);
-    } else {
-      legacyQuery = legacyQuery.eq("escola_ativa", true);
-    }
+    const [legacyPayload, primaryRes] = await Promise.all([legacyQuery, primaryQuery]);
 
-    const [legacyRes, primaryRes] = await Promise.all([legacyQuery, primaryQuery]);
-
-    if (legacyRes.error) {
-      console.error("[DashboardHome] Falha ao carregar alcance das escolas (LEGACY)", legacyRes.error);
-      setSchoolHealth([]);
-      return;
-    }
     if (primaryRes.error) {
       console.error("[DashboardHome] Falha ao carregar cronograma das escolas (PRIMARY)", primaryRes.error);
     }
 
-    const cronogramaBySchool = new Map<
-      string,
-      { cronograma: number; cronogramas_gerados: number; blocos: number }
-    >();
-    for (const row of primaryRes.data ?? []) {
-      cronogramaBySchool.set(String(row.school_id), {
+    const primaryRows = (primaryRes.data ?? []) as SchoolActivityRow[];
+    const cronogramaBySchool = new Map<string, PrimarySchoolMetrics>();
+    for (const row of primaryRows) {
+      const metric: PrimarySchoolMetrics = {
+        primary_school_id: typeof row.school_id === "string" ? row.school_id : null,
         cronograma: toNumber(row.alunos_com_cronograma),
         cronogramas_gerados: toNumber(row.cronogramas_gerados),
         blocos: toNumber(row.blocos_criados),
-      });
+      };
+
+      for (const key of schoolLookupKeys(row)) {
+        if (!cronogramaBySchool.has(key)) {
+          cronogramaBySchool.set(key, metric);
+        }
+      }
     }
 
-    const merged: SchoolHealth[] = (legacyRes.data ?? [])
+    const legacyRows = legacyPayload.schools.length > 0 ? legacyPayload.schools : primaryRows;
+    const merged: SchoolHealth[] = legacyRows
       .filter((school) => !/^teste/i.test(String(school.escola ?? "").trim()))
       .map((school) => {
-      const cron = cronogramaBySchool.get(String(school.school_id)) ?? {
-        cronograma: 0,
-        cronogramas_gerados: 0,
-        blocos: 0,
-      };
-      return {
-        school_id: String(school.school_id),
-        name: String(school.escola),
-        alunos_base: toNumber(school.alunos_base),
-        alunos_com_simulado: toNumber(school.alunos_com_simulado),
-        alunos_com_cronograma: cron.cronograma,
-        alunos_atendidos: cron.cronograma, // atendido = cronograma (PRIMARY), não simulado
-        cronogramas_gerados: cron.cronogramas_gerados,
-        blocos_criados: cron.blocos,
-        downloads_listas: toNumber(school.downloads_listas),
-        escola_ativa: Boolean(school.escola_ativa),
-      };
-    });
+        const cron = schoolLookupKeys(school)
+          .map((key) => cronogramaBySchool.get(key))
+          .find((value): value is PrimarySchoolMetrics => Boolean(value)) ?? {
+            primary_school_id: null,
+            cronograma: 0,
+            cronogramas_gerados: 0,
+            blocos: 0,
+          };
+
+        return {
+          school_id: String(school.school_id ?? school.slug ?? school.escola),
+          primary_school_id: cron.primary_school_id,
+          name: String(school.escola ?? "Escola sem nome"),
+          alunos_base: toNumber(school.alunos_base),
+          alunos_com_simulado: toNumber(school.alunos_com_simulado),
+          alunos_com_cronograma: cron.cronograma,
+          alunos_atendidos: cron.cronograma, // atendido = cronograma (PRIMARY), não simulado
+          cronogramas_gerados: cron.cronogramas_gerados,
+          blocos_criados: cron.blocos,
+          downloads_listas: toNumber(school.downloads_listas),
+          escola_ativa: Boolean(school.escola_ativa),
+        };
+      });
 
     // Atendimento (cronograma) primeiro; depois alcance (simulado).
     merged.sort(
@@ -490,7 +606,7 @@ export function DashboardHome({
     );
 
     setSchoolHealth(merged);
-  }, [isSchoolScoped, userSchoolId]);
+  }, [isSchoolScoped, loadLegacyExecutiveMetrics, userSchoolId]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {

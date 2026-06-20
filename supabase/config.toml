@@ -16,3 +16,14 @@ verify_jwt = false
 #   - Ou exige user JWT cujo sub == students.profile_id
 [functions.get-student-performance]
 verify_jwt = false
+
+# get-executive-legacy-metrics: verify_jwt=false pelo mesmo motivo dos fluxos
+# acima. A função valida internamente o Authorization no PRIMARY e consulta o
+# LEGACY com service_role server-side, sem depender de sessão duplicada no browser.
+[functions.get-executive-legacy-metrics]
+verify_jwt = false
+
+# Fonte LEGACY chamada apenas pela função PRIMARY acima via segredo interno.
+# Também usa validação interna porque o gateway rejeita chaves ES256 antes do handler.
+[functions.get-executive-legacy-metrics-source]
+verify_jwt = false

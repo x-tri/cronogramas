@@ -4,9 +4,9 @@ import { buildAtendimentos } from './school-detail'
 
 describe('buildAtendimentos', () => {
   const students = [
-    { matricula: '001', name: 'Ana', turma: 'Turma 300' },
-    { matricula: '002', name: 'Bia', turma: 'Turma 301' },
-    { matricula: '003', name: 'Caio', turma: 'Turma 300' },
+    { id: 'uuid-001', matricula: '001', name: 'Ana', turma: 'Turma 300' },
+    { id: 'uuid-002', matricula: '002', name: 'Bia', turma: 'Turma 301' },
+    { id: 'uuid-003', matricula: '003', name: 'Caio', turma: 'Turma 300' },
   ]
 
   it('só inclui alunos com cronograma, com a data do mais recente', () => {
@@ -23,11 +23,24 @@ describe('buildAtendimentos', () => {
 
   it('aluno sem nome cai na matrícula; sem turma vira "-"', () => {
     const atendimentos = buildAtendimentos(
-      [{ matricula: '009', name: null, turma: null }],
+      [{ id: 'uuid-009', matricula: '009', name: null, turma: null }],
       [{ aluno_id: '009', updated_at: '2026-06-12T08:00:00Z' }],
     )
 
     expect(atendimentos[0]).toMatchObject({ nome: '009', turma: '-' })
+  })
+
+  it('também reconhece cronogramas vinculados pelo UUID do aluno', () => {
+    const atendimentos = buildAtendimentos(students, [
+      { aluno_id: 'uuid-002', updated_at: '2026-06-13T08:00:00Z' },
+    ])
+
+    expect(atendimentos).toHaveLength(1)
+    expect(atendimentos[0]).toMatchObject({
+      matricula: '002',
+      nome: 'Bia',
+      ultimoCronograma: '2026-06-13T08:00:00Z',
+    })
   })
 
   it('sem cronogramas retorna vazio', () => {
