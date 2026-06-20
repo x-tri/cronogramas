@@ -48,6 +48,7 @@ function safeFilename(value: string): string {
 export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): ReactElement {
   const [loading, setLoading] = useState(true)
   const [generatingReport, setGeneratingReport] = useState(false)
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null)
   const [atendimentos, setAtendimentos] = useState<Atendimento[]>([])
   const [mentores, setMentores] = useState<MentorEngagementRow[]>([])
   const [pdfsPorTipo, setPdfsPorTipo] = useState<Record<string, number>>({})
@@ -138,6 +139,7 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
 
   const handleDownloadReport = async () => {
     setGeneratingReport(true)
+    setReportFeedback(null)
     try {
       const { createElement } = await import('react')
       const { pdf } = await import('@react-pdf/renderer')
@@ -151,17 +153,30 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
         generatedAt,
       })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const blob = await pdf(doc as any).toBlob()
-      const url = URL.createObjectURL(blob)
+      const generatedBlob = await pdf(doc as any).toBlob()
       const date = generatedAt.toISOString().slice(0, 10)
       const filename = `relatorio-escola-${safeFilename(school.name)}-${date}.pdf`
+      const pdfBlob =
+        generatedBlob.type === 'application/pdf'
+          ? generatedBlob
+          : new Blob([generatedBlob], { type: 'application/pdf' })
+      const file = new File([pdfBlob], filename, { type: 'application/pdf' })
+      const url = URL.createObjectURL(file)
       const link = document.createElement('a')
       link.href = url
       link.download = filename
+      link.rel = 'noopener'
+      link.style.display = 'none'
+      document.body.appendChild(link)
       link.click()
-      URL.revokeObjectURL(url)
+      setReportFeedback(`PDF gerado: ${filename}`)
+      window.setTimeout(() => {
+        URL.revokeObjectURL(url)
+        link.remove()
+      }, 30_000)
     } catch (error) {
       console.error('[SchoolDetailModal] Falha ao gerar relatório da escola:', error)
+      setReportFeedback(null)
       window.alert('Não consegui gerar o PDF agora. Tente novamente em instantes.')
     } finally {
       setGeneratingReport(false)
@@ -186,6 +201,9 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
               Detalhes da escola
             </p>
             <h2 className="mt-1 text-base font-semibold text-[#1d1d1f]">{school.name}</h2>
+            {reportFeedback && (
+              <p className="mt-1 text-xs font-medium text-[#15803d]">{reportFeedback}</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
