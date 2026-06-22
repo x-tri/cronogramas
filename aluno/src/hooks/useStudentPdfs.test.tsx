@@ -17,6 +17,10 @@ interface PdfRow {
 let pdfRows: PdfRow[] = [];
 let signedError: { message: string } | null = null;
 
+const supabaseMocks = vi.hoisted(() => ({
+  createSignedUrl: vi.fn(),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: vi.fn(() => ({
@@ -30,13 +34,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     })),
     storage: {
       from: vi.fn(() => ({
-        createSignedUrl: vi.fn(() =>
-          Promise.resolve(
-            signedError
-              ? { data: null, error: signedError }
-              : { data: { signedUrl: "https://signed.local/pdf" }, error: null },
-          ),
-        ),
+        createSignedUrl: supabaseMocks.createSignedUrl,
       })),
     },
   },
@@ -68,6 +66,14 @@ describe("useStudentPdfs", () => {
       },
     ];
     signedError = null;
+    supabaseMocks.createSignedUrl.mockReset();
+    supabaseMocks.createSignedUrl.mockImplementation(() =>
+      Promise.resolve(
+        signedError
+          ? { data: null, error: signedError }
+          : { data: { signedUrl: "https://signed.local/pdf" }, error: null },
+      ),
+    );
   });
 
   it("retorna PDF com URL assinada quando storage permite acesso", async () => {
@@ -76,6 +82,9 @@ describe("useStudentPdfs", () => {
     const payload = await screen.findByTestId("payload");
 
     expect(payload.textContent).toContain("https://signed.local/pdf");
+    expect(supabaseMocks.createSignedUrl).toHaveBeenCalledWith("school/C/caderno.pdf", 3600, {
+      download: "caderno.pdf",
+    });
   });
 
   it("mantem o PDF visivel mesmo quando a signed URL falha", async () => {

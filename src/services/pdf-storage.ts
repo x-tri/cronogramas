@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
 import { logAudit } from "./audit";
 import { getCurrentProjectUser } from "../lib/project-user";
+import { ensurePdfFilename } from "../lib/pdf-download";
 
 const BUCKET = "cronogramas-pdf";
 
@@ -20,12 +21,13 @@ export async function getSignedPdfUrl(
   ttlSeconds: number = SIGNED_URL_TTL_SECONDS,
   options?: { downloadAs?: string },
 ): Promise<string | null> {
+  const downloadAs = options?.downloadAs ? ensurePdfFilename(options.downloadAs) : undefined;
   const { data, error } = await supabase.storage
     .from(BUCKET)
     .createSignedUrl(
       storagePath,
       ttlSeconds,
-      options?.downloadAs ? { download: options.downloadAs } : undefined,
+      downloadAs ? { download: downloadAs } : undefined,
     );
 
   if (error || !data?.signedUrl) {
@@ -75,7 +77,7 @@ export function buildPdfStoragePath(params: {
   readonly filename: string;
 }): string {
   const turmaFolder = sanitizeStorageSegment(params.turma ?? "sem-turma", "sem-turma");
-  const storageFilename = sanitizeStorageSegment(params.filename, "arquivo.pdf");
+  const storageFilename = sanitizeStorageSegment(ensurePdfFilename(params.filename), "arquivo.pdf");
   return `${params.schoolId ?? "sem-escola"}/${turmaFolder}/${storageFilename}`;
 }
 
@@ -146,6 +148,7 @@ export async function uploadPdf({
   matricula,
   tipo = "cronograma",
 }: UploadPdfParams): Promise<{ url: string; path: string; historyId: string | null; schoolId: string | null } | null> {
+  const safeFilename = ensurePdfFilename(filename);
   const resolvedSchoolId = await resolveSchoolId({
     schoolId,
     schoolName,
@@ -155,7 +158,7 @@ export async function uploadPdf({
   const storagePath = buildPdfStoragePath({
     schoolId: resolvedSchoolId,
     turma,
-    filename,
+    filename: safeFilename,
   });
 
   // Upload to storage (upsert to overwrite if same week)
@@ -173,7 +176,7 @@ export async function uploadPdf({
 
   // Gera signed URL (bucket é privado — CRITICAL 1).
   // Se falhar, segue com upload registrado, retornando URL vazia em último caso.
-  const signedUrl = await getSignedPdfUrl(storagePath);
+  const signedUrl = await getSignedPdfUrl(storagePath, undefined, { downloadAs: safeFilename });
 
   // Registra no historico. Sem isso o PDF existe no storage, mas nao aparece
   // no portal do aluno nem na auditoria do coordenador.
@@ -198,7 +201,7 @@ export async function uploadPdf({
     turma,
     matricula,
     tipo,
-    filename,
+    filename: safeFilename,
     storage_path: storagePath,
     file_size: blob.size,
   };
@@ -223,7 +226,7 @@ export async function uploadPdf({
     return null;
   }
 
-  logAudit("generate_pdf", "pdf", filename, {
+  logAudit("generate_pdf", "pdf", safeFilename, {
     aluno: alunoNome,
     turma,
     schoolId: resolvedSchoolId,

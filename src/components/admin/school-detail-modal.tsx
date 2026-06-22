@@ -11,6 +11,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 
 import { supabase } from '../../lib/supabase'
 import { formatDateShortBR } from '../../lib/format-date'
+import { saveBlobAsFile } from '../../lib/pdf-download'
 import { PDF_TYPE_LABELS } from './pdf-types'
 import {
   daysSinceLogin,
@@ -290,24 +291,8 @@ export function SchoolDetailModal({ school, onClose }: SchoolDetailModalProps): 
       const generatedBlob = await pdf(doc as any).toBlob()
       const date = generatedAt.toISOString().slice(0, 10)
       const filename = `relatorio-escola-${safeFilename(school.name)}-${date}.pdf`
-      const pdfBlob =
-        generatedBlob.type === 'application/pdf'
-          ? generatedBlob
-          : new Blob([generatedBlob], { type: 'application/pdf' })
-      const file = new File([pdfBlob], filename, { type: 'application/pdf' })
-      const url = URL.createObjectURL(file)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      link.rel = 'noopener'
-      link.style.display = 'none'
-      document.body.appendChild(link)
-      link.click()
+      saveBlobAsFile(generatedBlob, filename)
       setReportFeedback(`PDF gerado: ${filename}`)
-      window.setTimeout(() => {
-        URL.revokeObjectURL(url)
-        link.remove()
-      }, 30_000)
     } catch (error) {
       console.error('[SchoolDetailModal] Falha ao gerar relatório da escola:', error)
       setReportFeedback(null)

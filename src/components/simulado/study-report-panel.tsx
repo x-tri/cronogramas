@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { StudyReport } from '../../services/study-report'
+import { saveBlobAsFile } from '../../lib/pdf-download'
 
 interface StudyReportPanelProps {
   report: StudyReport
@@ -63,12 +64,7 @@ export function StudyReportPanel({ report, nomeAluno, simuladoTitle = 'Simulado'
       const doc = createElement(StudyReportPDF, { report, nomeAluno, simuladoTitle })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const blob = await pdf(doc as any).toBlob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `relatorio-estudos-${(nomeAluno ?? 'aluno').toLowerCase().replace(/\s+/g, '-')}.pdf`
-      link.click()
-      URL.revokeObjectURL(url)
+      saveBlobAsFile(blob, `relatorio-estudos-${(nomeAluno ?? 'aluno').toLowerCase().replace(/\s+/g, '-')}.pdf`)
     } catch (err) {
       console.error('Erro ao gerar PDF:', err)
     } finally {

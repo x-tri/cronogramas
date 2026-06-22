@@ -66,6 +66,24 @@ describe('downloadAllSequential', () => {
     expect(result).toEqual({ ok: 2, failed: 0 })
   })
 
+  it('normaliza filename sem extensão antes de assinar e baixar', async () => {
+    const items = [
+      makeRecord({ id: 'a', storage_path: 'p/a.pdf', filename: 'uuid-sem-extensao' }),
+    ]
+    const getUrl = vi.fn(async () => 'https://signed/p/a.pdf')
+    const triggerDownload = vi.fn()
+
+    const result = await downloadAllSequential(items, {
+      getUrl,
+      triggerDownload,
+      delayMs: 0,
+    })
+
+    expect(getUrl).toHaveBeenCalledWith('p/a.pdf', 'uuid-sem-extensao.pdf')
+    expect(triggerDownload).toHaveBeenCalledWith('https://signed/p/a.pdf', 'uuid-sem-extensao.pdf')
+    expect(result).toEqual({ ok: 1, failed: 0 })
+  })
+
   it('triggerDownload assíncrono que retorna false conta como falha', async () => {
     const items = [
       makeRecord({ id: 'a', storage_path: 'p/a.pdf' }),

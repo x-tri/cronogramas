@@ -1,3 +1,4 @@
+import { useState, type MouseEvent } from "react";
 import { useStudentProfile } from "@/hooks/useStudentData";
 import { useNotifications, type StudentNotification } from "@/hooks/useNotifications";
 import { useGamification } from "@/hooks/useGamification";
@@ -6,6 +7,7 @@ import { useTrackPdfDownload } from "@/hooks/useTrackPdfDownload";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { downloadFileFromUrl, ensurePdfFilename } from "@/lib/pdf-download";
 import { Zap, Flame, ArrowRight, FileText, Download } from "lucide-react";
 
 const COLOR_MAP = {
@@ -189,23 +191,33 @@ interface PdfCardProps {
 }
 
 function PdfCard({ pdf, index, studentId, matricula, schoolId }: PdfCardProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
   const typeInfo = PDF_TYPE_LABELS[pdf.tipo] ?? { label: pdf.tipo.replace("_", " "), emoji: "📄" };
   const date = pdf.created_at
     ? new Date(pdf.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
     : "";
   const trackDownload = useTrackPdfDownload();
 
-  function handleClick(): void {
-    // Fire-and-forget: nao bloqueia a abertura do link.
-    // ON CONFLICT DO NOTHING preserva a primeira data registrada.
-    if (studentId && schoolId) {
+  async function handleClick(event: MouseEvent<HTMLAnchorElement>): Promise<void> {
+    event.preventDefault();
+    if (!pdf.url || isDownloading) return;
+
+    setIsDownloading(true);
+    const filename = ensurePdfFilename(pdf.filename, `${typeInfo.label}.pdf`);
+    const downloaded = await downloadFileFromUrl(pdf.url, filename);
+    setIsDownloading(false);
+
+    if (downloaded && studentId && schoolId) {
       trackDownload.mutate({
         pdfHistoryId: pdf.id,
         studentId,
         matricula,
         schoolId,
       });
+      return;
     }
+
+    window.open(pdf.url, "_blank", "noopener,noreferrer");
   }
 
   const content = (
@@ -216,7 +228,7 @@ function PdfCard({ pdf, index, studentId, matricula, schoolId }: PdfCardProps) {
           {typeInfo.label}
         </p>
         <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">
-          {date || "Material gerado"}
+          {isDownloading ? "Baixando PDF..." : date || "Material gerado"}
           {!pdf.url ? " · link indisponível" : ""}
         </p>
       </div>

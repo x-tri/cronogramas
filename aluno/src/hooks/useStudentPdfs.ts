@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ensurePdfFilename } from "@/lib/pdf-download";
 
 const BUCKET = "cronogramas-pdf";
 // 1 hora de validade — suficiente pra ver/baixar; URL nova em cada page load
@@ -47,7 +48,9 @@ export function useStudentPdfs(studentKey: string | undefined) {
         rows.map(async (row): Promise<StudentPdf | null> => {
           const { data: signed, error: sErr } = await supabase.storage
             .from(BUCKET)
-            .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS);
+            .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS, {
+              download: ensurePdfFilename(row.filename),
+            });
 
           if (sErr || !signed?.signedUrl) {
             console.warn("[student-pdfs] Falha ao assinar PDF:", row.id, sErr?.message);

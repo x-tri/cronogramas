@@ -2,6 +2,7 @@
 // (pdf-student-history-drawer.tsx) para testabilidade e Fast Refresh.
 
 import type { PdfRecord } from './pdf-types'
+import { ensurePdfFilename } from '../../lib/pdf-download'
 
 export function selectStudentHistory(
   records: readonly PdfRecord[],
@@ -42,9 +43,10 @@ export async function downloadAllSequential(
   let failed = 0
 
   for (const [index, item] of items.entries()) {
-    const url = await deps.getUrl(item.storage_path, item.filename)
+    const filename = ensurePdfFilename(item.filename)
+    const url = await deps.getUrl(item.storage_path, filename)
     if (url) {
-      const downloaded = await deps.triggerDownload(url, item.filename)
+      const downloaded = await deps.triggerDownload(url, filename)
       if (downloaded === false) {
         failed += 1
       } else {

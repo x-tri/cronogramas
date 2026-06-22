@@ -3,6 +3,7 @@ import { useCronogramaStore } from '../../stores/cronograma-store'
 import { getWeekBounds } from '../week-utils'
 import type { SimuladoResult } from '../../types/supabase'
 import { uploadPdf } from '../../services/pdf-storage'
+import { saveBlobAsFile } from '../../lib/pdf-download'
 
 type PdfDeps = [
   typeof import('@react-pdf/renderer'),
@@ -125,12 +126,7 @@ export function ShareDropdown({ variant = 'default' }: { variant?: 'default' | '
   }
 
   const downloadBlob = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    link.click()
-    URL.revokeObjectURL(url)
+    saveBlobAsFile(blob, filename)
   }
 
   const getFilename = () => {

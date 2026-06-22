@@ -16,6 +16,7 @@ import {
   ReportLoadingSkeleton,
 } from './report'
 import { uploadPdf } from '../../services/pdf-storage'
+import { saveBlobAsFile } from '../../lib/pdf-download'
 
 interface RelatorioCirurgicoProps {
   readonly report: ReportData | null
@@ -267,17 +268,12 @@ export function RelatorioCirurgico({
       })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const blob = await pdf(doc as any).toBlob()
-      const url = URL.createObjectURL(blob)
       const filename = `relatorio-desempenho-${nomeAluno.toLowerCase().replace(/\s+/g, '-')}.pdf`
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      link.click()
+      saveBlobAsFile(blob, filename)
       const saved = await saveGeneratedPdf({ blob, filename, tipo: 'relatorio' })
       if (saved === null) {
         window.alert('O relatório foi baixado, mas não consegui registrar no portal do aluno. Gere novamente ou confira permissões do PDF.')
       }
-      URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Erro ao gerar PDF do relatorio:', err)
     } finally {
@@ -307,12 +303,8 @@ export function RelatorioCirurgico({
       })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const blob = await pdf(doc as any).toBlob()
-      const url = URL.createObjectURL(blob)
       const filename = `caderno-questoes-${nomeAluno.toLowerCase().replace(/\s+/g, '-')}.pdf`
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      link.click()
+      saveBlobAsFile(blob, filename)
       const saved = await saveGeneratedPdf({ blob, filename, tipo: 'caderno_questoes' })
       if (saved === null) {
         window.alert('O caderno foi baixado, mas não consegui registrar no portal do aluno. Gere novamente ou confira permissões do PDF.')
@@ -338,7 +330,6 @@ export function RelatorioCirurgico({
           questoes: questoesEntregues,
         })
       }
-      URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Erro ao gerar PDF de questoes:', err)
     } finally {

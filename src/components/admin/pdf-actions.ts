@@ -3,20 +3,17 @@
 // (pdf-student-history-drawer.tsx) — fonte única para abrir/copiar/baixar.
 
 import { getSignedPdfUrl } from '../../services/pdf-storage'
+import {
+  downloadFileFromUrl as downloadPdfFromUrl,
+  ensurePdfFilename,
+  saveBlobAsFile as savePdfBlobAsFile,
+} from '../../lib/pdf-download'
 
 const LINK_ERROR_MESSAGE =
   'Não foi possível gerar o link. Verifique permissões no bucket.'
 
 export function saveBlobAsFile(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  // Revogação adiada: revogar síncrono pode abortar o download em alguns browsers
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  savePdfBlobAsFile(blob, filename)
 }
 
 /**
@@ -27,15 +24,7 @@ export function saveBlobAsFile(blob: Blob, filename: string): void {
  * extensão). Blob é same-origin, então o `download` é sempre respeitado.
  */
 export async function downloadFileFromUrl(url: string, filename: string): Promise<boolean> {
-  try {
-    const response = await fetch(url)
-    if (!response.ok) return false
-    const blob = await response.blob()
-    saveBlobAsFile(blob, filename)
-    return true
-  } catch {
-    return false
-  }
+  return downloadPdfFromUrl(url, filename)
 }
 
 export async function openPdfInNewTab(storagePath: string): Promise<void> {
@@ -61,11 +50,12 @@ export async function downloadPdfFile(
   storagePath: string,
   filename: string,
 ): Promise<void> {
-  const url = await getSignedPdfUrl(storagePath, undefined, { downloadAs: filename })
+  const safeFilename = ensurePdfFilename(filename)
+  const url = await getSignedPdfUrl(storagePath, undefined, { downloadAs: safeFilename })
   if (!url) {
     alert(LINK_ERROR_MESSAGE)
     return
   }
-  const ok = await downloadFileFromUrl(url, filename)
+  const ok = await downloadFileFromUrl(url, safeFilename)
   if (!ok) alert(LINK_ERROR_MESSAGE)
 }
