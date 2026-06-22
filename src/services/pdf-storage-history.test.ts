@@ -118,6 +118,7 @@ describe('uploadPdf — histórico sem duplicatas', () => {
     const result = await uploadPdf(UPLOAD_PARAMS)
 
     expect(result).not.toBeNull()
+    expect(result?.historyId).toBe('row-existente')
     const historyOps = tableCalls.filter((c) => c.table === 'pdf_history')
     expect(historyOps.map((c) => c.op)).toEqual(['update'])
   })

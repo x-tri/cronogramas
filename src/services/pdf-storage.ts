@@ -206,14 +206,24 @@ export async function uploadPdf({
     file_size: blob.size,
   };
 
-  const { data: historyRow, error: historyError } = existingRow?.id
-    ? await supabase
-        .from("pdf_history")
-        .update({ ...historyValues, created_at: new Date().toISOString() })
-        .eq("id", existingRow.id)
-        .select("id")
-        .maybeSingle()
-    : await supabase.from("pdf_history").insert(historyValues).select("id").maybeSingle();
+  let historyId = existingRow?.id ?? null;
+  let historyError: { message: string } | null = null;
+
+  if (existingRow?.id) {
+    const { error: updateError } = await supabase
+      .from("pdf_history")
+      .update({ ...historyValues, created_at: new Date().toISOString() })
+      .eq("id", existingRow.id);
+    historyError = updateError;
+  } else {
+    const { data: historyRow, error: insertError } = await supabase
+      .from("pdf_history")
+      .insert(historyValues)
+      .select("id")
+      .maybeSingle();
+    historyId = (historyRow?.id as string | undefined) ?? null;
+    historyError = insertError;
+  }
 
   if (historyError) {
     console.error("[pdf-storage] Falha ao registrar pdf_history:", historyError.message, {
@@ -236,7 +246,7 @@ export async function uploadPdf({
   return {
     url: signedUrl ?? "",
     path: storagePath,
-    historyId: (historyRow?.id as string | undefined) ?? existingRow?.id ?? null,
+    historyId,
     schoolId: resolvedSchoolId,
   };
 }
