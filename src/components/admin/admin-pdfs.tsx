@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { deletePdf, deleteAllSchoolPdfs } from "../../services/pdf-storage";
 import { useSchools } from "../../hooks/use-schools";
-import { copyPdfLink, openPdfInNewTab } from "./pdf-actions";
+import { copyPdfLink, downloadPdfFile } from "./pdf-actions";
 import { PdfStudentHistoryDrawer } from "./pdf-student-history-drawer";
 import { PDF_TYPE_LABELS, formatFileSize, type PdfRecord } from "./pdf-types";
 
@@ -292,7 +292,7 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
                       <div className="flex items-center justify-end gap-1">
                         {/* Download */}
                         <button
-                          onClick={() => void openPdfInNewTab(r.storage_path)}
+                          onClick={() => void downloadPdfFile(r.storage_path, r.filename)}
                           className="rounded p-1.5 text-[#2563eb] hover:bg-[#dbeafe] transition-colors"
                           title="Baixar (link temporário)"
                         >
