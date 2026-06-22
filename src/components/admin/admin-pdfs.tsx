@@ -302,7 +302,7 @@ export function AdminPdfs({ onBack, embedded, userRole, userSchoolId }: AdminPdf
                         </button>
                         {/* Copy link */}
                         <button
-                          onClick={() => void copyPdfLink(r.storage_path)}
+                          onClick={() => void copyPdfLink(r.storage_path, r.filename)}
                           className="rounded p-1.5 text-[#64748b] hover:bg-[#f1f5f9] transition-colors"
                           title="Copiar link (válido por 1 hora)"
                         >

@@ -4,11 +4,11 @@ export function ensurePdfFilename(filename: string | null | undefined, fallback 
   return /\.pdf$/i.test(base) ? base : `${base}.pdf`
 }
 
-export function saveBlobAsFile(blob: Blob, filename: string): string {
-  const safeFilename = ensurePdfFilename(filename)
-  const pdfBlob =
-    blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' })
-  const file = new File([pdfBlob], safeFilename, { type: 'application/pdf' })
+export function saveBlobAsDownload(blob: Blob, filename: string, mimeType?: string): string {
+  const safeFilename = filename.trim().length > 0 ? filename.trim() : 'download'
+  const finalBlob =
+    mimeType && blob.type !== mimeType ? new Blob([blob], { type: mimeType }) : blob
+  const file = new File([finalBlob], safeFilename, { type: mimeType ?? finalBlob.type })
   const url = URL.createObjectURL(file)
   const anchor = document.createElement('a')
   anchor.href = url
@@ -27,14 +27,24 @@ export function saveBlobAsFile(blob: Blob, filename: string): string {
   return safeFilename
 }
 
-export async function downloadFileFromUrl(url: string, filename: string): Promise<boolean> {
+export function saveBlobAsFile(blob: Blob, filename: string): string {
+  const safeFilename = ensurePdfFilename(filename)
+  return saveBlobAsDownload(blob, safeFilename, 'application/pdf')
+}
+
+export async function fetchBlobFromUrl(url: string): Promise<Blob | null> {
   try {
     const response = await fetch(url)
-    if (!response.ok) return false
-    const blob = await response.blob()
-    saveBlobAsFile(blob, filename)
-    return true
+    if (!response.ok) return null
+    return await response.blob()
   } catch {
-    return false
+    return null
   }
+}
+
+export async function downloadFileFromUrl(url: string, filename: string): Promise<boolean> {
+  const blob = await fetchBlobFromUrl(url)
+  if (!blob) return false
+  saveBlobAsFile(blob, filename)
+  return true
 }

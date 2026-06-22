@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { downloadFileFromUrl, ensurePdfFilename, saveBlobAsFile } from './pdf-download'
+import { downloadFileFromUrl, ensurePdfFilename, fetchBlobFromUrl, saveBlobAsFile } from './pdf-download'
 
 const createObjectURL = vi.fn(() => 'blob:pdf-download')
 const revokeObjectURL = vi.fn()
@@ -69,5 +69,16 @@ describe('pdf-download', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('https://signed.local/pdf')
     expect(createObjectURL).toHaveBeenCalledOnce()
+  })
+
+  it('retorna blob da URL assinada sem disparar download', async () => {
+    const blob = new Blob(['pdf'], { type: 'application/pdf' })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(blob),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchBlobFromUrl('https://signed.local/pdf')).resolves.toBe(blob)
   })
 })

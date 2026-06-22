@@ -6,6 +6,7 @@ import { getSignedPdfUrl } from '../../services/pdf-storage'
 import {
   downloadFileFromUrl as downloadPdfFromUrl,
   ensurePdfFilename,
+  fetchBlobFromUrl as fetchPdfBlobFromUrl,
   saveBlobAsFile as savePdfBlobAsFile,
 } from '../../lib/pdf-download'
 
@@ -27,6 +28,10 @@ export async function downloadFileFromUrl(url: string, filename: string): Promis
   return downloadPdfFromUrl(url, filename)
 }
 
+export async function fetchBlobFromUrl(url: string): Promise<Blob | null> {
+  return fetchPdfBlobFromUrl(url)
+}
+
 export async function openPdfInNewTab(storagePath: string): Promise<void> {
   const url = await getSignedPdfUrl(storagePath)
   if (!url) {
@@ -36,8 +41,13 @@ export async function openPdfInNewTab(storagePath: string): Promise<void> {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-export async function copyPdfLink(storagePath: string): Promise<void> {
-  const url = await getSignedPdfUrl(storagePath)
+export async function copyPdfLink(storagePath: string, filename?: string): Promise<void> {
+  const safeFilename = filename ? ensurePdfFilename(filename) : undefined
+  const url = await getSignedPdfUrl(
+    storagePath,
+    undefined,
+    safeFilename ? { downloadAs: safeFilename } : undefined,
+  )
   if (!url) {
     alert(LINK_ERROR_MESSAGE)
     return

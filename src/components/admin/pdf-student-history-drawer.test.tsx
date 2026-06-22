@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 
 import type { PdfRecord } from './pdf-types'
 import { PdfStudentHistoryDrawer } from './pdf-student-history-drawer'
-import { downloadAllSequential, selectStudentHistory } from './pdf-student-history'
+import { downloadAllAsZip, downloadAllSequential, selectStudentHistory } from './pdf-student-history'
 
 function makeRecord(overrides: Partial<PdfRecord>): PdfRecord {
   return {
@@ -120,6 +120,60 @@ describe('downloadAllSequential', () => {
   })
 })
 
+describe('downloadAllAsZip', () => {
+  it('baixa os PDFs e salva um ZIP unico', async () => {
+    const items = [
+      makeRecord({ id: 'a', storage_path: 'p/a.pdf', filename: 'a.pdf' }),
+      makeRecord({ id: 'b', storage_path: 'p/b.pdf', filename: 'uuid-sem-extensao' }),
+    ]
+    const getUrl = vi.fn(async (path: string) => `https://signed/${path}`)
+    const fetchBlob = vi.fn(async () => new Blob(['pdf'], { type: 'application/pdf' }))
+    const saveZip = vi.fn()
+    const progress: number[] = []
+
+    const result = await downloadAllAsZip(items, {
+      getUrl,
+      fetchBlob,
+      saveZip,
+      zipFilename: 'documentos-001.zip',
+      onProgress: (done) => progress.push(done),
+    })
+
+    expect(getUrl).toHaveBeenNthCalledWith(1, 'p/a.pdf', 'a.pdf')
+    expect(getUrl).toHaveBeenNthCalledWith(2, 'p/b.pdf', 'uuid-sem-extensao.pdf')
+    expect(saveZip).toHaveBeenCalledWith(
+      [
+        { filename: 'a.pdf', blob: expect.any(Blob) },
+        { filename: 'uuid-sem-extensao.pdf', blob: expect.any(Blob) },
+      ],
+      'documentos-001.zip',
+    )
+    expect(progress).toEqual([1, 2])
+    expect(result).toEqual({ ok: 2, failed: 0 })
+  })
+
+  it('continua quando um PDF nao baixa e salva ZIP com os demais', async () => {
+    const items = [
+      makeRecord({ id: 'a', storage_path: 'p/a.pdf', filename: 'a.pdf' }),
+      makeRecord({ id: 'b', storage_path: 'p/b.pdf', filename: 'b.pdf' }),
+    ]
+    const saveZip = vi.fn()
+
+    const result = await downloadAllAsZip(items, {
+      getUrl: async (path) => (path.includes('a.pdf') ? null : `https://signed/${path}`),
+      fetchBlob: async () => new Blob(['pdf'], { type: 'application/pdf' }),
+      saveZip,
+      zipFilename: 'documentos.zip',
+    })
+
+    expect(saveZip).toHaveBeenCalledWith(
+      [{ filename: 'b.pdf', blob: expect.any(Blob) }],
+      'documentos.zip',
+    )
+    expect(result).toEqual({ ok: 1, failed: 1 })
+  })
+})
+
 describe('PdfStudentHistoryDrawer', () => {
   it('mostra os documentos do aluno com tipo, badge de download e contadores', () => {
     const records = [
@@ -151,7 +205,7 @@ describe('PdfStudentHistoryDrawer', () => {
     expect(screen.getByText('Relatório de desempenho')).toBeInTheDocument()
     expect(screen.getByText('Caderno de questões')).toBeInTheDocument()
     expect(screen.queryByText('Outra Aluna')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /baixar tudo \(3\)/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /baixar tudo \(.zip\)/i })).toBeInTheDocument()
     // 1 baixado de 3
     expect(screen.getByText(/1 de 3 baixados/i)).toBeInTheDocument()
   })

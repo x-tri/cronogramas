@@ -12,8 +12,9 @@
 import { useEffect, useState, type ReactElement } from 'react'
 
 import { getSignedPdfUrl } from '../../services/pdf-storage'
-import { copyPdfLink, downloadFileFromUrl, downloadPdfFile } from './pdf-actions'
-import { downloadAllSequential, selectStudentHistory } from './pdf-student-history'
+import { copyPdfLink, downloadPdfFile, fetchBlobFromUrl } from './pdf-actions'
+import { saveBlobsAsZip } from '../../lib/zip-download'
+import { downloadAllAsZip, selectStudentHistory } from './pdf-student-history'
 import { PDF_TYPE_LABELS, formatFileSize, type PdfRecord } from './pdf-types'
 import { formatDateShortBR as formatDate } from '../../lib/format-date'
 
@@ -55,22 +56,25 @@ export function PdfStudentHistoryDrawer({
   const history = selectStudentHistory(records, alunoId)
   const student = history[0] ?? null
   const downloadedCount = history.filter((r) => r.download_count > 0).length
+  const zipFilename = `documentos-${student?.matricula ?? 'aluno'}-${new Date().toISOString().slice(0, 10)}.zip`
 
   async function handleDownloadAll() {
     setDownloading(true)
     setResultMessage(null)
     try {
-      const { ok, failed } = await downloadAllSequential(history, {
+      const { ok, failed } = await downloadAllAsZip(history, {
         getUrl: (path, filename) => getSignedPdfUrl(path, undefined, { downloadAs: filename }),
-        // fetch + blob same-origin: garante o nome do arquivo em todos os
-        // navegadores (ver downloadFileFromUrl)
-        triggerDownload: (url, filename) => downloadFileFromUrl(url, filename),
+        // ZIP único: evita bloqueio/renomeação incorreta de múltiplos downloads
+        // programáticos no Chrome e preserva o nome real de cada PDF.
+        fetchBlob: fetchBlobFromUrl,
+        saveZip: saveBlobsAsZip,
+        zipFilename,
         onProgress: (done, total) => setProgress({ done, total }),
       })
       setResultMessage(
         failed === 0
-          ? `${ok} documento${ok === 1 ? '' : 's'} baixado${ok === 1 ? '' : 's'}.`
-          : `${ok} de ${history.length} baixados (${failed} falhar${failed === 1 ? 'am' : 'am'}).`,
+          ? `${ok} documento${ok === 1 ? '' : 's'} no ZIP.`
+          : `${ok} de ${history.length} no ZIP (${failed} falhar${failed === 1 ? 'am' : 'am'}).`,
       )
     } finally {
       setDownloading(false)
@@ -83,7 +87,7 @@ export function PdfStudentHistoryDrawer({
   }
 
   async function handleCopyLink(record: PdfRecord) {
-    await copyPdfLink(record.storage_path)
+    await copyPdfLink(record.storage_path, record.filename)
   }
 
   return (
@@ -137,7 +141,7 @@ export function PdfStudentHistoryDrawer({
               </svg>
               {downloading && progress
                 ? `Baixando ${progress.done}/${progress.total}...`
-                : `Baixar tudo (${history.length})`}
+                : `Baixar tudo (.zip)`}
             </button>
             {resultMessage && (
               <span className="text-xs text-[#64748b]">{resultMessage}</span>

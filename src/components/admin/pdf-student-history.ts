@@ -3,6 +3,7 @@
 
 import type { PdfRecord } from './pdf-types'
 import { ensurePdfFilename } from '../../lib/pdf-download'
+import type { ZipEntryInput } from '../../lib/zip-download'
 
 export function selectStudentHistory(
   records: readonly PdfRecord[],
@@ -26,6 +27,14 @@ export interface DownloadAllDeps {
 export interface DownloadAllResult {
   ok: number
   failed: number
+}
+
+export interface DownloadAllAsZipDeps {
+  getUrl: (storagePath: string, filename: string) => Promise<string | null>
+  fetchBlob: (url: string) => Promise<Blob | null>
+  saveZip: (entries: readonly ZipEntryInput[], filename: string) => Promise<string> | string
+  zipFilename: string
+  onProgress?: (done: number, total: number) => void
 }
 
 function wait(ms: number): Promise<void> {
@@ -60,4 +69,32 @@ export async function downloadAllSequential(
   }
 
   return { ok, failed }
+}
+
+export async function downloadAllAsZip(
+  items: readonly PdfRecord[],
+  deps: DownloadAllAsZipDeps,
+): Promise<DownloadAllResult> {
+  let failed = 0
+  const zipEntries: ZipEntryInput[] = []
+
+  for (const [index, item] of items.entries()) {
+    const filename = ensurePdfFilename(item.filename)
+    const url = await deps.getUrl(item.storage_path, filename)
+    const blob = url ? await deps.fetchBlob(url) : null
+
+    if (blob) {
+      zipEntries.push({ filename, blob })
+    } else {
+      failed += 1
+    }
+
+    deps.onProgress?.(index + 1, items.length)
+  }
+
+  if (zipEntries.length > 0) {
+    await deps.saveZip(zipEntries, deps.zipFilename)
+  }
+
+  return { ok: zipEntries.length, failed }
 }
